@@ -1,0 +1,13 @@
+services:
+  elder-bot:
+    build: .
+    image: elder-bot
+    env_file: .env
+    environment:
+      DATABASE_PATH: /data/elder-bot.db
+    volumes:
+      - elder-bot-data:/data
+    restart: unless-stopped
+
+volumes:
+  elder-bot-data:
