@@ -68,8 +68,9 @@ export function formatDice(dice: number[]): string {
   const numbers = sorted.map((d) => (d >= 8 ? `**${d}**` : `${d}`)).join(' ');
   const faces = sorted.map((d) => diceEmoji(d));
   if (faces.some((f) => f === undefined)) return numbers;
-  // Big pools fall back to plain numbers so the field stays within Discord's limit.
-  const withFaces = `${faces.join('')}\n${numbers}`;
+  // A heading line makes Discord draw the emojis larger. Big pools fall back to plain
+  // numbers so the field stays within Discord's limit.
+  const withFaces = `## ${faces.join(' ')}\n${numbers}`;
   return withFaces.length <= FIELD_LIMIT ? withFaces : numbers;
 }
 
