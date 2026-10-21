@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { performRoll, type RollRequest } from '../src/game/roll.js';
 import { Store } from '../src/state/store.js';
 import { setDiceEmojis } from '../src/ui/diceEmojis.js';
-import { formatDice, rollMessage } from '../src/ui/format.js';
+import type { Locale } from '../src/i18n/index.js';
+import { formatDice, rollErrorText, rollMessage } from '../src/ui/format.js';
 
 const base: RollRequest = {
   channelId: 'c1',
@@ -16,14 +17,14 @@ const base: RollRequest = {
   applyTraits: true,
 };
 
-function render(request: RollRequest, dice: number[], quickening = 0) {
+function render(request: RollRequest, dice: number[], quickening = 0, locale: Locale = 'it') {
   const store = new Store(':memory:');
   store.setQuickening(request.channelId, request.userId, quickening);
   let i = 0;
   const response = performRoll(store, request, { roller: () => dice[i++ % dice.length]! });
   store.close();
-  if (response.kind === 'error') throw new Error(response.message);
-  const message = rollMessage(response, 'Andrea: salto sul tetto');
+  if (response.kind === 'error') throw new Error(rollErrorText(locale, response));
+  const message = rollMessage(locale, response, 'Andrea: salto sul tetto');
   return {
     content: message.content,
     embed: message.embeds[0]!.toJSON(),
@@ -58,12 +59,12 @@ describe('rollMessage', () => {
   });
 
   it("offers Devil's Bargain and Try again on a failure", () => {
-    const { buttons } = render(base, [5]);
+    const { buttons } = render(base, [5], 0, 'en');
     expect(buttons.map((b) => 'label' in b && b.label)).toEqual(["Devil's Bargain", 'Try again']);
   });
 
   it('lists Choose Your Pain on a painful failure, with a button per option', () => {
-    const { embed, buttons } = render(base, [1, 3]);
+    const { embed, buttons } = render(base, [1, 3], 0, 'en');
     expect(embed.fields?.map((f) => f.name)).toContain('Choose Your Pain');
     expect(buttons.map((b) => 'label' in b && b.label)).toEqual([
       'Lose 3 Vitae/Willpower',
@@ -74,22 +75,55 @@ describe('rollMessage', () => {
   });
 
   it('offers Lose all Quickening only to a player who has some', () => {
-    const { buttons } = render(base, [1, 3]);
+    const { buttons } = render(base, [1, 3], 0, 'en');
     expect(buttons.map((b) => 'label' in b && b.label)).not.toContain('Lose all Quickening');
-    const withQuickening = render(base, [1, 3], 2);
+    const withQuickening = render(base, [1, 3], 2, 'en');
     expect(withQuickening.buttons.map((b) => 'label' in b && b.label)).toContain(
       'Lose all Quickening',
     );
   });
 
   it('asks before rolling when Overqualified', () => {
-    const { buttons } = render({ ...base, dice: 6 }, [9]);
+    const { buttons } = render({ ...base, dice: 6 }, [9], 0, 'en');
     expect(buttons.map((b) => 'label' in b && b.label)).toEqual(['Take basic success', 'Roll']);
   });
 
   it('offers Accept failure at No Dice Left', () => {
-    const { buttons } = render({ ...base, dice: 0 }, [9]);
+    const { buttons } = render({ ...base, dice: 0 }, [9], 0, 'en');
     expect(buttons.map((b) => 'label' in b && b.label)).toEqual(['Accept failure']);
+  });
+
+  it('writes the roll in English, keeping the game terms', () => {
+    const { embed } = render(base, [10, 8, 2], 0, 'en');
+    expect(embed.description).toBe('3 dice + 1 bonus − Difficulty 1 = **3** dice');
+    expect(embed.fields?.find((f) => f.name === 'Dice')?.value).toBe('**10** **8** 2');
+    expect(embed.fields?.find((f) => f.name === 'Outcome')?.value).toBe(
+      '**Success** · 2 successes (1 extra)',
+    );
+  });
+
+  it('translates the buttons but not the game terms in Italian', () => {
+    const painful = render(base, [1, 3], 0, 'it');
+    expect(painful.buttons.map((b) => 'label' in b && b.label)).toEqual([
+      'Perdi 3 Vitae/Willpower',
+      'Segna Beast',
+      'Dai 1 Drama',
+      'Try again',
+    ]);
+    expect(painful.embed.fields?.find((f) => f.name === 'Choose Your Pain')?.value).toContain(
+      '- Perdi 3 Vitae o Willpower (a tua scelta)',
+    );
+    const failure = render(base, [5], 0, 'it');
+    expect(failure.buttons.map((b) => 'label' in b && b.label)).toEqual([
+      "Devil's Bargain",
+      'Try again',
+    ]);
+  });
+
+  it('uses the singular for one die and one success', () => {
+    const { embed } = render({ ...base, dice: 1, modifier: 0, difficulty: 0 }, [9], 0, 'it');
+    expect(embed.description).toBe('1 dado = **1** dado');
+    expect(embed.fields?.find((f) => f.name === 'Esito')?.value).toBe('**Success** · 1 successo');
   });
 });
 

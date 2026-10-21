@@ -42,6 +42,8 @@ export class Store {
       CREATE TABLE IF NOT EXISTS prolonged (
         channel_id TEXT NOT NULL, user_id TEXT NOT NULL, task TEXT NOT NULL,
         PRIMARY KEY (channel_id, user_id));
+      CREATE TABLE IF NOT EXISTS table_locale (
+        channel_id TEXT PRIMARY KEY, locale TEXT NOT NULL);
     `);
   }
 
@@ -135,6 +137,27 @@ export class Store {
       .run(channelId, userId);
   }
 
+  /** The language fixed for a table by /elder session language; undefined follows each user. */
+  getTableLocale(channelId: string): string | undefined {
+    const row = this.db
+      .prepare('SELECT locale FROM table_locale WHERE channel_id = ?')
+      .get(channelId) as { locale: string } | undefined;
+    return row?.locale;
+  }
+
+  setTableLocale(channelId: string, locale: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO table_locale (channel_id, locale) VALUES (?, ?)
+         ON CONFLICT (channel_id) DO UPDATE SET locale = excluded.locale`,
+      )
+      .run(channelId, locale);
+  }
+
+  clearTableLocale(channelId: string): void {
+    this.db.prepare('DELETE FROM table_locale WHERE channel_id = ?').run(channelId);
+  }
+
   getProlonged(channelId: string, userId: string): ProlongedTask | undefined {
     const row = this.db
       .prepare('SELECT task FROM prolonged WHERE channel_id = ? AND user_id = ?')
@@ -172,7 +195,7 @@ export class Store {
     })();
   }
 
-  /** End of the game at this table: everything is wiped, including who the Storyteller is. */
+  /** End of the game at this table: everything is wiped, including the Storyteller and the language. */
   endSession(channelId: string): void {
     this.db.transaction(() => {
       for (const table of [
@@ -182,6 +205,7 @@ export class Store {
         'bargains',
         'prolonged',
         'storytellers',
+        'table_locale',
       ]) {
         this.db.prepare(`DELETE FROM ${table} WHERE channel_id = ?`).run(channelId);
       }

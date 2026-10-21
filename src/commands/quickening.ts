@@ -1,76 +1,62 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { STORYTELLER_ONLY, isStoryteller } from '../auth/storyteller.js';
+import { isStoryteller, storytellerOnly } from '../auth/storyteller.js';
 import { MAX_QUICKENING, basicSuccessCost } from '../dice/quickening.js';
 import { grantQuickening } from '../game/roll.js';
+import { described, localeFor, t } from '../i18n/index.js';
 import { infoEmbed, quickeningLine } from '../ui/format.js';
 import type { Command } from './types.js';
 
-const data = new SlashCommandBuilder()
-  .setName('quickening')
-  .setDescription('Il tuo Quickening in questo canale (massimo 5, si azzera a fine sessione)')
+const data = described(
+  new SlashCommandBuilder().setName('quickening'),
+  'cmd.quickening.description',
+)
   .addSubcommand((s) =>
-    s
-      .setName('show')
-      .setDescription('Mostra il Quickening')
-      .addUserOption((o) => o.setName('player').setDescription('Un altro giocatore')),
+    described(s.setName('show'), 'cmd.quickening.show.description').addUserOption((o) =>
+      described(o.setName('player'), 'opt.quickening.player'),
+    ),
   )
   .addSubcommand((s) =>
-    s
-      .setName('add')
-      .setDescription('Aggiunge Quickening (oltre 5 si segnano caselle Beast o Nature)')
+    described(s.setName('add'), 'cmd.quickening.add.description')
       .addIntegerOption((o) =>
-        o
-          .setName('amount')
-          .setDescription('Quanti')
+        described(o.setName('amount'), 'opt.quickening.amount')
           .setRequired(true)
           .setMinValue(1)
           .setMaxValue(10),
       )
-      .addUserOption((o) => o.setName('player').setDescription('Un altro giocatore')),
+      .addUserOption((o) => described(o.setName('player'), 'opt.quickening.player')),
   )
   .addSubcommand((s) =>
-    s
-      .setName('spend')
-      .setDescription('Spende Quickening, ad esempio per dare dadi a un alleato')
+    described(s.setName('spend'), 'cmd.quickening.spend.description')
       .addIntegerOption((o) =>
-        o
-          .setName('amount')
-          .setDescription('Quanti')
+        described(o.setName('amount'), 'opt.quickening.amount')
           .setRequired(true)
           .setMinValue(1)
           .setMaxValue(5),
       )
-      .addStringOption((o) => o.setName('reason').setDescription('Per cosa').setMaxLength(100)),
-  )
-  .addSubcommand((s) =>
-    s
-      .setName('success')
-      .setDescription("Compra un successo base: 3 Quickening, o 5 se non hai pallini nell'Abilità")
-      .addBooleanOption((o) =>
-        o
-          .setName('skill_dots')
-          .setDescription("Hai almeno 1 pallino nell'Abilità?")
-          .setRequired(true),
+      .addStringOption((o) =>
+        described(o.setName('reason'), 'opt.quickening.reason').setMaxLength(100),
       ),
   )
   .addSubcommand((s) =>
-    s
-      .setName('set')
-      .setDescription('Corregge il valore a mano')
+    described(s.setName('success'), 'cmd.quickening.success.description').addBooleanOption((o) =>
+      described(o.setName('skill_dots'), 'opt.quickening.skill_dots').setRequired(true),
+    ),
+  )
+  .addSubcommand((s) =>
+    described(s.setName('set'), 'cmd.quickening.set.description')
       .addIntegerOption((o) =>
-        o
-          .setName('value')
-          .setDescription('Nuovo valore')
+        described(o.setName('value'), 'opt.quickening.value')
           .setRequired(true)
           .setMinValue(0)
           .setMaxValue(MAX_QUICKENING),
       )
-      .addUserOption((o) => o.setName('player').setDescription('Un altro giocatore')),
+      .addUserOption((o) => described(o.setName('player'), 'opt.quickening.player')),
   );
 
 export const quickening: Command = {
   data,
   async execute(interaction, { store }) {
+    const locale = localeFor(interaction, store);
     const channelId = interaction.channelId;
     const player = interaction.options.getUser('player') ?? interaction.user;
     const current = store.getQuickening(channelId, player.id);
@@ -83,7 +69,7 @@ export const quickening: Command = {
       otherPlayer &&
       !isStoryteller(interaction, store.getStoryteller(channelId))
     ) {
-      await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: storytellerOnly(locale), flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -104,7 +90,7 @@ export const quickening: Command = {
         interaction.options.getInteger('amount', true),
       );
       const lines = [`${player.displayName}: **${gain.value}/${MAX_QUICKENING}**`];
-      if (gain.overflow) lines.push(quickeningLine(0, gain.value, gain.overflow)!);
+      if (gain.overflow) lines.push(quickeningLine(locale, 0, gain.value, gain.overflow)!);
       await interaction.reply({ embeds: [infoEmbed('Quickening', lines.join('\n'))] });
       return;
     }
@@ -124,7 +110,7 @@ export const quickening: Command = {
         : interaction.options.getInteger('amount', true);
     if (cost > current) {
       await interaction.reply({
-        content: `Hai ${current} Quickening, ne servono ${cost}.`,
+        content: t(locale, 'quickening.notEnough', { current, cost }),
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -132,16 +118,14 @@ export const quickening: Command = {
     store.setQuickening(channelId, player.id, current - cost);
     const what =
       sub === 'success'
-        ? `spende ${cost} Quickening per un **successo base**`
-        : `spende ${cost} Quickening${reason(interaction.options.getString('reason'))}`;
-    await interaction.reply({
-      embeds: [
-        infoEmbed(
-          'Quickening',
-          `${player.displayName} ${what}. Restano **${current - cost}/${MAX_QUICKENING}**.\nSi spende prima di tirare.`,
-        ),
-      ],
-    });
+        ? t(locale, 'quickening.spentSuccess', { player: player.displayName, cost })
+        : t(locale, 'quickening.spent', {
+            player: player.displayName,
+            cost,
+            reason: reason(interaction.options.getString('reason')),
+          });
+    const left = t(locale, 'quickening.left', { left: current - cost, max: MAX_QUICKENING });
+    await interaction.reply({ embeds: [infoEmbed('Quickening', `${what}. ${left}`)] });
   },
 };
 

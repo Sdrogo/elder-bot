@@ -6,6 +6,7 @@ import {
   type ChatInputCommandInteraction,
   type RESTPostAPIChatInputApplicationCommandsJSONBody,
 } from 'discord.js';
+import { localizations, t } from '../i18n/index.js';
 import type { Command, Context } from './types.js';
 
 export const ROOT = 'elder';
@@ -18,19 +19,22 @@ type Nested = APIApplicationCommandSubcommandOption | APIApplicationCommandSubco
 export function elderCommand(commands: Command[]): RESTPostAPIChatInputApplicationCommandsJSONBody {
   return {
     name: ROOT,
-    description: 'Tiri e risorse di Vampire: The Masquerade 6e',
+    description: t('en', 'cmd.elder.description'),
+    description_localizations: localizations('cmd.elder.description'),
     options: commands.map((c) => nest(c.data.toJSON())),
   };
 }
 
 function nest(command: RESTPostAPIChatInputApplicationCommandsJSONBody): Nested {
   const options: APIApplicationCommandOption[] = command.options ?? [];
-  const { name, description } = command;
+  // The translated descriptions travel with the name and the English description.
+  const { name, description, description_localizations } = command;
   if (options.some((o) => o.type === ApplicationCommandOptionType.Subcommand)) {
     return {
       type: ApplicationCommandOptionType.SubcommandGroup,
       name,
       description,
+      description_localizations,
       options: options as APIApplicationCommandSubcommandOption[],
     };
   }
@@ -38,6 +42,7 @@ function nest(command: RESTPostAPIChatInputApplicationCommandsJSONBody): Nested 
     type: ApplicationCommandOptionType.Subcommand,
     name,
     description,
+    description_localizations,
     options: options as APIApplicationCommandSubcommandOption['options'],
   };
 }

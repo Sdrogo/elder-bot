@@ -15,15 +15,15 @@ Le regole vengono dal Player Packet (cap. 4, "Rules of the Night") e dallo Story
 
 Tutti i comandi stanno sotto `/elder`, così il bot aggiunge una sola voce al server.
 
-| Comando                                                                                                              | Cosa fa                                                                                                                                                 |
-| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/elder roll dice [difficulty] [bonus] [quickening] [combat] [reason] [ignore_traits]`                               | Test standard, Power o Self-Control. Pulsanti per Overqualified, No Dice Left, Devil's Bargain, Choose Your Pain e Try again                            |
-| `/elder contest dice (opponent_dice \| opponent_npc_level) [attribute] [opponent_attribute] [opponent] [difficulty]` | Test contrapposto. Pareggio tra PG: vince l'Attributo più alto. Contro un PNG: chi ha iniziato o decide il Narratore                                    |
-| `/elder prolonged start \| roll \| status \| cancel`                                                                 | Test prolungato: 3, 5, 7 o 10 successi in 3, 5 o 7 tiri                                                                                                 |
-| `/elder npc level`                                                                                                   | Test per un PNG controllato da un giocatore: pool 2 × Livello                                                                                           |
-| `/elder quickening show \| add \| spend \| success \| set`                                                           | Quickening del giocatore nel canale                                                                                                                     |
-| `/elder drama show \| add \| spend \| trait \| clear_traits`                                                         | Drama del Narratore. `trait` costa 2 Drama e aggiunge da −3 a +3 dadi a tutti i `/elder roll` della scena                                               |
-| `/elder session new \| scene \| end \| storyteller`                                                                  | Nuova sessione (Quickening a 0, Drama = 1 per PG), nuova scena (via scene trait e Devil's Bargain), fine sessione (azzera tutto) o Narratore del canale |
+| Comando                                                                                                              | Cosa fa                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/elder roll dice [difficulty] [bonus] [quickening] [combat] [reason] [ignore_traits]`                               | Test standard, Power o Self-Control. Pulsanti per Overqualified, No Dice Left, Devil's Bargain, Choose Your Pain e Try again                                               |
+| `/elder contest dice (opponent_dice \| opponent_npc_level) [attribute] [opponent_attribute] [opponent] [difficulty]` | Test contrapposto. Pareggio tra PG: vince l'Attributo più alto. Contro un PNG: chi ha iniziato o decide il Narratore                                                       |
+| `/elder prolonged start \| roll \| status \| cancel`                                                                 | Test prolungato: 3, 5, 7 o 10 successi in 3, 5 o 7 tiri                                                                                                                    |
+| `/elder npc level`                                                                                                   | Test per un PNG controllato da un giocatore: pool 2 × Livello                                                                                                              |
+| `/elder quickening show \| add \| spend \| success \| set`                                                           | Quickening del giocatore nel canale                                                                                                                                        |
+| `/elder drama show \| add \| spend \| trait \| clear_traits`                                                         | Drama del Narratore. `trait` costa 2 Drama e aggiunge da −3 a +3 dadi a tutti i `/elder roll` della scena                                                                  |
+| `/elder session new \| scene \| end \| storyteller \| language`                                                      | Nuova sessione (Quickening a 0, Drama = 1 per PG), nuova scena (via scene trait e Devil's Bargain), fine sessione (azzera tutto), Narratore del canale o lingua del tavolo |
 
 Esempio: `/elder roll dice:7 difficulty:2 reason:Scalare il muro`. Discord passa da un campo all'altro col Tab.
 
@@ -39,6 +39,16 @@ Sopra il riepilogo del tiro il bot mostra i dadi come icone grandi, dal più alt
 Le icone sono emoji dell'applicazione: il bot le carica da solo all'avvio e sostituisce quelle vecchie quando cambiano. Con più di 27 dadi, o se le emoji non sono ancora caricate, i dadi compaiono come numeri nel campo **Dadi**. Le immagini nascono dai disegni in `assets/dice/art`: dopo averli modificati rigenera le facce con `scripts/build-dice.sh` (serve ImageMagick).
 
 Lo stato (Quickening, Drama, scene trait, test prolungati) è salvato per canale in un file SQLite: un canale corrisponde a un tavolo di gioco. Ogni tavolo ha il suo **Narratore**: chi fa `/elder session new` in un canale che non ne ha ancora uno lo diventa, e può passare il ruolo con `/elder session storyteller user`. `/elder session end` chiude la partita: azzera lo stato del canale e libera il ruolo di Narratore. Gli amministratori del server (permesso Gestisci server) contano sempre come Narratore, così un tavolo non resta bloccato. Solo il Narratore può usare `/elder session`, `/elder drama` (tranne `show`), accettare o rifiutare un Devil's Bargain e modificare il Quickening di un altro giocatore. Chi tira non può rispondere al proprio bargain.
+
+## Lingue
+
+Il bot risponde a ciascuno nella lingua del suo client Discord: inglese, italiano, spagnolo, francese o tedesco, e inglese per tutte le altre lingue. Anche le descrizioni dei comandi seguono la lingua di Discord; i nomi dei comandi e delle opzioni restano in inglese.
+
+Il Narratore può fissare la lingua del tavolo con `/elder session language`: una lingua (`English`, `Italiano`, `Español`, `Français`, `Deutsch`) vale per tutti nel canale, `Auto (Discord language)` torna alla lingua di ciascuno. `/elder session end` riporta il tavolo ad automatica.
+
+I termini di gioco del playtest restano in inglese in ogni lingua: Quickening, Drama, Painful Failure, Devil's Bargain, Overqualified, No Dice Left, Choose Your Pain, Try again, scene trait e così via.
+
+Per aggiungere una lingua copia `src/i18n/en.ts` in un nuovo file (ad esempio `src/i18n/pt.ts`, tipizzato `Messages` come `it.ts`), traduci i testi lasciando invariati i `{segnaposto}`, poi registralo in `src/i18n/index.ts` (`Locale`, `CATALOGS`, `LANGUAGE_NAMES` e il codice di Discord in `DISCORD_LOCALES`). I test controllano che il nuovo file abbia tutte le chiavi e gli stessi segnaposto. Dopo, registra di nuovo i comandi per pubblicare le descrizioni tradotte.
 
 ## Sviluppo in locale
 

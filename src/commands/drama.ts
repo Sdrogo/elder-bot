@@ -1,5 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { STORYTELLER_ONLY, isStoryteller } from '../auth/storyteller.js';
+import { isStoryteller, storytellerOnly } from '../auth/storyteller.js';
+import { described, localeFor, t } from '../i18n/index.js';
 import { MAX_DRAMA, MAX_SCENE_TRAITS } from '../state/store.js';
 import { infoEmbed } from '../ui/format.js';
 import type { Command } from './types.js';
@@ -7,72 +8,57 @@ import type { Command } from './types.js';
 /** Storyteller Packet p. 30: a scene trait costs 2 Drama and gives +1 to +3 or -1 to -3 dice. */
 export const SCENE_TRAIT_COST = 2;
 
-const data = new SlashCommandBuilder()
-  .setName('drama')
-  .setDescription('Drama del Narratore in questo canale')
+const data = described(new SlashCommandBuilder().setName('drama'), 'cmd.drama.description')
+  .addSubcommand((s) => described(s.setName('show'), 'cmd.drama.show.description'))
   .addSubcommand((s) =>
-    s.setName('show').setDescription('Mostra il Drama e gli scene trait attivi'),
-  )
-  .addSubcommand((s) =>
-    s
-      .setName('add')
-      .setDescription('Aggiunge Drama')
+    described(s.setName('add'), 'cmd.drama.add.description')
       .addIntegerOption((o) =>
-        o
-          .setName('amount')
-          .setDescription('Quanto')
+        described(o.setName('amount'), 'opt.drama.amount')
           .setRequired(true)
           .setMinValue(1)
           .setMaxValue(20),
       )
-      .addStringOption((o) => o.setName('reason').setDescription('Perché').setMaxLength(100)),
-  )
-  .addSubcommand((s) =>
-    s
-      .setName('spend')
-      .setDescription('Spende Drama')
-      .addIntegerOption((o) =>
-        o
-          .setName('amount')
-          .setDescription('Quanto')
-          .setRequired(true)
-          .setMinValue(1)
-          .setMaxValue(20),
-      )
-      .addStringOption((o) => o.setName('reason').setDescription('Per cosa').setMaxLength(100)),
-  )
-  .addSubcommand((s) =>
-    s
-      .setName('trait')
-      .setDescription('Crea uno scene trait (2 Drama): bonus o penalità a tutti i tiri della scena')
       .addStringOption((o) =>
-        o
-          .setName('name')
-          .setDescription('Ad esempio "Pioggia battente"')
+        described(o.setName('reason'), 'opt.drama.add_reason').setMaxLength(100),
+      ),
+  )
+  .addSubcommand((s) =>
+    described(s.setName('spend'), 'cmd.drama.spend.description')
+      .addIntegerOption((o) =>
+        described(o.setName('amount'), 'opt.drama.amount')
           .setRequired(true)
-          .setMaxLength(60),
+          .setMinValue(1)
+          .setMaxValue(20),
+      )
+      .addStringOption((o) =>
+        described(o.setName('reason'), 'opt.drama.spend_reason').setMaxLength(100),
+      ),
+  )
+  .addSubcommand((s) =>
+    described(s.setName('trait'), 'cmd.drama.trait.description')
+      .addStringOption((o) =>
+        described(o.setName('name'), 'opt.drama.name').setRequired(true).setMaxLength(60),
       )
       .addIntegerOption((o) =>
-        o
-          .setName('modifier')
-          .setDescription('Da -3 a +3 dadi')
+        described(o.setName('modifier'), 'opt.drama.modifier')
           .setRequired(true)
           .addChoices(
             ...[-3, -2, -1, 1, 2, 3].map((n) => ({ name: n > 0 ? `+${n}` : `${n}`, value: n })),
           ),
       ),
   )
-  .addSubcommand((s) => s.setName('clear_traits').setDescription('Rimuove gli scene trait'));
+  .addSubcommand((s) => described(s.setName('clear_traits'), 'cmd.drama.clear_traits.description'));
 
 export const drama: Command = {
   data,
   async execute(interaction, { store }) {
+    const locale = localeFor(interaction, store);
     const channelId = interaction.channelId;
     const current = store.getDrama(channelId);
     const sub = interaction.options.getSubcommand();
 
     if (sub !== 'show' && !isStoryteller(interaction, store.getStoryteller(channelId))) {
-      await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: storytellerOnly(locale), flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -82,8 +68,10 @@ export const drama: Command = {
       if (traits.length) {
         lines.push(
           '',
-          'Scene trait attivi:',
-          ...traits.map((t) => `- ${t.name}: ${signed(t.modifier)} dadi`),
+          t(locale, 'drama.activeTraits'),
+          ...traits.map((tr) =>
+            t(locale, 'drama.trait', { name: tr.name, modifier: signed(tr.modifier) }),
+          ),
         );
       }
       await interaction.reply({ embeds: [infoEmbed('Drama', lines.join('\n'))] });
@@ -94,12 +82,17 @@ export const drama: Command = {
       const amount = interaction.options.getInteger('amount', true);
       store.setDrama(channelId, current + amount);
       const now = store.getDrama(channelId);
-      const cap = now === MAX_DRAMA ? ` (massimo ${MAX_DRAMA})` : '';
+      const cap = now === MAX_DRAMA ? ` (${t(locale, 'drama.max', { max: MAX_DRAMA })})` : '';
       await interaction.reply({
         embeds: [
           infoEmbed(
             'Drama',
-            `+${amount} Drama${reason(interaction.options.getString('reason'))}. Ora **${now}**${cap}.`,
+            t(locale, 'drama.added', {
+              amount,
+              reason: reason(interaction.options.getString('reason')),
+              now,
+              cap,
+            }),
           ),
         ],
       });
@@ -108,13 +101,15 @@ export const drama: Command = {
 
     if (sub === 'clear_traits') {
       store.clearTraits(channelId);
-      await interaction.reply({ embeds: [infoEmbed('Drama', 'Scene trait rimossi.')] });
+      await interaction.reply({
+        embeds: [infoEmbed('Drama', t(locale, 'drama.traitsCleared'))],
+      });
       return;
     }
 
     if (sub === 'trait' && store.listTraits(channelId).length >= MAX_SCENE_TRAITS) {
       await interaction.reply({
-        content: `Ci sono già ${MAX_SCENE_TRAITS} scene trait: rimuovili con \`/elder drama clear_traits\`.`,
+        content: t(locale, 'drama.traitLimit', { max: MAX_SCENE_TRAITS }),
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -124,7 +119,7 @@ export const drama: Command = {
       sub === 'trait' ? SCENE_TRAIT_COST : interaction.options.getInteger('amount', true);
     if (cost > current) {
       await interaction.reply({
-        content: `Il Narratore ha ${current} Drama, ne servono ${cost}.`,
+        content: t(locale, 'drama.notEnough', { current, cost }),
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -139,7 +134,11 @@ export const drama: Command = {
         embeds: [
           infoEmbed(
             'Scene trait',
-            `**${name}**: ${signed(modifier)} dadi a tutti i \`/elder roll\` della scena (chi non è coinvolto usa \`ignore_traits\`).\nDrama rimasto: **${current - cost}**.`,
+            t(locale, 'drama.traitCreated', {
+              name,
+              modifier: signed(modifier),
+              left: current - cost,
+            }),
           ),
         ],
       });
@@ -150,7 +149,11 @@ export const drama: Command = {
       embeds: [
         infoEmbed(
           'Drama',
-          `Il Narratore spende ${cost} Drama${reason(interaction.options.getString('reason'))}. Restano **${current - cost}**.`,
+          t(locale, 'drama.spent', {
+            cost,
+            reason: reason(interaction.options.getString('reason')),
+            left: current - cost,
+          }),
         ),
       ],
     });

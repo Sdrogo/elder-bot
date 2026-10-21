@@ -11,18 +11,21 @@ import {
   type ButtonInteraction,
   type ModalSubmitInteraction,
 } from 'discord.js';
-import { STORYTELLER_ONLY, isStoryteller } from '../auth/storyteller.js';
+import { isStoryteller, storytellerOnly } from '../auth/storyteller.js';
 import { MAX_QUICKENING } from '../dice/quickening.js';
 import { grantQuickening, performRoll, type RollRequest } from '../game/roll.js';
 import type { Context } from '../commands/types.js';
+import { localeFor, t, type Locale } from '../i18n/index.js';
 import { decodeRollId, encodeRollId } from '../ui/customId.js';
 import {
+  CHOOSE_YOUR_PAIN,
   COLORS,
   PAIN_OPTIONS,
   button,
   choosePainRow,
   quickeningLine,
   retryRow,
+  rollErrorText,
   rollMessage,
 } from '../ui/format.js';
 import { OnceGuard } from './once.js';
@@ -31,7 +34,6 @@ import { OnceGuard } from './once.js';
 const STORYTELLER_ACTIONS = new Set(['bargain-yes', 'bargain-no']);
 
 const once = new OnceGuard();
-const ALREADY_USED = 'Questo pulsante è già stato usato.';
 
 /** Claims one step of a roll message; false if someone already clicked it. */
 function claim(interaction: ButtonInteraction | ModalSubmitInteraction, step: string): boolean {
@@ -44,6 +46,13 @@ function release(interaction: ButtonInteraction | ModalSubmitInteraction, step: 
 
 function stepKey(interaction: ButtonInteraction | ModalSubmitInteraction, step: string): string {
   return `${interaction.message?.id ?? interaction.id}:${step}`;
+}
+
+function alreadyUsed(
+  interaction: ButtonInteraction | ModalSubmitInteraction,
+  locale: Locale,
+): Promise<void> {
+  return replyEphemeral(interaction, t(locale, 'button.alreadyUsed'));
 }
 
 async function replyEphemeral(
@@ -60,89 +69,96 @@ export async function handleRollButton(
   const ref = decodeRollId(interaction.customId);
   if (!ref) return;
   const { store } = ctx;
+  const locale = localeFor(interaction, store);
   const channelId = interaction.channelId;
   const request: RollRequest = { ...ref.request, channelId };
   const userId = request.userId;
 
   if (STORYTELLER_ACTIONS.has(ref.action)) {
     if (interaction.user.id === userId) {
-      await replyEphemeral(interaction, 'Il bargain lo accetta o rifiuta il Narratore.');
+      await replyEphemeral(interaction, t(locale, 'bargain.storytellerAnswers'));
       return;
     }
     if (!isStoryteller(interaction, store.getStoryteller(channelId))) {
-      await replyEphemeral(interaction, STORYTELLER_ONLY);
+      await replyEphemeral(interaction, storytellerOnly(locale));
       return;
     }
   } else if (interaction.user.id !== userId) {
-    await replyEphemeral(interaction, 'Solo chi ha tirato può usare questo pulsante.');
+    await replyEphemeral(interaction, t(locale, 'button.notYours'));
     return;
   }
 
   const original = interaction.message.embeds[0];
-  const title = original?.title ?? 'Test';
+  const title = original?.title ?? t(locale, 'roll.title');
   const embed = original ? EmbedBuilder.from(original) : new EmbedBuilder().setTitle(title);
 
   switch (ref.action) {
     case 'oq-take': {
-      if (!claim(interaction, 'overqualified')) return replyEphemeral(interaction, ALREADY_USED);
+      if (!claim(interaction, 'overqualified')) return alreadyUsed(interaction, locale);
       embed.setColor(COLORS.success).setFields({
-        name: 'Esito',
-        value: '**Success** · successo base senza tirare (Overqualified)',
+        name: t(locale, 'roll.field.outcome'),
+        value: t(locale, 'overqualified.taken'),
       });
       await interaction.update({ embeds: [embed], components: [] });
       return;
     }
 
     case 'oq-roll': {
-      if (!claim(interaction, 'overqualified')) return replyEphemeral(interaction, ALREADY_USED);
+      if (!claim(interaction, 'overqualified')) return alreadyUsed(interaction, locale);
       const response = performRoll(store, request, { roller: ctx.roller, skipOverqualified: true });
       if (response.kind === 'error') {
         release(interaction, 'overqualified');
-        await interaction.reply({ content: response.message, flags: MessageFlags.Ephemeral });
+        await replyEphemeral(interaction, rollErrorText(locale, response));
         return;
       }
-      await interaction.update(rollMessage(response, title));
+      await interaction.update(rollMessage(locale, response, title));
       return;
     }
 
     case 'zero-accept': {
-      if (!claim(interaction, 'zero')) return replyEphemeral(interaction, ALREADY_USED);
+      if (!claim(interaction, 'zero')) return alreadyUsed(interaction, locale);
       const gain = grantQuickening(store, channelId, userId, 1);
       const drama = store.getDrama(channelId) + 1;
       store.setDrama(channelId, drama);
       const lines = [
-        '**Failure** accettato: racconta come la situazione si complica.',
+        t(locale, 'noDice.accepted'),
         gain.gained
-          ? `+1 Quickening (ora ${gain.value}/${MAX_QUICKENING}).`
-          : quickeningLine(0, gain.value, gain.overflow)!,
-        `+1 Drama al Narratore (ora ${drama}).`,
+          ? t(locale, 'noDice.quickening', { value: gain.value, max: MAX_QUICKENING })
+          : quickeningLine(locale, 0, gain.value, gain.overflow)!,
+        t(locale, 'noDice.drama', { drama }),
       ];
-      embed.setColor(COLORS.failure).setFields({ name: 'Esito', value: lines.join('\n') });
+      embed
+        .setColor(COLORS.failure)
+        .setFields({ name: t(locale, 'roll.field.outcome'), value: lines.join('\n') });
       await interaction.update({ embeds: [embed], components: [] });
       return;
     }
 
     case 'bargain': {
       if (store.hasUsedBargain(channelId, userId)) {
-        await interaction.reply({
-          content: "Hai già proposto un Devil's Bargain in questa scena.",
-          flags: MessageFlags.Ephemeral,
-        });
+        await replyEphemeral(interaction, t(locale, 'bargain.alreadyUsed'));
         return;
       }
-      if (!claim(interaction, 'bargain')) return replyEphemeral(interaction, ALREADY_USED);
+      if (!claim(interaction, 'bargain')) return alreadyUsed(interaction, locale);
       store.markBargain(channelId, userId);
       embed.addFields({
         name: "Devil's Bargain",
-        value:
-          'Proposta: una complicazione in cambio di un successo base. Il Narratore accetta (+1 Drama) o rifiuta spendendo 1 Drama.',
+        value: t(locale, 'bargain.offer'),
       });
       await interaction.update({
         embeds: [embed],
         components: [
           new ActionRowBuilder<ButtonBuilder>().addComponents(
-            button(encodeRollId('bargain-yes', request), 'Accept bargain', ButtonStyle.Success),
-            button(encodeRollId('bargain-no', request), 'Reject bargain', ButtonStyle.Danger),
+            button(
+              encodeRollId('bargain-yes', request),
+              t(locale, 'button.acceptBargain'),
+              ButtonStyle.Success,
+            ),
+            button(
+              encodeRollId('bargain-no', request),
+              t(locale, 'button.rejectBargain'),
+              ButtonStyle.Danger,
+            ),
           ),
         ],
       });
@@ -150,12 +166,12 @@ export async function handleRollButton(
     }
 
     case 'bargain-yes': {
-      if (!claim(interaction, 'bargain-answer')) return replyEphemeral(interaction, ALREADY_USED);
+      if (!claim(interaction, 'bargain-answer')) return alreadyUsed(interaction, locale);
       const drama = store.getDrama(channelId) + 1;
       store.setDrama(channelId, drama);
       embed.setColor(COLORS.success).addFields({
-        name: 'Bargain accettato',
-        value: `**Success** (successo base) con la complicazione concordata. +1 Drama al Narratore (ora ${drama}).`,
+        name: t(locale, 'bargain.accepted.title'),
+        value: t(locale, 'bargain.accepted', { drama }),
       });
       await interaction.update({ embeds: [embed], components: [] });
       return;
@@ -164,26 +180,16 @@ export async function handleRollButton(
     case 'bargain-no': {
       const drama = store.getDrama(channelId);
       if (drama < 1) {
-        await interaction.reply({
-          content: 'Il Narratore non ha Drama: per rifiutare deve spenderne 1.',
-          flags: MessageFlags.Ephemeral,
-        });
+        await replyEphemeral(interaction, t(locale, 'bargain.noDrama'));
         return;
       }
-      if (!claim(interaction, 'bargain-answer')) return replyEphemeral(interaction, ALREADY_USED);
+      if (!claim(interaction, 'bargain-answer')) return alreadyUsed(interaction, locale);
       store.setDrama(channelId, drama - 1);
       embed.addFields({
-        name: 'Bargain rifiutato',
-        value: `Il Narratore spende 1 Drama (ora ${drama - 1}). Il fallimento resta.`,
+        name: t(locale, 'bargain.rejected.title'),
+        value: t(locale, 'bargain.rejected', { drama: drama - 1 }),
       });
-      await interaction.update({
-        embeds: [embed],
-        components: [
-          new ActionRowBuilder<ButtonBuilder>().addComponents(
-            button(encodeRollId('retry', request), 'Try again', ButtonStyle.Secondary),
-          ),
-        ],
-      });
+      await interaction.update({ embeds: [embed], components: [retryRow(request)] });
       return;
     }
 
@@ -191,10 +197,10 @@ export async function handleRollButton(
       const next = { ...request, difficulty: request.difficulty + 1, retry: true, quickening: 0 };
       const modal = new ModalBuilder()
         .setCustomId(encodeRollId('retry-modal', next))
-        .setTitle('Try again: Difficoltà +1')
+        .setTitle(t(locale, 'retry.modal.title'))
         .addLabelComponents(
           new LabelBuilder()
-            .setLabel('Nuovo pool (cambia Attributo o Abilità)')
+            .setLabel(t(locale, 'retry.modal.dice'))
             .setTextInputComponent(
               new TextInputBuilder()
                 .setCustomId('dice')
@@ -204,7 +210,7 @@ export async function handleRollButton(
                 .setMaxLength(2),
             ),
           new LabelBuilder()
-            .setLabel('Quickening da spendere')
+            .setLabel(t(locale, 'retry.modal.quickening'))
             .setTextInputComponent(
               new TextInputBuilder()
                 .setCustomId('quickening')
@@ -226,31 +232,30 @@ export async function handleRollButton(
       if (ref.action === 'pain-quickening') {
         const current = store.getQuickening(channelId, userId);
         if (current === 0) {
-          await interaction.reply({
-            content: 'Non hai Quickening da perdere: scegli un altro prezzo.',
-            flags: MessageFlags.Ephemeral,
-          });
+          await replyEphemeral(interaction, t(locale, 'pain.noQuickening'));
           return;
         }
-        if (!claim(interaction, 'pain')) return replyEphemeral(interaction, ALREADY_USED);
+        if (!claim(interaction, 'pain')) return alreadyUsed(interaction, locale);
         store.setQuickening(channelId, userId, 0);
         lines.push(`Quickening: ${current} → 0.`);
       }
       if (ref.action !== 'pain-quickening' && !claim(interaction, 'pain')) {
-        return replyEphemeral(interaction, ALREADY_USED);
+        return alreadyUsed(interaction, locale);
       }
       if (ref.action === 'pain-drama') {
         const drama = store.getDrama(channelId) + 1;
         store.setDrama(channelId, drama);
-        lines.push(`Drama del Narratore: ora ${drama}.`);
+        lines.push(t(locale, 'pain.drama', { drama }));
       }
       if (ref.action === 'pain-vitae' || ref.action === 'pain-beast') {
-        lines.push('Aggiornalo sulla scheda del personaggio.');
+        lines.push(t(locale, 'pain.sheet'));
       }
-      const choice = `${interaction.user.displayName} ${PAIN_OPTIONS[ref.action].result}.`;
+      const choice = t(locale, PAIN_OPTIONS[ref.action].result, {
+        player: interaction.user.displayName,
+      });
       const fields = (original?.fields ?? []).map((f) =>
-        f.name === 'Choose Your Pain'
-          ? { name: 'Choose Your Pain', value: [choice, ...lines].join('\n') }
+        f.name === CHOOSE_YOUR_PAIN
+          ? { name: CHOOSE_YOUR_PAIN, value: [choice, ...lines].join('\n') }
           : f,
       );
       embed.setFields(fields);
@@ -272,20 +277,18 @@ export async function handleRollModal(
 ): Promise<void> {
   const ref = decodeRollId(interaction.customId);
   if (!ref || ref.action !== 'retry-modal') return;
+  const locale = localeFor(interaction, ctx.store);
   const dice = parseCount(interaction.fields.getTextInputValue('dice'), 30);
   const quickening = parseCount(
     interaction.fields.getTextInputValue('quickening') || '0',
     MAX_QUICKENING,
   );
   if (dice === undefined || quickening === undefined) {
-    await interaction.reply({
-      content: 'Inserisci numeri interi: pool da 0 a 30, Quickening da 0 a 5.',
-      flags: MessageFlags.Ephemeral,
-    });
+    await replyEphemeral(interaction, t(locale, 'retry.modal.invalid'));
     return;
   }
 
-  if (!claim(interaction, 'retry')) return replyEphemeral(interaction, ALREADY_USED);
+  if (!claim(interaction, 'retry')) return alreadyUsed(interaction, locale);
 
   const request: RollRequest = {
     ...ref.request,
@@ -296,18 +299,24 @@ export async function handleRollModal(
   const response = performRoll(ctx.store, request, { roller: ctx.roller });
   if (response.kind === 'error') {
     release(interaction, 'retry');
-    await interaction.reply({ content: response.message, flags: MessageFlags.Ephemeral });
+    await replyEphemeral(interaction, rollErrorText(locale, response));
     return;
   }
-  const title = interaction.message?.embeds[0]?.title ?? 'Test';
-  await interaction.reply(rollMessage(response, `${title} (Try again)`));
+  const title = interaction.message?.embeds[0]?.title ?? t(locale, 'roll.title');
+  await interaction.reply(rollMessage(locale, response, t(locale, 'roll.retryTitle', { title })));
   // Only one second attempt: drop the first roll's buttons, but keep Choose Your Pain if still open.
-  const pain = interaction.message?.embeds[0]?.fields.find((f) => f.name === 'Choose Your Pain');
+  const pain = interaction.message?.embeds[0]?.fields.find((f) => f.name === CHOOSE_YOUR_PAIN);
   const painOpen = pain?.value.startsWith('- ') ?? false;
   await interaction.message?.edit({
     components: painOpen
       ? // ref.request carries the retry flag, so choosing the pain later offers no second retry.
-        [choosePainRow(ref.request, ctx.store.getQuickening(request.channelId, request.userId) > 0)]
+        [
+          choosePainRow(
+            locale,
+            ref.request,
+            ctx.store.getQuickening(request.channelId, request.userId) > 0,
+          ),
+        ]
       : [],
   });
 }
