@@ -21,6 +21,31 @@ describe('Store', () => {
     expect(store.getDrama('c1')).toBe(0);
   });
 
+  it('keeps one Storyteller per channel', () => {
+    expect(store.getStoryteller('c1')).toBeUndefined();
+    store.setStoryteller('c1', 'u1');
+    store.setStoryteller('c1', 'u2');
+    store.newSession('c1', 3);
+    expect(store.getStoryteller('c1')).toBe('u2');
+    expect(store.getStoryteller('c2')).toBeUndefined();
+  });
+
+  it('ending a session wipes the table, Storyteller included', () => {
+    store.setStoryteller('c1', 'u1');
+    store.setQuickening('c1', 'u2', 3);
+    store.setDrama('c1', 4);
+    store.addTrait('c1', 'Nebbia', -1);
+    store.markBargain('c1', 'u2');
+    store.setQuickening('c2', 'u2', 2);
+    store.endSession('c1');
+    expect(store.getStoryteller('c1')).toBeUndefined();
+    expect(store.getQuickening('c1', 'u2')).toBe(0);
+    expect(store.getDrama('c1')).toBe(0);
+    expect(store.listTraits('c1')).toEqual([]);
+    expect(store.hasUsedBargain('c1', 'u2')).toBe(false);
+    expect(store.getQuickening('c2', 'u2')).toBe(2);
+  });
+
   it('caps Drama', () => {
     store.setDrama('c1', MAX_DRAMA + 50);
     expect(store.getDrama('c1')).toBe(MAX_DRAMA);

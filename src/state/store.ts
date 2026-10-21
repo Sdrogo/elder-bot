@@ -37,6 +37,8 @@ export class Store {
       CREATE TABLE IF NOT EXISTS bargains (
         channel_id TEXT NOT NULL, user_id TEXT NOT NULL,
         PRIMARY KEY (channel_id, user_id));
+      CREATE TABLE IF NOT EXISTS storytellers (
+        channel_id TEXT PRIMARY KEY, user_id TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS prolonged (
         channel_id TEXT NOT NULL, user_id TEXT NOT NULL, task TEXT NOT NULL,
         PRIMARY KEY (channel_id, user_id));
@@ -116,6 +118,23 @@ export class Store {
     this.db.prepare('DELETE FROM bargains WHERE channel_id = ?').run(channelId);
   }
 
+  /** The Storyteller of a table, set by /session; undefined until someone takes the role. */
+  getStoryteller(channelId: string): string | undefined {
+    const row = this.db
+      .prepare('SELECT user_id FROM storytellers WHERE channel_id = ?')
+      .get(channelId) as { user_id: string } | undefined;
+    return row?.user_id;
+  }
+
+  setStoryteller(channelId: string, userId: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO storytellers (channel_id, user_id) VALUES (?, ?)
+         ON CONFLICT (channel_id) DO UPDATE SET user_id = excluded.user_id`,
+      )
+      .run(channelId, userId);
+  }
+
   getProlonged(channelId: string, userId: string): ProlongedTask | undefined {
     const row = this.db
       .prepare('SELECT task FROM prolonged WHERE channel_id = ? AND user_id = ?')
@@ -150,6 +169,22 @@ export class Store {
       this.resetQuickening(channelId);
       this.newScene(channelId);
       this.setDrama(channelId, playerCharacters);
+    })();
+  }
+
+  /** End of the game at this table: everything is wiped, including who the Storyteller is. */
+  endSession(channelId: string): void {
+    this.db.transaction(() => {
+      for (const table of [
+        'quickening',
+        'drama',
+        'scene_traits',
+        'bargains',
+        'prolonged',
+        'storytellers',
+      ]) {
+        this.db.prepare(`DELETE FROM ${table} WHERE channel_id = ?`).run(channelId);
+      }
     })();
   }
 

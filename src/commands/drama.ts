@@ -66,12 +66,12 @@ const data = new SlashCommandBuilder()
 
 export const drama: Command = {
   data,
-  async execute(interaction, { store, storytellerRoleId }) {
+  async execute(interaction, { store }) {
     const channelId = interaction.channelId;
     const current = store.getDrama(channelId);
     const sub = interaction.options.getSubcommand();
 
-    if (sub !== 'show' && !isStoryteller(interaction, storytellerRoleId)) {
+    if (sub !== 'show' && !isStoryteller(interaction, store.getStoryteller(channelId))) {
       await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
       return;
     }
