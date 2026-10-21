@@ -59,19 +59,23 @@ export function retryRow(request: Omit<RollRequest, 'channelId'>): ActionRowBuil
   );
 }
 
-/** Discord's limit for an embed field value. */
-const FIELD_LIMIT = 1024;
+/** Discord draws emojis large only in a message made of nothing else, and only up to this many. */
+const JUMBO_LIMIT = 27;
 
 export function formatDice(dice: number[]): string {
   if (dice.length === 0) return '-';
-  const sorted = [...dice].sort((a, b) => b - a);
-  const numbers = sorted.map((d) => (d >= 8 ? `**${d}**` : `${d}`)).join(' ');
-  const faces = sorted.map((d) => diceEmoji(d));
-  if (faces.some((f) => f === undefined)) return numbers;
-  // A heading line makes Discord draw the emojis larger. Big pools fall back to plain
-  // numbers so the field stays within Discord's limit.
-  const withFaces = `## ${faces.join(' ')}\n${numbers}`;
-  return withFaces.length <= FIELD_LIMIT ? withFaces : numbers;
+  return [...dice]
+    .sort((a, b) => b - a)
+    .map((d) => (d >= 8 ? `**${d}**` : `${d}`))
+    .join(' ');
+}
+
+/** The dice as a row of emoji faces, or undefined when they can't be shown large. */
+export function diceLine(dice: number[]): string | undefined {
+  if (dice.length === 0 || dice.length > JUMBO_LIMIT) return undefined;
+  const faces = [...dice].sort((a, b) => b - a).map((d) => diceEmoji(d));
+  if (faces.some((f) => f === undefined)) return undefined;
+  return faces.join(' ');
 }
 
 export function formatPool(
@@ -120,6 +124,7 @@ export function quickeningLine(
 }
 
 export interface RollMessage {
+  content?: string;
   embeds: EmbedBuilder[];
   components: ActionRowBuilder<ButtonBuilder>[];
 }
@@ -136,6 +141,7 @@ export function rollMessage(
   const fields: APIEmbedField[] = [];
   const buttons: ButtonBuilder[] = [];
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  let content: string | undefined;
 
   if (response.kind === 'overqualified') {
     embed.setColor(COLORS.neutral);
@@ -165,6 +171,7 @@ export function rollMessage(
   } else {
     const { result, quickening } = response;
     embed.setColor(outcomeColor(result.outcome));
+    content = diceLine(result.dice);
     fields.push({ name: 'Dadi', value: formatDice(result.dice) });
     fields.push({ name: 'Esito', value: outcomeLine(result) });
     if (result.outcome === 'painful-failure') {
@@ -189,6 +196,7 @@ export function rollMessage(
 
   embed.addFields(fields);
   return {
+    ...(content ? { content } : {}),
     embeds: [embed],
     components: buttons.length
       ? [...rows, new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)]
