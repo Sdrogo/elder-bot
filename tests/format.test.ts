@@ -15,8 +15,9 @@ const base: RollRequest = {
   applyTraits: true,
 };
 
-function render(request: RollRequest, dice: number[]) {
+function render(request: RollRequest, dice: number[], quickening = 0) {
   const store = new Store(':memory:');
+  store.setQuickening(request.channelId, request.userId, quickening);
   let i = 0;
   const response = performRoll(store, request, { roller: () => dice[i++ % dice.length]! });
   store.close();
@@ -42,9 +43,24 @@ describe('rollMessage', () => {
     expect(buttons.map((b) => 'label' in b && b.label)).toEqual(["Devil's Bargain", 'Try again']);
   });
 
-  it('lists Choose Your Pain on a painful failure', () => {
-    const { embed } = render(base, [1, 3]);
+  it('lists Choose Your Pain on a painful failure, with a button per option', () => {
+    const { embed, buttons } = render(base, [1, 3]);
     expect(embed.fields?.map((f) => f.name)).toContain('Choose Your Pain');
+    expect(buttons.map((b) => 'label' in b && b.label)).toEqual([
+      'Lose 3 Vitae/Willpower',
+      'Mark Beast',
+      'Give 1 Drama',
+      'Try again',
+    ]);
+  });
+
+  it('offers Lose all Quickening only to a player who has some', () => {
+    const { buttons } = render(base, [1, 3]);
+    expect(buttons.map((b) => 'label' in b && b.label)).not.toContain('Lose all Quickening');
+    const withQuickening = render(base, [1, 3], 2);
+    expect(withQuickening.buttons.map((b) => 'label' in b && b.label)).toContain(
+      'Lose all Quickening',
+    );
   });
 
   it('asks before rolling when Overqualified', () => {

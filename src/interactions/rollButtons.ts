@@ -15,7 +15,15 @@ import { MAX_QUICKENING } from '../dice/quickening.js';
 import { grantQuickening, performRoll, type RollRequest } from '../game/roll.js';
 import type { Context } from '../commands/types.js';
 import { decodeRollId, encodeRollId } from '../ui/customId.js';
-import { COLORS, button, quickeningLine, rollMessage } from '../ui/format.js';
+import {
+  COLORS,
+  PAIN_OPTIONS,
+  button,
+  choosePainRow,
+  quickeningLine,
+  retryRow,
+  rollMessage,
+} from '../ui/format.js';
 
 /** Buttons the Storyteller (or anyone at the table) answers; all others belong to the roller. */
 const TABLE_ACTIONS = new Set(['bargain-yes', 'bargain-no']);
@@ -172,6 +180,45 @@ export async function handleRollButton(
       return;
     }
 
+    case 'pain-vitae':
+    case 'pain-quickening':
+    case 'pain-beast':
+    case 'pain-drama': {
+      const lines: string[] = [];
+      if (ref.action === 'pain-quickening') {
+        const current = store.getQuickening(channelId, userId);
+        if (current === 0) {
+          await interaction.reply({
+            content: 'Non hai Quickening da perdere: scegli un altro prezzo.',
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        store.setQuickening(channelId, userId, 0);
+        lines.push(`Quickening: ${current} → 0.`);
+      }
+      if (ref.action === 'pain-drama') {
+        const drama = store.getDrama(channelId) + 1;
+        store.setDrama(channelId, drama);
+        lines.push(`Drama del Narratore: ora ${drama}.`);
+      }
+      if (ref.action === 'pain-vitae' || ref.action === 'pain-beast') {
+        lines.push('Aggiornalo sulla scheda del personaggio.');
+      }
+      const choice = `${interaction.user.displayName} ${PAIN_OPTIONS[ref.action].result}.`;
+      const fields = (original?.fields ?? []).map((f) =>
+        f.name === 'Choose Your Pain'
+          ? { name: 'Choose Your Pain', value: [choice, ...lines].join('\n') }
+          : f,
+      );
+      embed.setFields(fields);
+      await interaction.update({
+        embeds: [embed],
+        components: request.retry ? [] : [retryRow(request)],
+      });
+      return;
+    }
+
     default:
       return;
   }
@@ -209,8 +256,15 @@ export async function handleRollModal(
   }
   const title = interaction.message?.embeds[0]?.title ?? 'Test';
   await interaction.reply(rollMessage(response, `${title} (Try again)`));
-  // Only one second attempt: drop the buttons from the first roll.
-  await interaction.message?.edit({ components: [] });
+  // Only one second attempt: drop the first roll's buttons, but keep Choose Your Pain if still open.
+  const pain = interaction.message?.embeds[0]?.fields.find((f) => f.name === 'Choose Your Pain');
+  const painOpen = pain?.value.startsWith('- ') ?? false;
+  await interaction.message?.edit({
+    components: painOpen
+      ? // ref.request carries the retry flag, so choosing the pain later offers no second retry.
+        [choosePainRow(ref.request, ctx.store.getQuickening(request.channelId, request.userId) > 0)]
+      : [],
+  });
 }
 
 function parseCount(text: string, max: number): number | undefined {
