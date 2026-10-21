@@ -172,6 +172,22 @@ export class Store {
     })();
   }
 
+  /** End of the game at this table: everything is wiped, including who the Storyteller is. */
+  endSession(channelId: string): void {
+    this.db.transaction(() => {
+      for (const table of [
+        'quickening',
+        'drama',
+        'scene_traits',
+        'bargains',
+        'prolonged',
+        'storytellers',
+      ]) {
+        this.db.prepare(`DELETE FROM ${table} WHERE channel_id = ?`).run(channelId);
+      }
+    })();
+  }
+
   close(): void {
     this.db.close();
   }
