@@ -3,10 +3,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { session } from '../src/commands/session.js';
 import { en } from '../src/i18n/en.js';
 import { LOCALES, localeFor, resolveLocale, t, tn } from '../src/i18n/index.js';
+import { de } from '../src/i18n/de.js';
+import { es } from '../src/i18n/es.js';
+import { fr } from '../src/i18n/fr.js';
 import { it as italian } from '../src/i18n/it.js';
 import { Store } from '../src/state/store.js';
 
-const CATALOGS = { en, it: italian };
+const CATALOGS = { en, it: italian, es, fr, de };
 
 function placeholders(text: string): string[] {
   return [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
@@ -43,7 +46,10 @@ describe('resolveLocale', () => {
     expect(resolveLocale('it')).toBe('it');
     expect(resolveLocale('en-US')).toBe('en');
     expect(resolveLocale('en-GB')).toBe('en');
-    expect(resolveLocale('fr')).toBe('en');
+    expect(resolveLocale('es-ES')).toBe('es');
+    expect(resolveLocale('es-419')).toBe('es');
+    expect(resolveLocale('fr')).toBe('fr');
+    expect(resolveLocale('de')).toBe('de');
     expect(resolveLocale('pt-BR')).toBe('en');
     expect(resolveLocale(undefined)).toBe('en');
     expect(resolveLocale(null)).toBe('en');

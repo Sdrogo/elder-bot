@@ -1,24 +1,36 @@
 import { Locale as DiscordLocale, type LocalizationMap } from 'discord.js';
 import type { Store } from '../state/store.js';
 import { en, type MessageKey, type Messages } from './en.js';
+import { de } from './de.js';
+import { es } from './es.js';
+import { fr } from './fr.js';
 import { it } from './it.js';
 
 export type { MessageKey, Messages } from './en.js';
 
 /** Languages the bot speaks. English is the default and the fallback. */
-export type Locale = 'en' | 'it';
+export type Locale = 'en' | 'it' | 'es' | 'fr' | 'de';
 
 /** To add a language: write its catalog (a copy of en.ts) and register it here. */
-const CATALOGS: Record<Locale, Messages> = { en, it };
+const CATALOGS: Record<Locale, Messages> = { en, it, es, fr, de };
 
 export const LOCALES = Object.keys(CATALOGS) as Locale[];
 
 /** Each language under its own name, for the /elder session language choices and replies. */
-export const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', it: 'Italiano' };
+export const LANGUAGE_NAMES: Record<Locale, string> = {
+  en: 'English',
+  it: 'Italiano',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+};
 
 /** Discord locale codes that map to each non-English language (descriptions in English are the default). */
 const DISCORD_LOCALES: Record<Exclude<Locale, 'en'>, DiscordLocale[]> = {
   it: [DiscordLocale.Italian],
+  es: [DiscordLocale.SpanishES, DiscordLocale.SpanishLATAM],
+  fr: [DiscordLocale.French],
+  de: [DiscordLocale.German],
 };
 
 export function isLocale(value: unknown): value is Locale {

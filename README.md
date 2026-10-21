@@ -42,13 +42,13 @@ Lo stato (Quickening, Drama, scene trait, test prolungati) è salvato per canale
 
 ## Lingue
 
-Il bot risponde a ciascuno nella lingua del suo client Discord: italiano o inglese, e inglese per tutte le altre lingue. Anche le descrizioni dei comandi seguono la lingua di Discord; i nomi dei comandi e delle opzioni restano in inglese.
+Il bot risponde a ciascuno nella lingua del suo client Discord: inglese, italiano, spagnolo, francese o tedesco, e inglese per tutte le altre lingue. Anche le descrizioni dei comandi seguono la lingua di Discord; i nomi dei comandi e delle opzioni restano in inglese.
 
-Il Narratore può fissare la lingua del tavolo con `/elder session language`: `English` o `Italiano` valgono per tutti nel canale, `Auto (Discord language)` torna alla lingua di ciascuno. `/elder session end` riporta il tavolo ad automatica.
+Il Narratore può fissare la lingua del tavolo con `/elder session language`: una lingua (`English`, `Italiano`, `Español`, `Français`, `Deutsch`) vale per tutti nel canale, `Auto (Discord language)` torna alla lingua di ciascuno. `/elder session end` riporta il tavolo ad automatica.
 
 I termini di gioco del playtest restano in inglese in ogni lingua: Quickening, Drama, Painful Failure, Devil's Bargain, Overqualified, No Dice Left, Choose Your Pain, Try again, scene trait e così via.
 
-Per aggiungere una lingua copia `src/i18n/en.ts` in un nuovo file (ad esempio `src/i18n/fr.ts`, tipizzato `Messages` come `it.ts`), traduci i testi lasciando invariati i `{segnaposto}`, poi registralo in `src/i18n/index.ts` (`Locale`, `CATALOGS`, `LANGUAGE_NAMES` e il codice di Discord in `DISCORD_LOCALES`). I test controllano che il nuovo file abbia tutte le chiavi e gli stessi segnaposto. Dopo, registra di nuovo i comandi per pubblicare le descrizioni tradotte.
+Per aggiungere una lingua copia `src/i18n/en.ts` in un nuovo file (ad esempio `src/i18n/pt.ts`, tipizzato `Messages` come `it.ts`), traduci i testi lasciando invariati i `{segnaposto}`, poi registralo in `src/i18n/index.ts` (`Locale`, `CATALOGS`, `LANGUAGE_NAMES` e il codice di Discord in `DISCORD_LOCALES`). I test controllano che il nuovo file abbia tutte le chiavi e gli stessi segnaposto. Dopo, registra di nuovo i comandi per pubblicare le descrizioni tradotte.
 
 ## Sviluppo in locale
 
