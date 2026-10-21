@@ -1,5 +1,6 @@
 import { Client, Events, GatewayIntentBits, MessageFlags, type Interaction } from 'discord.js';
 import { commands } from './commands/index.js';
+import { runElder } from './commands/elder.js';
 import type { Context } from './commands/types.js';
 import { loadConfig } from './config.js';
 import { handleRollButton, handleRollModal } from './interactions/rollButtons.js';
@@ -27,7 +28,7 @@ client.once(Events.ClientReady, (c) => {
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
-      await byName.get(interaction.commandName)?.execute(interaction, ctx);
+      await runElder(byName, interaction, ctx);
     } else if (interaction.isButton()) {
       await handleRollButton(interaction, ctx);
     } else if (interaction.isModalSubmit()) {

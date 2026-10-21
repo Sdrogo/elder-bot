@@ -1,4 +1,5 @@
 import { REST, Routes } from 'discord.js';
+import { elderCommand } from './commands/elder.js';
 import { commands } from './commands/index.js';
 import { loadConfig } from './config.js';
 
@@ -6,12 +7,13 @@ import { loadConfig } from './config.js';
 // without it they are registered globally, which can take up to an hour to show up.
 const config = loadConfig();
 const rest = new REST().setToken(config.token);
-const body = commands.map((c) => c.data.toJSON());
+// One /elder command; the PUT also removes the old top-level commands.
+const body = [elderCommand(commands)];
 const route = config.guildId
   ? Routes.applicationGuildCommands(config.clientId, config.guildId)
   : Routes.applicationCommands(config.clientId);
 
 await rest.put(route, { body });
 console.log(
-  `Registrati ${body.length} comandi ${config.guildId ? `sul server ${config.guildId}` : 'globalmente'}.`,
+  `Registrato /elder con ${commands.length} comandi ${config.guildId ? `sul server ${config.guildId}` : 'globalmente'}.`,
 );

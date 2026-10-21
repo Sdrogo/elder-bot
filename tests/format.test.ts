@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { performRoll, type RollRequest } from '../src/game/roll.js';
 import { Store } from '../src/state/store.js';
+import { setDiceEmojis } from '../src/ui/diceEmojis.js';
 import { formatDice, rollMessage } from '../src/ui/format.js';
 
 const base: RollRequest = {
@@ -24,12 +25,30 @@ function render(request: RollRequest, dice: number[], quickening = 0) {
   if (response.kind === 'error') throw new Error(response.message);
   const message = rollMessage(response, 'Andrea: salto sul tetto');
   return {
+    content: message.content,
     embed: message.embeds[0]!.toJSON(),
     buttons: message.components.flatMap((row) => row.toJSON().components),
   };
 }
 
 describe('rollMessage', () => {
+  it('puts the dice faces in the message text, where Discord draws them large', () => {
+    setDiceEmojis({ 10: '<:d10:1>', 8: '<:d8:2>', 2: '<:d2:3>' });
+    try {
+      const { content, embed } = render(base, [10, 8, 2]);
+      expect(content).toBe('<:d10:1> <:d8:2> <:d2:3>');
+      expect(embed.fields?.find((f) => f.name === 'Dadi')).toBeUndefined();
+    } finally {
+      setDiceEmojis({});
+    }
+  });
+
+  it('lists the dice as numbers when the faces are not available', () => {
+    const { content, embed } = render(base, [10, 8, 2]);
+    expect(content).toBeUndefined();
+    expect(embed.fields?.find((f) => f.name === 'Dadi')?.value).toBe('**10** **8** 2');
+  });
+
   it('shows a success with extra successes and the 10s', () => {
     const { embed, buttons } = render(base, [10, 8, 2]);
     expect(embed.description).toContain('= **3** dadi');

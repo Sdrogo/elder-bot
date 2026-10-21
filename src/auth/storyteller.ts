@@ -16,4 +16,4 @@ export function isStoryteller(info: MemberInfo, storytellerId: string | undefine
 }
 
 export const STORYTELLER_ONLY =
-  'Solo il Narratore di questo tavolo può farlo. Chi fa `/session new` diventa Narratore, e può passare il ruolo con `/session storyteller`.';
+  'Solo il Narratore di questo tavolo può farlo. Chi fa `/elder session new` diventa Narratore, e può passare il ruolo con `/elder session storyteller`.';
