@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { dieFace, setDiceEmojis } from '../src/ui/diceEmojis.js';
+import { dieFace, emojiName, setDiceEmojis } from '../src/ui/diceEmojis.js';
 import { formatDice } from '../src/ui/format.js';
 
 const EMOJIS = {
@@ -25,12 +25,21 @@ describe('dice emojis', () => {
 
   it('shows faces above the numbers once synced', () => {
     setDiceEmojis(EMOJIS);
-    expect(formatDice([1, 10, 5])).toBe(`${EMOJIS.ten}${EMOJIS.fail}${EMOJIS.one}\n**10** 5 1`);
+    expect(formatDice([1, 10, 5])).toBe(
+      `## ${EMOJIS.ten} ${EMOJIS.fail} ${EMOJIS.one}\n**10** 5 1`,
+    );
   });
 
   it('falls back to numbers when a pool is too big for one field', () => {
     setDiceEmojis(EMOJIS);
     const dice = Array.from({ length: 40 }, () => 9);
     expect(formatDice(dice)).not.toContain('<:');
+  });
+
+  it('names each emoji after its artwork so new art gets uploaded', () => {
+    const a = emojiName('ten', Buffer.from('old art'));
+    const b = emojiName('ten', Buffer.from('new art'));
+    expect(a).toMatch(/^vtm6e_ten_[0-9a-f]{8}$/);
+    expect(a).not.toBe(b);
   });
 });

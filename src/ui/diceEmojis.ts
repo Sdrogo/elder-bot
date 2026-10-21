@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Client } from 'discord.js';
@@ -27,18 +28,34 @@ export function setDiceEmojis(map: Partial<Record<DieFace, string>>): void {
   emojis = map;
 }
 
-/** Uploads any missing face to the application's emojis, then remembers their markup. */
+/**
+ * Uploads each face as an application emoji, then remembers their markup.
+ * The name carries a hash of the artwork, so changed art replaces the old emoji.
+ */
 export async function syncDiceEmojis(client: Client<true>): Promise<void> {
   const existing = await client.application.emojis.fetch();
   const map: Partial<Record<DieFace, string>> = {};
   for (const face of FACES) {
-    const name = `${EMOJI_PREFIX}${face}`;
+    const attachment = await readFile(fileURLToPath(new URL(`${face}.png`, ASSETS)));
+    const name = emojiName(face, attachment);
     let emoji = existing.find((e) => e.name === name);
     if (!emoji) {
-      const attachment = await readFile(fileURLToPath(new URL(`${face}.png`, ASSETS)));
+      for (const stale of existing.filter((e) => isFaceEmoji(e.name, face)).values()) {
+        await stale.delete();
+      }
       emoji = await client.application.emojis.create({ attachment, name });
     }
     map[face] = emoji.toString();
   }
   setDiceEmojis(map);
+}
+
+export function emojiName(face: DieFace, art: Buffer): string {
+  const hash = createHash('sha256').update(art).digest('hex').slice(0, 8);
+  return `${EMOJI_PREFIX}${face}_${hash}`;
+}
+
+function isFaceEmoji(name: string | null, face: DieFace): boolean {
+  const base = `${EMOJI_PREFIX}${face}`;
+  return name === base || (name?.startsWith(`${base}_`) ?? false);
 }
