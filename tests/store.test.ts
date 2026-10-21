@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Store } from '../src/state/store.js';
+import { MAX_DRAMA, Store } from '../src/state/store.js';
 
 let store: Store;
 beforeEach(() => {
@@ -19,6 +19,11 @@ describe('Store', () => {
   it('never stores negative Drama', () => {
     store.setDrama('c1', -2);
     expect(store.getDrama('c1')).toBe(0);
+  });
+
+  it('caps Drama', () => {
+    store.setDrama('c1', MAX_DRAMA + 50);
+    expect(store.getDrama('c1')).toBe(MAX_DRAMA);
   });
 
   it('sums scene traits', () => {

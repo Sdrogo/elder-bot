@@ -7,11 +7,19 @@ import { Store } from './state/store.js';
 import { syncDiceEmojis } from './ui/diceEmojis.js';
 
 const config = loadConfig();
-const ctx: Context = { store: new Store(config.databasePath) };
+const ctx: Context = {
+  store: new Store(config.databasePath),
+  storytellerRoleId: config.storytellerRoleId,
+};
 const byName = new Map(commands.map((c) => [c.data.name, c]));
 
 // Slash commands and buttons need no privileged intents.
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// No mentions: text typed by players (task names, reasons) must never ping @everyone or a role.
+const client = new Client({ intents: [GatewayIntentBits.Guilds], allowedMentions: { parse: [] } });
+
+// Log gateway and stray async errors instead of letting them crash the process.
+client.on(Events.Error, (error) => console.error('Errore del client Discord:', error));
+process.on('unhandledRejection', (error) => console.error('Promise non gestita:', error));
 
 client.once(Events.ClientReady, (c) => {
   console.log(`Connesso come ${c.user.tag}`);
