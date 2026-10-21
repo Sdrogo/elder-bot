@@ -25,24 +25,57 @@ const data = new SlashCommandBuilder()
       .setDescription(
         "Nuova scena: rimuove gli scene trait e rende di nuovo disponibile il Devil's Bargain",
       ),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('storyteller')
+      .setDescription('Mostra o cambia il Narratore di questo canale')
+      .addUserOption((o) => o.setName('user').setDescription('Il nuovo Narratore')),
   );
 
 export const session: Command = {
   data,
-  async execute(interaction, { store, storytellerRoleId }) {
-    if (!isStoryteller(interaction, storytellerRoleId)) {
+  async execute(interaction, { store }) {
+    const channelId = interaction.channelId;
+    const sub = interaction.options.getSubcommand();
+    const current = store.getStoryteller(channelId);
+    const newUser = sub === 'storyteller' ? interaction.options.getUser('user') : null;
+
+    if (sub === 'storyteller' && !newUser) {
+      const who = current ? `<@${current}>` : 'nessuno: chi fa `/session new` lo diventa';
+      await interaction.reply({
+        embeds: [infoEmbed('Narratore', `Narratore del tavolo: ${who}.`)],
+      });
+      return;
+    }
+
+    // A table without a Storyteller is claimed by whoever starts it; afterwards only the
+    // Storyteller (or a server admin) runs the session.
+    if (current !== undefined && !isStoryteller(interaction, current)) {
       await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
       return;
     }
-    const channelId = interaction.channelId;
-    if (interaction.options.getSubcommand() === 'new') {
+
+    if (newUser) {
+      store.setStoryteller(channelId, newUser.id);
+      await interaction.reply({
+        embeds: [infoEmbed('Narratore', `${newUser} è il Narratore di questo tavolo.`)],
+      });
+      return;
+    }
+
+    const claimed = current === undefined;
+    if (claimed) store.setStoryteller(channelId, interaction.user.id);
+    const storytellerLine = claimed ? `\n${interaction.user} è il Narratore di questo tavolo.` : '';
+
+    if (sub === 'new') {
       const pcs = interaction.options.getInteger('player_characters', true);
       store.newSession(channelId, pcs);
       await interaction.reply({
         embeds: [
           infoEmbed(
             'Nuova sessione',
-            `Quickening di tutti a 0, Drama del Narratore a **${pcs}**, scene trait rimossi.`,
+            `Quickening di tutti a 0, Drama del Narratore a **${pcs}**, scene trait rimossi.${storytellerLine}`,
           ),
         ],
       });
@@ -53,7 +86,7 @@ export const session: Command = {
       embeds: [
         infoEmbed(
           'Nuova scena',
-          "Scene trait rimossi, Devil's Bargain di nuovo disponibile per tutti.",
+          `Scene trait rimossi, Devil's Bargain di nuovo disponibile per tutti.${storytellerLine}`,
         ),
       ],
     });

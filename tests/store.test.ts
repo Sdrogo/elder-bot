@@ -21,6 +21,15 @@ describe('Store', () => {
     expect(store.getDrama('c1')).toBe(0);
   });
 
+  it('keeps one Storyteller per channel', () => {
+    expect(store.getStoryteller('c1')).toBeUndefined();
+    store.setStoryteller('c1', 'u1');
+    store.setStoryteller('c1', 'u2');
+    store.newSession('c1', 3);
+    expect(store.getStoryteller('c1')).toBe('u2');
+    expect(store.getStoryteller('c2')).toBeUndefined();
+  });
+
   it('caps Drama', () => {
     store.setDrama('c1', MAX_DRAMA + 50);
     expect(store.getDrama('c1')).toBe(MAX_DRAMA);
