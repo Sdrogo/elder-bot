@@ -1,4 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { STORYTELLER_ONLY, isStoryteller } from '../auth/storyteller.js';
+import { MAX_DRAMA, MAX_SCENE_TRAITS } from '../state/store.js';
 import { infoEmbed } from '../ui/format.js';
 import type { Command } from './types.js';
 
@@ -64,10 +66,15 @@ const data = new SlashCommandBuilder()
 
 export const drama: Command = {
   data,
-  async execute(interaction, { store }) {
+  async execute(interaction, { store, storytellerRoleId }) {
     const channelId = interaction.channelId;
     const current = store.getDrama(channelId);
     const sub = interaction.options.getSubcommand();
+
+    if (sub !== 'show' && !isStoryteller(interaction, storytellerRoleId)) {
+      await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
+      return;
+    }
 
     if (sub === 'show') {
       const traits = store.listTraits(channelId);
@@ -86,11 +93,13 @@ export const drama: Command = {
     if (sub === 'add') {
       const amount = interaction.options.getInteger('amount', true);
       store.setDrama(channelId, current + amount);
+      const now = store.getDrama(channelId);
+      const cap = now === MAX_DRAMA ? ` (massimo ${MAX_DRAMA})` : '';
       await interaction.reply({
         embeds: [
           infoEmbed(
             'Drama',
-            `+${amount} Drama${reason(interaction.options.getString('reason'))}. Ora **${current + amount}**.`,
+            `+${amount} Drama${reason(interaction.options.getString('reason'))}. Ora **${now}**${cap}.`,
           ),
         ],
       });
@@ -100,6 +109,14 @@ export const drama: Command = {
     if (sub === 'clear_traits') {
       store.clearTraits(channelId);
       await interaction.reply({ embeds: [infoEmbed('Drama', 'Scene trait rimossi.')] });
+      return;
+    }
+
+    if (sub === 'trait' && store.listTraits(channelId).length >= MAX_SCENE_TRAITS) {
+      await interaction.reply({
+        content: `Ci sono già ${MAX_SCENE_TRAITS} scene trait: rimuovili con \`/drama clear_traits\`.`,
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 

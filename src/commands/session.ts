@@ -1,4 +1,5 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { STORYTELLER_ONLY, isStoryteller } from '../auth/storyteller.js';
 import { infoEmbed } from '../ui/format.js';
 import type { Command } from './types.js';
 
@@ -28,7 +29,11 @@ const data = new SlashCommandBuilder()
 
 export const session: Command = {
   data,
-  async execute(interaction, { store }) {
+  async execute(interaction, { store, storytellerRoleId }) {
+    if (!isStoryteller(interaction, storytellerRoleId)) {
+      await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
+      return;
+    }
     const channelId = interaction.channelId;
     if (interaction.options.getSubcommand() === 'new') {
       const pcs = interaction.options.getInteger('player_characters', true);

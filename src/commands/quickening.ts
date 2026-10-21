@@ -1,4 +1,5 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { STORYTELLER_ONLY, isStoryteller } from '../auth/storyteller.js';
 import { MAX_QUICKENING, basicSuccessCost } from '../dice/quickening.js';
 import { grantQuickening } from '../game/roll.js';
 import { infoEmbed, quickeningLine } from '../ui/format.js';
@@ -69,11 +70,18 @@ const data = new SlashCommandBuilder()
 
 export const quickening: Command = {
   data,
-  async execute(interaction, { store }) {
+  async execute(interaction, { store, storytellerRoleId }) {
     const channelId = interaction.channelId;
     const player = interaction.options.getUser('player') ?? interaction.user;
     const current = store.getQuickening(channelId, player.id);
     const sub = interaction.options.getSubcommand();
+
+    // Everyone tracks their own Quickening; only the Storyteller changes someone else's.
+    const otherPlayer = player.id !== interaction.user.id;
+    if (sub !== 'show' && otherPlayer && !isStoryteller(interaction, storytellerRoleId)) {
+      await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
+      return;
+    }
 
     if (sub === 'show') {
       await interaction.reply({

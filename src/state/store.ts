@@ -3,6 +3,10 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ProlongedTask } from '../dice/prolonged.js';
 
+/** Caps that keep one channel from growing the database without limit. */
+export const MAX_DRAMA = 99;
+export const MAX_SCENE_TRAITS = 10;
+
 /** A Drama scene trait (Storyteller Packet p. 30): a dice bonus or penalty for everyone in the scene. */
 export interface SceneTrait {
   id: number;
@@ -71,7 +75,7 @@ export class Store {
         `INSERT INTO drama (channel_id, value) VALUES (?, ?)
          ON CONFLICT (channel_id) DO UPDATE SET value = excluded.value`,
       )
-      .run(channelId, Math.max(0, value));
+      .run(channelId, Math.min(MAX_DRAMA, Math.max(0, value)));
   }
 
   listTraits(channelId: string): SceneTrait[] {

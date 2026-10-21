@@ -23,7 +23,7 @@ Le regole vengono dal Player Packet (cap. 4, "Rules of the Night") e dallo Story
 | `/drama show \| add \| spend \| trait \| clear_traits`                                                         | Drama del Narratore. `trait` costa 2 Drama e aggiunge da −3 a +3 dadi a tutti i `/roll` della scena                          |
 | `/session new \| scene`                                                                                        | Nuova sessione (Quickening a 0, Drama = 1 per PG) o nuova scena (via scene trait e Devil's Bargain)                          |
 
-Lo stato (Quickening, Drama, scene trait, test prolungati) è salvato per canale in un file SQLite: un canale corrisponde a un tavolo di gioco. Al momento chiunque nel canale può usare i comandi del Narratore.
+Lo stato (Quickening, Drama, scene trait, test prolungati) è salvato per canale in un file SQLite: un canale corrisponde a un tavolo di gioco. Lo stato del tavolo lo cambia solo il **Narratore**: chi ha il ruolo indicato in `STORYTELLER_ROLE_ID`, più gli amministratori del server (permesso Gestisci server). Solo il Narratore può usare `/session`, `/drama` (tranne `show`), accettare o rifiutare un Devil's Bargain e modificare il Quickening di un altro giocatore. Chi tira non può rispondere al proprio bargain.
 
 ## Sviluppo in locale
 
@@ -39,6 +39,22 @@ npm run dev                   # avvia il bot e lo riavvia a ogni modifica
 Controlli: `npm test`, `npm run typecheck`, `npm run lint`, `npm run format:check`.
 
 Il token non va mai committato: `.env` è escluso da Git. Se finisce per sbaglio in chat o su GitHub, rigeneralo dal Developer Portal (Bot → Reset Token).
+
+## Sicurezza
+
+Nel [Developer Portal](https://discord.com/developers/applications):
+
+- **Bot → Public Bot** disattivato, così solo tu puoi aggiungere il bot a un server;
+- **Bot → Privileged Gateway Intents** tutti disattivati: il bot usa solo l'intent `Guilds`;
+- invito con gli scope `bot` e `applications.commands` e solo i permessi View Channels, Send Messages, Embed Links e Use External Emojis (niente Administrator).
+
+Sul server:
+
+- `chmod 600 .env`, e nel gruppo `docker` solo il tuo utente (`docker inspect` mostra il token);
+- il `compose.yaml` limita già memoria e processi, ruota i log e rende il container di sola lettura tranne `/data`;
+- SSH solo con chiave, firewall aperto solo sulle porte necessarie, `unattended-upgrades` attivo.
+
+Il bot non scrive menzioni: un `@everyone` scritto in un nome o in un motivo non notifica nessuno.
 
 ## Deploy su Oracle Cloud Always Free
 
@@ -62,6 +78,6 @@ Il token non va mai committato: `.env` è escluso da Git. Se finisce per sbaglio
    docker compose run --rm elder-bot node dist/deploy-commands.js
    docker compose logs -f   # deve comparire "Connesso come ..."
    ```
-7. Per aggiornare: `git pull && docker compose up -d --build`. I dati restano nel volume `elder-bot-data`; `restart: unless-stopped` riavvia il bot anche dopo un reboot.
+7. Per aggiornare: `git pull && docker compose build --pull && docker compose up -d` (`--pull` scarica anche le patch di sicurezza dell'immagine Node). I dati restano nel volume `elder-bot-data`; `restart: unless-stopped` riavvia il bot anche dopo un reboot.
 
 Senza `DISCORD_GUILD_ID` i comandi vengono registrati su tutti i server e possono metterci fino a un'ora a comparire.

@@ -11,6 +11,7 @@ import {
   type ButtonInteraction,
   type ModalSubmitInteraction,
 } from 'discord.js';
+import { STORYTELLER_ONLY, isStoryteller } from '../auth/storyteller.js';
 import { MAX_QUICKENING } from '../dice/quickening.js';
 import { grantQuickening, performRoll, type RollRequest } from '../game/roll.js';
 import type { Context } from '../commands/types.js';
@@ -24,9 +25,33 @@ import {
   retryRow,
   rollMessage,
 } from '../ui/format.js';
+import { OnceGuard } from './once.js';
 
-/** Buttons the Storyteller (or anyone at the table) answers; all others belong to the roller. */
-const TABLE_ACTIONS = new Set(['bargain-yes', 'bargain-no']);
+/** Buttons only the Storyteller answers; all others belong to the roller. */
+const STORYTELLER_ACTIONS = new Set(['bargain-yes', 'bargain-no']);
+
+const once = new OnceGuard();
+const ALREADY_USED = 'Questo pulsante è già stato usato.';
+
+/** Claims one step of a roll message; false if someone already clicked it. */
+function claim(interaction: ButtonInteraction | ModalSubmitInteraction, step: string): boolean {
+  return once.claim(stepKey(interaction, step));
+}
+
+function release(interaction: ButtonInteraction | ModalSubmitInteraction, step: string): void {
+  once.release(stepKey(interaction, step));
+}
+
+function stepKey(interaction: ButtonInteraction | ModalSubmitInteraction, step: string): string {
+  return `${interaction.message?.id ?? interaction.id}:${step}`;
+}
+
+async function replyEphemeral(
+  interaction: ButtonInteraction | ModalSubmitInteraction,
+  content: string,
+): Promise<void> {
+  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+}
 
 export async function handleRollButton(
   interaction: ButtonInteraction,
@@ -39,11 +64,17 @@ export async function handleRollButton(
   const request: RollRequest = { ...ref.request, channelId };
   const userId = request.userId;
 
-  if (!TABLE_ACTIONS.has(ref.action) && interaction.user.id !== userId) {
-    await interaction.reply({
-      content: 'Solo chi ha tirato può usare questo pulsante.',
-      flags: MessageFlags.Ephemeral,
-    });
+  if (STORYTELLER_ACTIONS.has(ref.action)) {
+    if (interaction.user.id === userId) {
+      await replyEphemeral(interaction, 'Il bargain lo accetta o rifiuta il Narratore.');
+      return;
+    }
+    if (!isStoryteller(interaction, ctx.storytellerRoleId)) {
+      await replyEphemeral(interaction, STORYTELLER_ONLY);
+      return;
+    }
+  } else if (interaction.user.id !== userId) {
+    await replyEphemeral(interaction, 'Solo chi ha tirato può usare questo pulsante.');
     return;
   }
 
@@ -53,6 +84,7 @@ export async function handleRollButton(
 
   switch (ref.action) {
     case 'oq-take': {
+      if (!claim(interaction, 'overqualified')) return replyEphemeral(interaction, ALREADY_USED);
       embed.setColor(COLORS.success).setFields({
         name: 'Esito',
         value: '**Success** · successo base senza tirare (Overqualified)',
@@ -62,8 +94,10 @@ export async function handleRollButton(
     }
 
     case 'oq-roll': {
+      if (!claim(interaction, 'overqualified')) return replyEphemeral(interaction, ALREADY_USED);
       const response = performRoll(store, request, { roller: ctx.roller, skipOverqualified: true });
       if (response.kind === 'error') {
+        release(interaction, 'overqualified');
         await interaction.reply({ content: response.message, flags: MessageFlags.Ephemeral });
         return;
       }
@@ -72,6 +106,7 @@ export async function handleRollButton(
     }
 
     case 'zero-accept': {
+      if (!claim(interaction, 'zero')) return replyEphemeral(interaction, ALREADY_USED);
       const gain = grantQuickening(store, channelId, userId, 1);
       const drama = store.getDrama(channelId) + 1;
       store.setDrama(channelId, drama);
@@ -95,6 +130,7 @@ export async function handleRollButton(
         });
         return;
       }
+      if (!claim(interaction, 'bargain')) return replyEphemeral(interaction, ALREADY_USED);
       store.markBargain(channelId, userId);
       embed.addFields({
         name: "Devil's Bargain",
@@ -114,6 +150,7 @@ export async function handleRollButton(
     }
 
     case 'bargain-yes': {
+      if (!claim(interaction, 'bargain-answer')) return replyEphemeral(interaction, ALREADY_USED);
       const drama = store.getDrama(channelId) + 1;
       store.setDrama(channelId, drama);
       embed.setColor(COLORS.success).addFields({
@@ -133,6 +170,7 @@ export async function handleRollButton(
         });
         return;
       }
+      if (!claim(interaction, 'bargain-answer')) return replyEphemeral(interaction, ALREADY_USED);
       store.setDrama(channelId, drama - 1);
       embed.addFields({
         name: 'Bargain rifiutato',
@@ -194,8 +232,12 @@ export async function handleRollButton(
           });
           return;
         }
+        if (!claim(interaction, 'pain')) return replyEphemeral(interaction, ALREADY_USED);
         store.setQuickening(channelId, userId, 0);
         lines.push(`Quickening: ${current} → 0.`);
+      }
+      if (ref.action !== 'pain-quickening' && !claim(interaction, 'pain')) {
+        return replyEphemeral(interaction, ALREADY_USED);
       }
       if (ref.action === 'pain-drama') {
         const drama = store.getDrama(channelId) + 1;
@@ -243,6 +285,8 @@ export async function handleRollModal(
     return;
   }
 
+  if (!claim(interaction, 'retry')) return replyEphemeral(interaction, ALREADY_USED);
+
   const request: RollRequest = {
     ...ref.request,
     channelId: interaction.channelId!,
@@ -251,6 +295,7 @@ export async function handleRollModal(
   };
   const response = performRoll(ctx.store, request, { roller: ctx.roller });
   if (response.kind === 'error') {
+    release(interaction, 'retry');
     await interaction.reply({ content: response.message, flags: MessageFlags.Ephemeral });
     return;
   }
