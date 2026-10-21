@@ -8,6 +8,7 @@ const data = addTestOptions(
   described(new SlashCommandBuilder().setName('npc'), 'cmd.npc.description').addIntegerOption((o) =>
     described(o.setName('level'), 'opt.npc.level').setRequired(true).setMinValue(1).setMaxValue(10),
   ) as SlashCommandBuilder,
+  { npc: true },
 );
 
 export const npc: Command = {
@@ -15,6 +16,6 @@ export const npc: Command = {
   async execute(interaction, ctx) {
     const level = interaction.options.getInteger('level', true);
     const title = t(localeFor(interaction, ctx.store), 'npc.name', { level });
-    await replyWithRoll(interaction, ctx, npcPool(level), title);
+    await replyWithRoll(interaction, ctx, npcPool(level), title, { npc: true });
   },
 };

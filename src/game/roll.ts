@@ -40,12 +40,46 @@ export type RollResponse =
       /** Quickening after spending and after the 10s. */
       quickening: QuickeningGain & { total: number };
       bargainAvailable: boolean;
+      /** An NPC roll: no player mechanics (Quickening, bargain, pain, Try again). */
+      npc: boolean;
     };
 
 export interface RollOptions {
   roller?: DieRoller;
   /** The player already chose to roll instead of taking a basic success. */
   skipOverqualified?: boolean;
+}
+
+const NO_QUICKENING = { value: 0, gained: 0, overflow: 0, total: 0 };
+
+/**
+ * A test for an NPC: the dice are simply rolled. Quickening, Overqualified, No Dice Left,
+ * Devil's Bargain, Choose Your Pain and Try again belong to the players, and an NPC
+ * that rolls no successes just fails.
+ */
+export function performNpcRoll(
+  store: Store,
+  request: RollRequest,
+  options: Pick<RollOptions, 'roller'> = {},
+): Extract<RollResponse, { kind: 'rolled' }> {
+  const traitModifier = request.applyTraits ? store.traitModifier(request.channelId) : 0;
+  const pool = buildPool({
+    dice: request.dice,
+    difficulty: request.difficulty,
+    modifier: request.modifier + traitModifier,
+  });
+  const result = evaluate(rollDice(pool.total, options.roller));
+  if (result.outcome === 'painful-failure') result.outcome = 'failure';
+  return {
+    kind: 'rolled',
+    request,
+    pool,
+    traitModifier,
+    result,
+    quickening: NO_QUICKENING,
+    bargainAvailable: false,
+    npc: true,
+  };
 }
 
 export function performRoll(
@@ -88,6 +122,7 @@ export function performRoll(
     quickening: { ...gain, total: gain.value },
     bargainAvailable:
       result.outcome === 'failure' && !request.retry && !store.hasUsedBargain(channelId, userId),
+    npc: false,
   };
 }
 
