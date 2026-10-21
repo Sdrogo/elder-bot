@@ -13,15 +13,15 @@ Le regole vengono dal Player Packet (cap. 4, "Rules of the Night") e dallo Story
 
 ## Comandi
 
-| Comando                                                                                                        | Cosa fa                                                                                                              |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `/roll dice [difficulty] [bonus] [quickening] [combat] [reason] [ignore_traits]`                               | Test standard, Power o Self-Control. Pulsanti per Overqualified, No Dice Left, Devil's Bargain, Choose Your Pain e Try again           |
-| `/contest dice (opponent_dice \| opponent_npc_level) [attribute] [opponent_attribute] [opponent] [difficulty]` | Test contrapposto. Pareggio tra PG: vince l'Attributo più alto. Contro un PNG: chi ha iniziato o decide il Narratore |
-| `/prolonged start \| roll \| status \| cancel`                                                                 | Test prolungato: 3, 5, 7 o 10 successi in 3, 5 o 7 tiri                                                              |
-| `/npc level`                                                                                                   | Test per un PNG controllato da un giocatore: pool 2 × Livello                                                        |
-| `/quickening show \| add \| spend \| success \| set`                                                           | Quickening del giocatore nel canale                                                                                  |
-| `/drama show \| add \| spend \| trait \| clear_traits`                                                         | Drama del Narratore. `trait` costa 2 Drama e aggiunge da −3 a +3 dadi a tutti i `/roll` della scena                  |
-| `/session new \| scene`                                                                                        | Nuova sessione (Quickening a 0, Drama = 1 per PG) o nuova scena (via scene trait e Devil's Bargain)                  |
+| Comando                                                                                                        | Cosa fa                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `/roll dice [difficulty] [bonus] [quickening] [combat] [reason] [ignore_traits]`                               | Test standard, Power o Self-Control. Pulsanti per Overqualified, No Dice Left, Devil's Bargain, Choose Your Pain e Try again |
+| `/contest dice (opponent_dice \| opponent_npc_level) [attribute] [opponent_attribute] [opponent] [difficulty]` | Test contrapposto. Pareggio tra PG: vince l'Attributo più alto. Contro un PNG: chi ha iniziato o decide il Narratore         |
+| `/prolonged start \| roll \| status \| cancel`                                                                 | Test prolungato: 3, 5, 7 o 10 successi in 3, 5 o 7 tiri                                                                      |
+| `/npc level`                                                                                                   | Test per un PNG controllato da un giocatore: pool 2 × Livello                                                                |
+| `/quickening show \| add \| spend \| success \| set`                                                           | Quickening del giocatore nel canale                                                                                          |
+| `/drama show \| add \| spend \| trait \| clear_traits`                                                         | Drama del Narratore. `trait` costa 2 Drama e aggiunge da −3 a +3 dadi a tutti i `/roll` della scena                          |
+| `/session new \| scene`                                                                                        | Nuova sessione (Quickening a 0, Drama = 1 per PG) o nuova scena (via scene trait e Devil's Bargain)                          |
 
 Lo stato (Quickening, Drama, scene trait, test prolungati) è salvato per canale in un file SQLite: un canale corrisponde a un tavolo di gioco. Al momento chiunque nel canale può usare i comandi del Narratore.
 
