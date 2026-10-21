@@ -11,7 +11,11 @@ export type RollAction =
   | 'bargain-yes'
   | 'bargain-no'
   | 'retry'
-  | 'retry-modal';
+  | 'retry-modal'
+  | 'pain-vitae'
+  | 'pain-quickening'
+  | 'pain-beast'
+  | 'pain-drama';
 
 export interface RollRef {
   action: RollAction;

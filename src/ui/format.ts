@@ -30,6 +30,34 @@ export const CHOOSE_YOUR_PAIN = [
   'Dai 1 Drama al Narratore',
 ].map((o) => `- ${o}`);
 
+/** Choose Your Pain options as buttons; the bot applies Quickening and Drama, the rest is recorded. */
+export const PAIN_OPTIONS = {
+  'pain-vitae': { label: 'Lose 3 Vitae/Willpower', result: 'perde 3 Vitae o Willpower' },
+  'pain-quickening': { label: 'Lose all Quickening', result: 'perde tutto il Quickening' },
+  'pain-beast': { label: 'Mark Beast', result: 'segna 1 casella sul tracker Beast' },
+  'pain-drama': { label: 'Give 1 Drama', result: 'dà 1 Drama al Narratore' },
+} as const;
+
+export type PainAction = keyof typeof PAIN_OPTIONS;
+
+export function choosePainRow(
+  request: Omit<RollRequest, 'channelId'>,
+  hasQuickening: boolean,
+): ActionRowBuilder<ButtonBuilder> {
+  const actions = (Object.keys(PAIN_OPTIONS) as PainAction[]).filter(
+    (a) => a !== 'pain-quickening' || hasQuickening,
+  );
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    actions.map((a) => button(encodeRollId(a, request), PAIN_OPTIONS[a].label, ButtonStyle.Danger)),
+  );
+}
+
+export function retryRow(request: Omit<RollRequest, 'channelId'>): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    button(encodeRollId('retry', request), 'Try again', ButtonStyle.Secondary),
+  );
+}
+
 export function formatDice(dice: number[]): string {
   if (dice.length === 0) return '-';
   return [...dice]
@@ -99,6 +127,7 @@ export function rollMessage(
     .setDescription(formatPool(request, pool, traitModifier));
   const fields: APIEmbedField[] = [];
   const buttons: ButtonBuilder[] = [];
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
 
   if (response.kind === 'overqualified') {
     embed.setColor(COLORS.neutral);
@@ -132,6 +161,7 @@ export function rollMessage(
     fields.push({ name: 'Esito', value: outcomeLine(result) });
     if (result.outcome === 'painful-failure') {
       fields.push({ name: 'Choose Your Pain', value: CHOOSE_YOUR_PAIN.join('\n') });
+      rows.push(choosePainRow(request, quickening.total > 0));
     }
     if (request.retry) {
       fields.push({
@@ -153,8 +183,8 @@ export function rollMessage(
   return {
     embeds: [embed],
     components: buttons.length
-      ? [new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)]
-      : [],
+      ? [...rows, new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)]
+      : rows,
   };
 }
 
