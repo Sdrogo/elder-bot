@@ -3,69 +3,50 @@ import { npcPool, resolveContest, type ContestResult } from '../dice/contest.js'
 import { rollDice } from '../dice/roller.js';
 import { buildPool, evaluate, type TestResult } from '../dice/test.js';
 import { grantQuickening } from '../game/roll.js';
+import { described, localeFor, t, tn, type Locale } from '../i18n/index.js';
 import { COLORS, formatDice, quickeningLine } from '../ui/format.js';
 import type { Command } from './types.js';
 
-const data = new SlashCommandBuilder()
-  .setName('contest')
-  .setDescription('Test contrapposto: vince chi ottiene più successi')
+const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contest.description')
   .addIntegerOption((o) =>
-    o
-      .setName('dice')
-      .setDescription('Il tuo pool')
+    described(o.setName('dice'), 'opt.contest.dice')
       .setRequired(true)
       .setMinValue(0)
       .setMaxValue(30),
   )
   .addIntegerOption((o) =>
-    o
-      .setName('opponent_dice')
-      .setDescription("Pool dell'avversario (PG)")
+    described(o.setName('opponent_dice'), 'opt.contest.opponent_dice')
       .setMinValue(0)
       .setMaxValue(30),
   )
   .addIntegerOption((o) =>
-    o
-      .setName('opponent_npc_level')
-      .setDescription("Livello dell'avversario PNG: tira 2 × Livello")
+    described(o.setName('opponent_npc_level'), 'opt.contest.opponent_npc_level')
       .setMinValue(1)
       .setMaxValue(10),
   )
-  .addUserOption((o) =>
-    o.setName('opponent').setDescription('Giocatore avversario: riceve il Quickening dei suoi 10'),
+  .addUserOption((o) => described(o.setName('opponent'), 'opt.contest.opponent'))
+  .addIntegerOption((o) =>
+    described(o.setName('attribute'), 'opt.contest.attribute').setMinValue(0).setMaxValue(10),
   )
   .addIntegerOption((o) =>
-    o
-      .setName('attribute')
-      .setDescription('Il tuo Attributo, per i pareggi tra PG')
+    described(o.setName('opponent_attribute'), 'opt.contest.opponent_attribute')
       .setMinValue(0)
       .setMaxValue(10),
   )
   .addIntegerOption((o) =>
-    o
-      .setName('opponent_attribute')
-      .setDescription("Attributo dell'avversario PG, per i pareggi")
-      .setMinValue(0)
-      .setMaxValue(10),
+    described(o.setName('difficulty'), 'opt.contest.difficulty').setMinValue(0).setMaxValue(15),
   )
-  .addIntegerOption((o) =>
-    o
-      .setName('difficulty')
-      .setDescription('Solo se competete contro lo stesso ostacolo: tolta a entrambi')
-      .setMinValue(0)
-      .setMaxValue(15),
-  )
-  .addStringOption((o) => o.setName('reason').setDescription('Posta in gioco').setMaxLength(100));
+  .addStringOption((o) => described(o.setName('reason'), 'opt.contest.reason').setMaxLength(100));
 
 export const contest: Command = {
   data,
   async execute(interaction, ctx) {
+    const locale = localeFor(interaction, ctx.store);
     const opponentDice = interaction.options.getInteger('opponent_dice');
     const npcLevel = interaction.options.getInteger('opponent_npc_level');
     if ((opponentDice === null) === (npcLevel === null)) {
       await interaction.reply({
-        content:
-          'Indica il pool avversario con `opponent_dice` (PG) oppure `opponent_npc_level` (PNG), non entrambi.',
+        content: t(locale, 'contest.error.pool'),
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -100,27 +81,26 @@ export const contest: Command = {
     const opponentUser = isNpc ? null : interaction.options.getUser('opponent');
     const myName = me.displayName;
     const theirName = isNpc
-      ? `PNG di Livello ${npcLevel}`
-      : (opponentUser?.displayName ?? 'Avversario');
+      ? t(locale, 'npc.name', { level: npcLevel })
+      : (opponentUser?.displayName ?? t(locale, 'contest.opponent'));
 
     const notes: string[] = [];
     const myGain = grantQuickening(ctx.store, interaction.channelId, me.id, mine.tens);
-    const myLine = quickeningLine(myGain.gained, myGain.value, myGain.overflow);
+    const myLine = quickeningLine(locale, myGain.gained, myGain.value, myGain.overflow);
     if (myLine) notes.push(`${myName}: ${myLine}`);
     if (opponentUser) {
       const gain = grantQuickening(ctx.store, interaction.channelId, opponentUser.id, theirs.tens);
-      const line = quickeningLine(gain.gained, gain.value, gain.overflow);
+      const line = quickeningLine(locale, gain.gained, gain.value, gain.overflow);
       if (line) notes.push(`${theirName}: ${line}`);
     }
 
+    const title = t(locale, 'contest.title', { a: myName, b: theirName });
     const embed = new EmbedBuilder()
-      .setTitle(
-        `${myName} contro ${theirName}${reasonSuffix(interaction.options.getString('reason'))}`,
-      )
+      .setTitle(`${title}${reasonSuffix(interaction.options.getString('reason'))}`)
       .setColor(outcome.winner === 'tie' ? COLORS.neutral : COLORS.success)
-      .addFields(side(myName, myPool, mine), side(theirName, theirPool, theirs), {
-        name: 'Risultato',
-        value: describe(outcome, myName, theirName),
+      .addFields(side(locale, myName, myPool, mine), side(locale, theirName, theirPool, theirs), {
+        name: t(locale, 'contest.result'),
+        value: describe(locale, outcome, myName, theirName),
       });
     if (notes.length) embed.addFields({ name: 'Quickening', value: notes.join('\n') });
     await interaction.reply({ embeds: [embed] });
@@ -131,24 +111,24 @@ function reasonSuffix(reason: string | null): string {
   return reason ? `: ${reason}` : '';
 }
 
-function side(name: string, pool: number, result: TestResult) {
+function side(locale: Locale, name: string, pool: number, result: TestResult) {
   return {
-    name: `${name} (${pool} ${pool === 1 ? 'dado' : 'dadi'})`,
-    value: `${formatDice(result.dice)}\n${result.successes} ${result.successes === 1 ? 'successo' : 'successi'}`,
+    name: `${name} (${tn(locale, 'dice.count', pool)})`,
+    value: `${formatDice(result.dice)}\n${tn(locale, 'roll.successes', result.successes)}`,
     inline: true,
   };
 }
 
-function describe(result: ContestResult, a: string, b: string): string {
+function describe(locale: Locale, result: ContestResult, a: string, b: string): string {
   const winner = result.winner === 'a' ? a : b;
   switch (result.tieBreak) {
     case undefined:
-      return `Vince **${winner}**.`;
+      return t(locale, 'contest.win', { winner });
     case 'attribute':
-      return `Pareggio: vince **${winner}** per l'Attributo più alto.`;
+      return t(locale, 'contest.tie.attribute', { winner });
     case 'initiator-or-storyteller':
-      return 'Pareggio contro un PNG: vince chi ha iniziato la sfida, oppure decide il Narratore.';
+      return t(locale, 'contest.tie.npc');
     case 'storyteller':
-      return "Pareggio: il Narratore assegna la vittoria all'Attributo più alto o a chi ha iniziato la sfida.";
+      return t(locale, 'contest.tie.storyteller');
   }
 }

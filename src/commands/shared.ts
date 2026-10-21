@@ -4,51 +4,36 @@ import {
   type SlashCommandBuilder,
 } from 'discord.js';
 import { performRoll, type RollRequest } from '../game/roll.js';
-import { rollMessage } from '../ui/format.js';
+import { described, localeFor } from '../i18n/index.js';
+import { rollErrorText, rollMessage } from '../ui/format.js';
 import type { Context } from './types.js';
 
 /** Options shared by /roll and /npc. */
 export function addTestOptions(builder: SlashCommandBuilder): SlashCommandBuilder {
   builder
     .addIntegerOption((o) =>
-      o
-        .setName('difficulty')
-        .setDescription('Difficoltà: dadi da togliere al pool')
-        .setMinValue(0)
-        .setMaxValue(15),
+      described(o.setName('difficulty'), 'opt.test.difficulty').setMinValue(0).setMaxValue(15),
     )
     .addIntegerOption((o) =>
-      o
-        .setName('bonus')
-        .setDescription('Dadi bonus (positivi) o penalità (negativi)')
-        .setMinValue(-10)
-        .setMaxValue(10),
+      described(o.setName('bonus'), 'opt.test.bonus').setMinValue(-10).setMaxValue(10),
     )
     .addIntegerOption((o) =>
-      o
-        .setName('quickening')
-        .setDescription('Quickening da spendere: +1 dado ciascuno')
-        .setMinValue(0)
-        .setMaxValue(5),
+      described(o.setName('quickening'), 'opt.test.quickening').setMinValue(0).setMaxValue(5),
     )
-    .addBooleanOption((o) =>
-      o.setName('combat').setDescription('Test di attacco o difesa: niente Overqualified'),
-    )
-    .addStringOption((o) =>
-      o.setName('reason').setDescription('Cosa stai tentando').setMaxLength(100),
-    )
-    .addBooleanOption((o) =>
-      o.setName('ignore_traits').setDescription('Non applicare gli scene trait del Drama'),
-    );
+    .addBooleanOption((o) => described(o.setName('combat'), 'opt.test.combat'))
+    .addStringOption((o) => described(o.setName('reason'), 'opt.test.reason').setMaxLength(100))
+    .addBooleanOption((o) => described(o.setName('ignore_traits'), 'opt.test.ignore_traits'));
   return builder;
 }
 
+/** Rolls a test for /roll and /npc. `title` is used when the player gives no reason. */
 export async function replyWithRoll(
   interaction: ChatInputCommandInteraction,
   ctx: Context,
   dice: number,
   title: string,
 ): Promise<void> {
+  const locale = localeFor(interaction, ctx.store);
   const request: RollRequest = {
     channelId: interaction.channelId,
     userId: interaction.user.id,
@@ -62,10 +47,13 @@ export async function replyWithRoll(
   };
   const response = performRoll(ctx.store, request, { roller: ctx.roller });
   if (response.kind === 'error') {
-    await interaction.reply({ content: response.message, flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      content: rollErrorText(locale, response),
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
   const reason = interaction.options.getString('reason');
   const fullTitle = `${interaction.user.displayName}: ${reason ?? title}`;
-  await interaction.reply(rollMessage(response, fullTitle));
+  await interaction.reply(rollMessage(locale, response, fullTitle));
 }

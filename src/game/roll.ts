@@ -27,7 +27,8 @@ export interface RollRequest {
 }
 
 export type RollResponse =
-  | { kind: 'error'; message: string }
+  /** The player tried to spend more Quickening than they have. */
+  | { kind: 'error'; available: number; requested: number }
   | { kind: 'overqualified'; request: RollRequest; pool: Pool; traitModifier: number }
   | { kind: 'no-dice'; request: RollRequest; pool: Pool; traitModifier: number }
   | {
@@ -55,10 +56,7 @@ export function performRoll(
   const { channelId, userId } = request;
   const available = store.getQuickening(channelId, userId);
   if (request.quickening > available) {
-    return {
-      kind: 'error',
-      message: `Hai solo ${available} Quickening: non puoi spenderne ${request.quickening}.`,
-    };
+    return { kind: 'error', available, requested: request.quickening };
   }
 
   const traitModifier = request.applyTraits ? store.traitModifier(channelId) : 0;

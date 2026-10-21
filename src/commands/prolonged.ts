@@ -7,66 +7,67 @@ import {
   type ProlongedTask,
 } from '../dice/prolonged.js';
 import { performRoll } from '../game/roll.js';
-import { COLORS, formatDice, formatPool, outcomeLine, quickeningLine } from '../ui/format.js';
+import { choice, described, localeFor, t, type Locale } from '../i18n/index.js';
+import {
+  COLORS,
+  formatDice,
+  formatPool,
+  outcomeLine,
+  quickeningLine,
+  rollErrorText,
+} from '../ui/format.js';
 import type { Command } from './types.js';
 
-const data = new SlashCommandBuilder()
-  .setName('prolonged')
-  .setDescription('Test prolungato: somma i successi di più tiri')
+const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prolonged.description')
   .addSubcommand((s) =>
-    s
-      .setName('start')
-      .setDescription('Apre un test prolungato')
+    described(s.setName('start'), 'cmd.prolonged.start.description')
       .addStringOption((o) =>
-        o.setName('name').setDescription('Il compito').setRequired(true).setMaxLength(80),
+        described(o.setName('name'), 'opt.prolonged.name').setRequired(true).setMaxLength(80),
       )
       .addIntegerOption((o) =>
-        o
-          .setName('target')
-          .setDescription('Successi richiesti')
+        described(o.setName('target'), 'opt.prolonged.target')
           .setRequired(true)
-          .addChoices(...PROLONGED_TARGETS.map((n) => ({ name: `${n} successi`, value: n }))),
+          .addChoices(
+            ...PROLONGED_TARGETS.map((n) => choice('choice.prolonged.target', n, { count: n })),
+          ),
       )
       .addIntegerOption((o) =>
-        o
-          .setName('tests')
-          .setDescription('Tiri disponibili')
+        described(o.setName('tests'), 'opt.prolonged.tests')
           .setRequired(true)
-          .addChoices(...PROLONGED_TESTS.map((n) => ({ name: `${n} tiri`, value: n }))),
+          .addChoices(
+            ...PROLONGED_TESTS.map((n) => choice('choice.prolonged.tests', n, { count: n })),
+          ),
       ),
   )
   .addSubcommand((s) =>
-    s
-      .setName('roll')
-      .setDescription('Tira per il tuo test prolungato')
+    described(s.setName('roll'), 'cmd.prolonged.roll.description')
       .addIntegerOption((o) =>
-        o
-          .setName('dice')
-          .setDescription('Attributo + Abilità')
+        described(o.setName('dice'), 'opt.prolonged.dice')
           .setRequired(true)
           .setMinValue(0)
           .setMaxValue(30),
       )
       .addIntegerOption((o) =>
-        o.setName('difficulty').setDescription('Difficoltà').setMinValue(0).setMaxValue(15),
+        described(o.setName('difficulty'), 'opt.prolonged.difficulty')
+          .setMinValue(0)
+          .setMaxValue(15),
       )
       .addIntegerOption((o) =>
-        o.setName('bonus').setDescription('Dadi bonus o penalità').setMinValue(-10).setMaxValue(10),
+        described(o.setName('bonus'), 'opt.prolonged.bonus').setMinValue(-10).setMaxValue(10),
       )
       .addIntegerOption((o) =>
-        o
-          .setName('quickening')
-          .setDescription('Quickening da spendere')
+        described(o.setName('quickening'), 'opt.prolonged.quickening')
           .setMinValue(0)
           .setMaxValue(5),
       ),
   )
-  .addSubcommand((s) => s.setName('status').setDescription('Mostra il tuo test prolungato'))
-  .addSubcommand((s) => s.setName('cancel').setDescription('Chiude il tuo test prolungato'));
+  .addSubcommand((s) => described(s.setName('status'), 'cmd.prolonged.status.description'))
+  .addSubcommand((s) => described(s.setName('cancel'), 'cmd.prolonged.cancel.description'));
 
 export const prolonged: Command = {
   data,
   async execute(interaction, { store, roller }) {
+    const locale = localeFor(interaction, store);
     const channelId = interaction.channelId;
     const userId = interaction.user.id;
     const sub = interaction.options.getSubcommand();
@@ -79,27 +80,30 @@ export const prolonged: Command = {
         interaction.options.getInteger('tests', true),
       );
       store.saveProlonged(channelId, userId, task);
-      await interaction.reply({ embeds: [taskEmbed(task, interaction.user.displayName)] });
+      await interaction.reply({ embeds: [taskEmbed(locale, task, interaction.user.displayName)] });
       return;
     }
 
     if (!current) {
       await interaction.reply({
-        content:
-          'Non hai un test prolungato aperto in questo canale. Usa `/elder prolonged start`.',
+        content: t(locale, 'prolonged.none'),
         flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
     if (sub === 'status') {
-      await interaction.reply({ embeds: [taskEmbed(current, interaction.user.displayName)] });
+      await interaction.reply({
+        embeds: [taskEmbed(locale, current, interaction.user.displayName)],
+      });
       return;
     }
 
     if (sub === 'cancel') {
       store.deleteProlonged(channelId, userId);
-      await interaction.reply({ content: `Test prolungato "${current.name}" chiuso.` });
+      await interaction.reply({
+        content: t(locale, 'prolonged.cancelled', { name: current.name }),
+      });
       return;
     }
 
@@ -119,13 +123,15 @@ export const prolonged: Command = {
       { roller, skipOverqualified: true },
     );
     if (response.kind === 'error') {
-      await interaction.reply({ content: response.message, flags: MessageFlags.Ephemeral });
+      await interaction.reply({
+        content: rollErrorText(locale, response),
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
     if (response.kind !== 'rolled') {
       await interaction.reply({
-        content:
-          'La Difficoltà ha azzerato il pool: cerca vantaggi che ti diano dadi extra, o fatti aiutare. Il tiro non è stato contato.',
+        content: t(locale, 'prolonged.noDice'),
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -135,35 +141,52 @@ export const prolonged: Command = {
     if (status === 'ongoing') store.saveProlonged(channelId, userId, task);
     else store.deleteProlonged(channelId, userId);
 
-    const embed = taskEmbed(task, interaction.user.displayName).addFields(
-      { name: 'Pool', value: formatPool(response.request, response.pool, response.traitModifier) },
-      { name: 'Dadi', value: formatDice(response.result.dice), inline: true },
-      { name: 'Esito', value: outcomeLine(response.result), inline: true },
+    const embed = taskEmbed(locale, task, interaction.user.displayName).addFields(
+      {
+        name: 'Pool',
+        value: formatPool(locale, response.request, response.pool, response.traitModifier),
+      },
+      {
+        name: t(locale, 'roll.field.dice'),
+        value: formatDice(response.result.dice),
+        inline: true,
+      },
+      {
+        name: t(locale, 'roll.field.outcome'),
+        value: outcomeLine(locale, response.result),
+        inline: true,
+      },
     );
     const q = quickeningLine(
+      locale,
       response.quickening.gained,
       response.quickening.total,
       response.quickening.overflow,
     );
     if (q) embed.addFields({ name: 'Quickening', value: q });
     if (response.result.outcome === 'painful-failure') {
-      embed.addFields({
-        name: 'Painful Failure',
-        value: 'Il tiro conta comunque, ma devi Choose Your Pain.',
-      });
+      embed.addFields({ name: 'Painful Failure', value: t(locale, 'prolonged.painful') });
     }
-    if (status === 'completed') embed.setColor(COLORS.success).setFooter({ text: 'Completato!' });
-    if (status === 'failed')
-      embed.setColor(COLORS.painful).setFooter({ text: 'Tiri esauriti: compito fallito.' });
+    if (status === 'completed') {
+      embed.setColor(COLORS.success).setFooter({ text: t(locale, 'prolonged.completed') });
+    }
+    if (status === 'failed') {
+      embed.setColor(COLORS.painful).setFooter({ text: t(locale, 'prolonged.failed') });
+    }
     await interaction.reply({ embeds: [embed] });
   },
 };
 
-function taskEmbed(task: ProlongedTask, player: string): EmbedBuilder {
+function taskEmbed(locale: Locale, task: ProlongedTask, player: string): EmbedBuilder {
   return new EmbedBuilder()
     .setTitle(`${player}: ${task.name}`)
     .setColor(COLORS.neutral)
     .setDescription(
-      `Successi **${task.successes}/${task.target}** · tiri usati **${task.testsDone}/${task.maxTests}**`,
+      t(locale, 'prolonged.progress', {
+        successes: task.successes,
+        target: task.target,
+        done: task.testsDone,
+        max: task.maxTests,
+      }),
     );
 }

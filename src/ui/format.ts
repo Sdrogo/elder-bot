@@ -6,6 +6,7 @@ import {
   type APIEmbedField,
 } from 'discord.js';
 import { MAX_QUICKENING } from '../dice/quickening.js';
+import { t, tn, type Locale, type MessageKey } from '../i18n/index.js';
 import type { Outcome, Pool, TestResult } from '../dice/test.js';
 import type { RollRequest, RollResponse } from '../game/roll.js';
 import { encodeRollId } from './customId.js';
@@ -18,30 +19,51 @@ export const COLORS = {
   neutral: 0x6a1b9a,
 };
 
+// Outcomes are game terms: the same in every language.
 const OUTCOME_LABEL: Record<Outcome, string> = {
   success: 'Success',
   failure: 'Failure',
   'painful-failure': 'Painful Failure',
 };
 
-export const CHOOSE_YOUR_PAIN = [
-  'Perdi 3 Vitae o Willpower (a tua scelta)',
-  'Perdi tutto il tuo Quickening (non se ne hai 0)',
-  'Segna 1 casella sul tracker Beast',
-  'Dai 1 Drama al Narratore',
-].map((o) => `- ${o}`);
+/** Name of the Choose Your Pain field; the roll buttons find the field by it, so it never changes. */
+export const CHOOSE_YOUR_PAIN = 'Choose Your Pain';
 
 /** Choose Your Pain options as buttons; the bot applies Quickening and Drama, the rest is recorded. */
 export const PAIN_OPTIONS = {
-  'pain-vitae': { label: 'Lose 3 Vitae/Willpower', result: 'perde 3 Vitae o Willpower' },
-  'pain-quickening': { label: 'Lose all Quickening', result: 'perde tutto il Quickening' },
-  'pain-beast': { label: 'Mark Beast', result: 'segna 1 casella sul tracker Beast' },
-  'pain-drama': { label: 'Give 1 Drama', result: 'dà 1 Drama al Narratore' },
-} as const;
+  'pain-vitae': {
+    option: 'pain.option.vitae',
+    label: 'pain.label.vitae',
+    result: 'pain.result.vitae',
+  },
+  'pain-quickening': {
+    option: 'pain.option.quickening',
+    label: 'pain.label.quickening',
+    result: 'pain.result.quickening',
+  },
+  'pain-beast': {
+    option: 'pain.option.beast',
+    label: 'pain.label.beast',
+    result: 'pain.result.beast',
+  },
+  'pain-drama': {
+    option: 'pain.option.drama',
+    label: 'pain.label.drama',
+    result: 'pain.result.drama',
+  },
+} as const satisfies Record<string, Record<'option' | 'label' | 'result', MessageKey>>;
 
 export type PainAction = keyof typeof PAIN_OPTIONS;
 
+/** The Choose Your Pain list; each line starts with "- " while the choice is still open. */
+export function chooseYourPain(locale: Locale): string {
+  return Object.values(PAIN_OPTIONS)
+    .map((o) => `- ${t(locale, o.option)}`)
+    .join('\n');
+}
+
 export function choosePainRow(
+  locale: Locale,
   request: Omit<RollRequest, 'channelId'>,
   hasQuickening: boolean,
 ): ActionRowBuilder<ButtonBuilder> {
@@ -49,14 +71,19 @@ export function choosePainRow(
     (a) => a !== 'pain-quickening' || hasQuickening,
   );
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    actions.map((a) => button(encodeRollId(a, request), PAIN_OPTIONS[a].label, ButtonStyle.Danger)),
+    actions.map((a) =>
+      button(encodeRollId(a, request), t(locale, PAIN_OPTIONS[a].label), ButtonStyle.Danger),
+    ),
   );
 }
 
 export function retryRow(request: Omit<RollRequest, 'channelId'>): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    button(encodeRollId('retry', request), 'Try again', ButtonStyle.Secondary),
-  );
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(retryButton(request));
+}
+
+/** Try again is a game term: the same label in every language. */
+export function retryButton(request: Omit<RollRequest, 'channelId'>): ButtonBuilder {
+  return button(encodeRollId('retry', request), 'Try again', ButtonStyle.Secondary);
 }
 
 /** Discord draws emojis large only in a message made of nothing else, and only up to this many. */
@@ -79,27 +106,31 @@ export function diceLine(dice: number[]): string | undefined {
 }
 
 export function formatPool(
+  locale: Locale,
   request: Omit<RollRequest, 'channelId'>,
   pool: Pool,
   traitModifier: number,
 ): string {
-  const parts = [`${request.dice} dadi`];
-  if (request.modifier) parts.push(signed(request.modifier, 'bonus'));
+  const parts = [tn(locale, 'dice.count', request.dice)];
+  if (request.modifier) parts.push(signed(request.modifier, t(locale, 'pool.bonus')));
   if (traitModifier) parts.push(signed(traitModifier, 'scene trait'));
-  if (request.difficulty) parts.push(`− Difficoltà ${request.difficulty}`);
-  if (request.quickening) parts.push(`+ ${request.quickening} Quickening`);
-  return `${parts.join(' ')} = **${pool.total}** ${pool.total === 1 ? 'dado' : 'dadi'}`;
+  if (request.difficulty) parts.push(t(locale, 'pool.difficulty', { n: request.difficulty }));
+  if (request.quickening) parts.push(t(locale, 'pool.quickening', { n: request.quickening }));
+  parts.push(tn(locale, 'pool.total', pool.total));
+  return parts.join(' ');
 }
 
 function signed(n: number, label: string): string {
   return `${n > 0 ? '+' : '−'} ${Math.abs(n)} ${label}`;
 }
 
-export function outcomeLine(result: TestResult): string {
+export function outcomeLine(locale: Locale, result: TestResult): string {
   const label = `**${OUTCOME_LABEL[result.outcome]}**`;
   if (result.outcome !== 'success') return label;
-  const extra = result.extraSuccesses ? ` (${result.extraSuccesses} extra)` : '';
-  return `${label} · ${result.successes} ${result.successes === 1 ? 'successo' : 'successi'}${extra}`;
+  const extra = result.extraSuccesses
+    ? ` (${t(locale, 'roll.extra', { count: result.extraSuccesses })})`
+    : '';
+  return `${label} · ${tn(locale, 'roll.successes', result.successes)}${extra}`;
 }
 
 function outcomeColor(outcome: Outcome): number {
@@ -109,17 +140,16 @@ function outcomeColor(outcome: Outcome): number {
 }
 
 export function quickeningLine(
+  locale: Locale,
   gained: number,
   total: number,
   overflow: number,
 ): string | undefined {
   const lines: string[] = [];
-  if (gained > 0) lines.push(`+${gained} Quickening dai 10 (ora ${total}/${MAX_QUICKENING})`);
-  if (overflow > 0) {
-    lines.push(
-      `Quickening al massimo: segna ${overflow} ${overflow === 1 ? 'casella' : 'caselle'} sul tracker Beast o Nature.`,
-    );
+  if (gained > 0) {
+    lines.push(t(locale, 'quickening.gained', { gained, total, max: MAX_QUICKENING }));
   }
+  if (overflow > 0) lines.push(tn(locale, 'quickening.overflow', overflow));
   return lines.length ? lines.join('\n') : undefined;
 }
 
@@ -131,13 +161,14 @@ export interface RollMessage {
 
 /** Renders the response of /roll, /npc and the roll buttons. `title` keeps the player's reason. */
 export function rollMessage(
+  locale: Locale,
   response: Exclude<RollResponse, { kind: 'error' }>,
   title: string,
 ): RollMessage {
   const { request, pool, traitModifier } = response;
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(formatPool(request, pool, traitModifier));
+    .setDescription(formatPool(locale, request, pool, traitModifier));
   const fields: APIEmbedField[] = [];
   const buttons: ButtonBuilder[] = [];
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
@@ -147,51 +178,48 @@ export function rollMessage(
     embed.setColor(COLORS.neutral);
     fields.push({
       name: 'Overqualified',
-      value:
-        'Restano 4 o più dadi dopo la Difficoltà: puoi prendere un successo base senza tirare (niente successi extra), oppure tirare.',
+      value: t(locale, 'roll.overqualified'),
     });
     buttons.push(
-      button(encodeRollId('oq-take', request), 'Take basic success', ButtonStyle.Success),
-      button(encodeRollId('oq-roll', request), 'Roll', ButtonStyle.Primary),
+      button(encodeRollId('oq-take', request), t(locale, 'button.takeBasic'), ButtonStyle.Success),
+      button(encodeRollId('oq-roll', request), t(locale, 'button.roll'), ButtonStyle.Primary),
     );
   } else if (response.kind === 'no-dice') {
     embed.setColor(COLORS.neutral);
     fields.push({
       name: 'No Dice Left',
-      value: [
-        'La Difficoltà ha azzerato il pool. Scegli:',
-        '- **Accept failure**: racconta come le cose si complicano, +1 Quickening a te e +1 Drama al Narratore',
-        '- **Cerca vantaggi**: aiuti, strumenti o posizione che ti danno dadi extra, poi ritira',
-        "- **Aiuta qualcuno** con l'azione assist",
-      ].join('\n'),
+      value: t(locale, 'roll.noDice'),
     });
     buttons.push(
-      button(encodeRollId('zero-accept', request), 'Accept failure', ButtonStyle.Secondary),
+      button(
+        encodeRollId('zero-accept', request),
+        t(locale, 'button.acceptFailure'),
+        ButtonStyle.Secondary,
+      ),
     );
   } else {
     const { result, quickening } = response;
     embed.setColor(outcomeColor(result.outcome));
     // The faces carry their numbers; the field is the fallback when they can't be shown.
     content = diceLine(result.dice);
-    if (!content) fields.push({ name: 'Dadi', value: formatDice(result.dice) });
-    fields.push({ name: 'Esito', value: outcomeLine(result) });
+    if (!content) {
+      fields.push({ name: t(locale, 'roll.field.dice'), value: formatDice(result.dice) });
+    }
+    fields.push({ name: t(locale, 'roll.field.outcome'), value: outcomeLine(locale, result) });
     if (result.outcome === 'painful-failure') {
-      fields.push({ name: 'Choose Your Pain', value: CHOOSE_YOUR_PAIN.join('\n') });
-      rows.push(choosePainRow(request, quickening.total > 0));
+      fields.push({ name: CHOOSE_YOUR_PAIN, value: chooseYourPain(locale) });
+      rows.push(choosePainRow(locale, request, quickening.total > 0));
     }
     if (request.retry) {
-      fields.push({
-        name: 'Try again',
-        value: 'Secondo tentativo: Difficoltà +1, ogni fallimento è un Painful Failure.',
-      });
+      fields.push({ name: 'Try again', value: t(locale, 'roll.retryNote') });
     }
-    const q = quickeningLine(quickening.gained, quickening.total, quickening.overflow);
+    const q = quickeningLine(locale, quickening.gained, quickening.total, quickening.overflow);
     if (q) fields.push({ name: 'Quickening', value: q });
     if (response.bargainAvailable) {
       buttons.push(button(encodeRollId('bargain', request), "Devil's Bargain", ButtonStyle.Danger));
     }
     if (result.outcome !== 'success' && !request.retry) {
-      buttons.push(button(encodeRollId('retry', request), 'Try again', ButtonStyle.Secondary));
+      buttons.push(retryButton(request));
     }
   }
 
@@ -215,4 +243,15 @@ export function infoEmbed(
   color = COLORS.neutral,
 ): EmbedBuilder {
   return new EmbedBuilder().setTitle(title).setDescription(description).setColor(color);
+}
+
+/** The message for a roll refused because the player spends more Quickening than they have. */
+export function rollErrorText(
+  locale: Locale,
+  error: Extract<RollResponse, { kind: 'error' }>,
+): string {
+  return t(locale, 'roll.error.quickening', {
+    available: error.available,
+    requested: error.requested,
+  });
 }

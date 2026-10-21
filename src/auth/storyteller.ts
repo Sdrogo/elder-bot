@@ -1,4 +1,5 @@
 import { PermissionFlagsBits, type PermissionsBitField } from 'discord.js';
+import { t, type Locale } from '../i18n/index.js';
 
 /** The parts of an interaction needed to tell who is the Storyteller. */
 export interface MemberInfo {
@@ -15,5 +16,7 @@ export function isStoryteller(info: MemberInfo, storytellerId: string | undefine
   return storytellerId !== undefined && info.user.id === storytellerId;
 }
 
-export const STORYTELLER_ONLY =
-  'Solo il Narratore di questo tavolo può farlo. Chi fa `/elder session new` diventa Narratore, e può passare il ruolo con `/elder session storyteller`.';
+/** The refusal shown to anyone else who tries a Storyteller action. */
+export function storytellerOnly(locale: Locale): string {
+  return t(locale, 'auth.storytellerOnly');
+}

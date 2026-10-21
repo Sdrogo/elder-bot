@@ -3,6 +3,7 @@ import { commands } from './commands/index.js';
 import { runElder } from './commands/elder.js';
 import type { Context } from './commands/types.js';
 import { loadConfig } from './config.js';
+import { localeFor, resolveLocale, t } from './i18n/index.js';
 import { handleRollButton, handleRollModal } from './interactions/rollButtons.js';
 import { Store } from './state/store.js';
 import { syncDiceEmojis } from './ui/diceEmojis.js';
@@ -37,9 +38,14 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   } catch (error) {
     console.error(error);
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction
-        .reply({ content: 'Qualcosa è andato storto.', flags: MessageFlags.Ephemeral })
-        .catch(() => undefined);
+      let locale = resolveLocale(interaction.locale);
+      try {
+        locale = localeFor(interaction, ctx.store);
+      } catch {
+        // The store may be what failed: answer in the user's own language.
+      }
+      const content = t(locale, 'error.generic');
+      await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => undefined);
     }
   }
 });
