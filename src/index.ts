@@ -4,6 +4,7 @@ import type { Context } from './commands/types.js';
 import { loadConfig } from './config.js';
 import { handleRollButton, handleRollModal } from './interactions/rollButtons.js';
 import { Store } from './state/store.js';
+import { syncDiceEmojis } from './ui/diceEmojis.js';
 
 const config = loadConfig();
 const ctx: Context = { store: new Store(config.databasePath) };
@@ -14,6 +15,8 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.once(Events.ClientReady, (c) => {
   console.log(`Connesso come ${c.user.tag}`);
+  // Without the emojis the dice are shown as numbers, so a failure here is not fatal.
+  syncDiceEmojis(c).catch((error) => console.error('Emoji dei dadi non caricate:', error));
 });
 
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {

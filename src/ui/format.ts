@@ -9,6 +9,7 @@ import { MAX_QUICKENING } from '../dice/quickening.js';
 import type { Outcome, Pool, TestResult } from '../dice/test.js';
 import type { RollRequest, RollResponse } from '../game/roll.js';
 import { encodeRollId } from './customId.js';
+import { diceEmoji } from './diceEmojis.js';
 
 export const COLORS = {
   success: 0x2e7d32,
@@ -58,12 +59,18 @@ export function retryRow(request: Omit<RollRequest, 'channelId'>): ActionRowBuil
   );
 }
 
+/** Discord's limit for an embed field value. */
+const FIELD_LIMIT = 1024;
+
 export function formatDice(dice: number[]): string {
   if (dice.length === 0) return '-';
-  return [...dice]
-    .sort((a, b) => b - a)
-    .map((d) => (d >= 8 ? `**${d}**` : `${d}`))
-    .join(' ');
+  const sorted = [...dice].sort((a, b) => b - a);
+  const numbers = sorted.map((d) => (d >= 8 ? `**${d}**` : `${d}`)).join(' ');
+  const faces = sorted.map((d) => diceEmoji(d));
+  if (faces.some((f) => f === undefined)) return numbers;
+  // Big pools fall back to plain numbers so the field stays within Discord's limit.
+  const withFaces = `${faces.join('')}\n${numbers}`;
+  return withFaces.length <= FIELD_LIMIT ? withFaces : numbers;
 }
 
 export function formatPool(
