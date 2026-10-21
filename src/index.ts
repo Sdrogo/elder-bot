@@ -7,10 +7,7 @@ import { Store } from './state/store.js';
 import { syncDiceEmojis } from './ui/diceEmojis.js';
 
 const config = loadConfig();
-const ctx: Context = {
-  store: new Store(config.databasePath),
-  storytellerRoleId: config.storytellerRoleId,
-};
+const ctx: Context = { store: new Store(config.databasePath) };
 const byName = new Map(commands.map((c) => [c.data.name, c]));
 
 // Slash commands and buttons need no privileged intents.

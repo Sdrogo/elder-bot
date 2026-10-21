@@ -70,7 +70,7 @@ const data = new SlashCommandBuilder()
 
 export const quickening: Command = {
   data,
-  async execute(interaction, { store, storytellerRoleId }) {
+  async execute(interaction, { store }) {
     const channelId = interaction.channelId;
     const player = interaction.options.getUser('player') ?? interaction.user;
     const current = store.getQuickening(channelId, player.id);
@@ -78,7 +78,11 @@ export const quickening: Command = {
 
     // Everyone tracks their own Quickening; only the Storyteller changes someone else's.
     const otherPlayer = player.id !== interaction.user.id;
-    if (sub !== 'show' && otherPlayer && !isStoryteller(interaction, storytellerRoleId)) {
+    if (
+      sub !== 'show' &&
+      otherPlayer &&
+      !isStoryteller(interaction, store.getStoryteller(channelId))
+    ) {
       await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
       return;
     }

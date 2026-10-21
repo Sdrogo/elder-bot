@@ -69,7 +69,7 @@ export async function handleRollButton(
       await replyEphemeral(interaction, 'Il bargain lo accetta o rifiuta il Narratore.');
       return;
     }
-    if (!isStoryteller(interaction, ctx.storytellerRoleId)) {
+    if (!isStoryteller(interaction, store.getStoryteller(channelId))) {
       await replyEphemeral(interaction, STORYTELLER_ONLY);
       return;
     }

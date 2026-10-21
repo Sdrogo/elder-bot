@@ -4,7 +4,6 @@ export interface Config {
   token: string;
   clientId: string;
   guildId?: string;
-  storytellerRoleId?: string;
   databasePath: string;
 }
 
@@ -19,7 +18,6 @@ export function loadConfig(): Config {
     token: required('DISCORD_TOKEN'),
     clientId: required('DISCORD_CLIENT_ID'),
     guildId: process.env.DISCORD_GUILD_ID?.trim() || undefined,
-    storytellerRoleId: process.env.STORYTELLER_ROLE_ID?.trim() || undefined,
     databasePath: process.env.DATABASE_PATH?.trim() || './data/elder-bot.db',
   };
 }
