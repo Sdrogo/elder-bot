@@ -83,3 +83,7 @@ Il bot non scrive menzioni: un `@everyone` scritto in un nome o in un motivo non
 7. Per aggiornare: `git pull && docker compose build --pull && docker compose up -d` (`--pull` scarica anche le patch di sicurezza dell'immagine Node). I dati restano nel volume `elder-bot-data`; `restart: unless-stopped` riavvia il bot anche dopo un reboot.
 
 Senza `DISCORD_GUILD_ID` i comandi vengono registrati su tutti i server e possono metterci fino a un'ora a comparire.
+
+## Termini e privacy
+
+[Termini di servizio](TERMS.md) · [Informativa sulla privacy](PRIVACY.md)
