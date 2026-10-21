@@ -71,7 +71,7 @@ export const en = {
   'opt.drama.name': 'For example "Pouring rain"',
   'opt.drama.modifier': 'From -3 to +3 dice',
 
-  'cmd.session.description': 'Start of a session or scene',
+  'cmd.session.description': 'Sessions, scenes, Storyteller and table language',
   'cmd.session.new.description': 'New session: Quickening to 0, Drama = 1 per PC',
   'opt.session.player_characters': 'Number of PCs at the table',
   'cmd.session.scene.description':

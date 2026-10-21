@@ -72,7 +72,7 @@ export const it: Messages = {
   'opt.drama.name': 'Ad esempio "Pioggia battente"',
   'opt.drama.modifier': 'Da -3 a +3 dadi',
 
-  'cmd.session.description': 'Inizio di sessione o di scena',
+  'cmd.session.description': 'Sessione, scena, Narratore e lingua del tavolo',
   'cmd.session.new.description': 'Nuova sessione: Quickening a 0, Drama = 1 per PG',
   'opt.session.player_characters': 'Numero di PG al tavolo',
   'cmd.session.scene.description':
@@ -172,7 +172,7 @@ export const it: Messages = {
   'prolonged.cancelled': 'Test prolungato "{name}" chiuso.',
   'prolonged.noDice':
     'La Difficoltà ha azzerato il pool: cerca vantaggi che ti diano dadi extra, o fatti aiutare. Il tiro non è stato contato.',
-  'prolonged.painful': 'Il tiro conta comunque, ma devi Choose Your Pain.',
+  'prolonged.painful': 'Il tiro conta comunque, ma scatta il Choose Your Pain.',
   'prolonged.completed': 'Completato!',
   'prolonged.failed': 'Tiri esauriti: compito fallito.',
   'prolonged.progress': 'Successi **{successes}/{target}** · tiri usati **{done}/{max}**',
