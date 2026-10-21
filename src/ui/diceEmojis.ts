@@ -3,59 +3,50 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Client } from 'discord.js';
 
-// Dice faces shown as application emojis (original artwork in assets/dice, V5-inspired).
-// 6e only cares about four kinds of result: 1, 2-7, 8-9 and 10.
-export type DieFace = 'one' | 'fail' | 'success' | 'ten';
-
-const FACES: DieFace[] = ['one', 'fail', 'success', 'ten'];
+// One application emoji per die value, built by scripts/build-dice.sh from the artwork in
+// assets/dice/art: the value is drawn on the face so it always sits with its die.
+const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const EMOJI_PREFIX = 'vtm6e_';
 const ASSETS = new URL('../../assets/dice/', import.meta.url);
 
-let emojis: Partial<Record<DieFace, string>> = {};
+let emojis: Partial<Record<number, string>> = {};
 
-export function dieFace(value: number): DieFace {
-  if (value === 1) return 'one';
-  if (value === 10) return 'ten';
-  return value >= 8 ? 'success' : 'fail';
-}
-
-/** The `<:name:id>` markup for each face, or undefined until the emojis are synced. */
+/** The `<:name:id>` markup for a die value, or undefined until the emojis are synced. */
 export function diceEmoji(value: number): string | undefined {
-  return emojis[dieFace(value)];
+  return emojis[value];
 }
 
-export function setDiceEmojis(map: Partial<Record<DieFace, string>>): void {
+export function setDiceEmojis(map: Partial<Record<number, string>>): void {
   emojis = map;
 }
 
 /**
- * Uploads each face as an application emoji, then remembers their markup.
+ * Uploads each die face as an application emoji, then remembers their markup.
  * The name carries a hash of the artwork, so changed art replaces the old emoji.
  */
 export async function syncDiceEmojis(client: Client<true>): Promise<void> {
   const existing = await client.application.emojis.fetch();
-  const map: Partial<Record<DieFace, string>> = {};
-  for (const face of FACES) {
-    const attachment = await readFile(fileURLToPath(new URL(`${face}.png`, ASSETS)));
-    const name = emojiName(face, attachment);
-    let emoji = existing.find((e) => e.name === name);
-    if (!emoji) {
-      for (const stale of existing.filter((e) => isFaceEmoji(e.name, face)).values()) {
-        await stale.delete();
-      }
-      emoji = await client.application.emojis.create({ attachment, name });
-    }
-    map[face] = emoji.toString();
+  const map: Partial<Record<number, string>> = {};
+  const wanted = new Set<string>();
+  for (const value of VALUES) {
+    const attachment = await readFile(fileURLToPath(new URL(`${value}.png`, ASSETS)));
+    const name = emojiName(value, attachment);
+    wanted.add(name);
+    const emoji =
+      existing.find((e) => e.name === name) ??
+      (await client.application.emojis.create({ attachment, name }));
+    map[value] = emoji.toString();
+  }
+  const stale = existing.filter(
+    (e) => e.name !== null && e.name.startsWith(EMOJI_PREFIX) && !wanted.has(e.name),
+  );
+  for (const emoji of stale.values()) {
+    await emoji.delete();
   }
   setDiceEmojis(map);
 }
 
-export function emojiName(face: DieFace, art: Buffer): string {
+export function emojiName(value: number, art: Buffer): string {
   const hash = createHash('sha256').update(art).digest('hex').slice(0, 8);
-  return `${EMOJI_PREFIX}${face}_${hash}`;
-}
-
-function isFaceEmoji(name: string | null, face: DieFace): boolean {
-  const base = `${EMOJI_PREFIX}${face}`;
-  return name === base || (name?.startsWith(`${base}_`) ?? false);
+  return `${EMOJI_PREFIX}d${value}_${hash}`;
 }

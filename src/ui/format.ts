@@ -171,8 +171,9 @@ export function rollMessage(
   } else {
     const { result, quickening } = response;
     embed.setColor(outcomeColor(result.outcome));
+    // The faces carry their numbers; the field is the fallback when they can't be shown.
     content = diceLine(result.dice);
-    fields.push({ name: 'Dadi', value: formatDice(result.dice) });
+    if (!content) fields.push({ name: 'Dadi', value: formatDice(result.dice) });
     fields.push({ name: 'Esito', value: outcomeLine(result) });
     if (result.outcome === 'painful-failure') {
       fields.push({ name: 'Choose Your Pain', value: CHOOSE_YOUR_PAIN.join('\n') });
