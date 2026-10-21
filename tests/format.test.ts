@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { performRoll, type RollRequest } from '../src/game/roll.js';
+import { performNpcRoll, performRoll, type RollRequest } from '../src/game/roll.js';
 import { Store } from '../src/state/store.js';
 import { setDiceEmojis } from '../src/ui/diceEmojis.js';
 import type { Locale } from '../src/i18n/index.js';
@@ -130,5 +130,43 @@ describe('rollMessage', () => {
 describe('formatDice', () => {
   it('sorts high to low and bolds successes', () => {
     expect(formatDice([3, 10, 8, 1])).toBe('**10** **8** 3 1');
+  });
+});
+
+describe('NPC rolls', () => {
+  function renderNpc(request: RollRequest, dice: number[]) {
+    const store = new Store(':memory:');
+    let i = 0;
+    const response = performNpcRoll(store, request, { roller: () => dice[i++ % dice.length]! });
+    const quickening = store.getQuickening(request.channelId, request.userId);
+    store.close();
+    const message = rollMessage('en', response, 'Level 3 NPC');
+    return {
+      quickening,
+      embed: message.embeds[0]!.toJSON(),
+      buttons: message.components.flatMap((row) => row.toJSON().components),
+    };
+  }
+
+  it('turns a would-be Painful Failure into a plain Failure with no player buttons', () => {
+    const { embed, buttons } = renderNpc({ ...base, dice: 6, difficulty: 0 }, [1, 3, 5]);
+    expect(embed.fields?.find((f) => f.name === 'Outcome')?.value).toContain('Failure');
+    expect(embed.fields?.find((f) => f.name === 'Outcome')?.value).not.toContain('Painful');
+    expect(embed.fields?.find((f) => f.name === 'Choose Your Pain')).toBeUndefined();
+    expect(buttons).toEqual([]);
+  });
+
+  it('rolls straight away even with 4+ dice, and gives nobody Quickening for its 10s', () => {
+    const { embed, quickening, buttons } = renderNpc({ ...base, dice: 8, difficulty: 0 }, [10]);
+    expect(embed.fields?.find((f) => f.name === 'Outcome')?.value).toContain('Success');
+    expect(embed.fields?.find((f) => f.name === 'Quickening')).toBeUndefined();
+    expect(quickening).toBe(0);
+    expect(buttons).toEqual([]);
+  });
+
+  it('just fails when Difficulty leaves no dice', () => {
+    const { embed, buttons } = renderNpc({ ...base, dice: 2, modifier: 0, difficulty: 3 }, [9]);
+    expect(embed.fields?.find((f) => f.name === 'Outcome')?.value).toContain('Failure');
+    expect(buttons).toEqual([]);
   });
 });

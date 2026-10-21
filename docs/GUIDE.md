@@ -103,7 +103,9 @@ A contested test: both sides roll, the most successes wins.
 
 ### `/elder npc`
 
-`/elder npc level`, plus the same options as `/elder roll`: a test for an NPC you control. The pool is 2 × NPC Level (1–10).
+`/elder npc level [difficulty] [bonus] [reason] [ignore_traits]`: a test for an NPC you control. The pool is 2 × NPC Level (1–10).
+
+NPCs don't use the players' mechanics: no Quickening, Overqualified, No Dice Left, Devil's Bargain, Choose Your Pain or Try again. The dice are rolled straight away, and an NPC with no successes simply fails.
 
 ### `/elder prolonged`
 

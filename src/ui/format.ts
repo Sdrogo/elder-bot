@@ -206,7 +206,7 @@ export function rollMessage(
       fields.push({ name: t(locale, 'roll.field.dice'), value: formatDice(result.dice) });
     }
     fields.push({ name: t(locale, 'roll.field.outcome'), value: outcomeLine(locale, result) });
-    if (result.outcome === 'painful-failure') {
+    if (result.outcome === 'painful-failure' && !response.npc) {
       fields.push({ name: CHOOSE_YOUR_PAIN, value: chooseYourPain(locale) });
       rows.push(choosePainRow(locale, request, quickening.total > 0));
     }
@@ -218,7 +218,7 @@ export function rollMessage(
     if (response.bargainAvailable) {
       buttons.push(button(encodeRollId('bargain', request), "Devil's Bargain", ButtonStyle.Danger));
     }
-    if (result.outcome !== 'success' && !request.retry) {
+    if (result.outcome !== 'success' && !request.retry && !response.npc) {
       buttons.push(retryButton(request));
     }
   }
