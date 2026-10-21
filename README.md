@@ -13,6 +13,8 @@ Le regole vengono dal Player Packet (cap. 4, "Rules of the Night") e dallo Story
 
 ## Comandi
 
+La guida completa per i giocatori, in inglese, è in [docs/GUIDE.md](docs/GUIDE.md).
+
 Tutti i comandi stanno sotto `/elder`, così il bot aggiunge una sola voce al server.
 
 | Comando                                                                                                              | Cosa fa                                                                                                                                                                    |
