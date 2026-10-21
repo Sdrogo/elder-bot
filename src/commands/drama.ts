@@ -114,7 +114,7 @@ export const drama: Command = {
 
     if (sub === 'trait' && store.listTraits(channelId).length >= MAX_SCENE_TRAITS) {
       await interaction.reply({
-        content: `Ci sono già ${MAX_SCENE_TRAITS} scene trait: rimuovili con \`/drama clear_traits\`.`,
+        content: `Ci sono già ${MAX_SCENE_TRAITS} scene trait: rimuovili con \`/elder drama clear_traits\`.`,
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -139,7 +139,7 @@ export const drama: Command = {
         embeds: [
           infoEmbed(
             'Scene trait',
-            `**${name}**: ${signed(modifier)} dadi a tutti i \`/roll\` della scena (chi non è coinvolto usa \`ignore_traits\`).\nDrama rimasto: **${current - cost}**.`,
+            `**${name}**: ${signed(modifier)} dadi a tutti i \`/elder roll\` della scena (chi non è coinvolto usa \`ignore_traits\`).\nDrama rimasto: **${current - cost}**.`,
           ),
         ],
       });

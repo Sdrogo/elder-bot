@@ -85,7 +85,8 @@ export const prolonged: Command = {
 
     if (!current) {
       await interaction.reply({
-        content: 'Non hai un test prolungato aperto in questo canale. Usa `/prolonged start`.',
+        content:
+          'Non hai un test prolungato aperto in questo canale. Usa `/elder prolonged start`.',
         flags: MessageFlags.Ephemeral,
       });
       return;

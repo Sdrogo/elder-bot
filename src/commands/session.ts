@@ -47,7 +47,7 @@ export const session: Command = {
     const newUser = sub === 'storyteller' ? interaction.options.getUser('user') : null;
 
     if (sub === 'storyteller' && !newUser) {
-      const who = current ? `<@${current}>` : 'nessuno: chi fa `/session new` lo diventa';
+      const who = current ? `<@${current}>` : 'nessuno: chi fa `/elder session new` lo diventa';
       await interaction.reply({
         embeds: [infoEmbed('Narratore', `Narratore del tavolo: ${who}.`)],
       });
@@ -64,7 +64,7 @@ export const session: Command = {
         embeds: [
           infoEmbed(
             'Sessione chiusa',
-            'Quickening, Drama, scene trait, bargain e test prolungati azzerati. Il tavolo non ha più un Narratore: il prossimo `/session new` lo assegna.',
+            'Quickening, Drama, scene trait, bargain e test prolungati azzerati. Il tavolo non ha più un Narratore: il prossimo `/elder session new` lo assegna.',
           ),
         ],
       });
