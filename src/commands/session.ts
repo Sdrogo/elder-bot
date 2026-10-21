@@ -28,6 +28,11 @@ const data = new SlashCommandBuilder()
   )
   .addSubcommand((s) =>
     s
+      .setName('end')
+      .setDescription('Chiude la sessione: azzera il tavolo e libera il ruolo di Narratore'),
+  )
+  .addSubcommand((s) =>
+    s
       .setName('storyteller')
       .setDescription('Mostra o cambia il Narratore di questo canale')
       .addUserOption((o) => o.setName('user').setDescription('Il nuovo Narratore')),
@@ -45,6 +50,23 @@ export const session: Command = {
       const who = current ? `<@${current}>` : 'nessuno: chi fa `/session new` lo diventa';
       await interaction.reply({
         embeds: [infoEmbed('Narratore', `Narratore del tavolo: ${who}.`)],
+      });
+      return;
+    }
+
+    if (sub === 'end') {
+      if (!isStoryteller(interaction, current)) {
+        await interaction.reply({ content: STORYTELLER_ONLY, flags: MessageFlags.Ephemeral });
+        return;
+      }
+      store.endSession(channelId);
+      await interaction.reply({
+        embeds: [
+          infoEmbed(
+            'Sessione chiusa',
+            'Quickening, Drama, scene trait, bargain e test prolungati azzerati. Il tavolo non ha più un Narratore: il prossimo `/session new` lo assegna.',
+          ),
+        ],
       });
       return;
     }
