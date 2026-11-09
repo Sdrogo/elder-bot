@@ -19,10 +19,10 @@ art() { # $1 = artwork, $2 = output, $3 = artwork height (default: full)
 }
 
 art one 1.png 96 && number 1 1.png
-for v in 2 3 4 5 6 7; do
+for v in 2 3 4 5; do
   convert -size 512x512 xc:none -fill '#8c8c8c' -draw 'circle 256 256 256 456' \
     -gravity center -font "$FONT" -pointsize 240 -fill white -annotate +0+8 "$v" \
     -resize ${SIZE}x${SIZE} "$v.png"
 done
-for v in 8 9; do art success "$v.png" && number "$v" "$v.png"; done
+for v in 6 7 8 9; do art success "$v.png" && number "$v" "$v.png"; done
 art ten 10.png && number 10 10.png

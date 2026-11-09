@@ -16,15 +16,7 @@ import type { Command } from './types.js';
 export const AUTO_LANGUAGE = 'auto';
 
 const data = described(new SlashCommandBuilder().setName('session'), 'cmd.session.description')
-  .addSubcommand((s) =>
-    described(s.setName('new'), 'cmd.session.new.description').addIntegerOption((o) =>
-      described(o.setName('player_characters'), 'opt.session.player_characters')
-        .setRequired(true)
-        .setMinValue(1)
-        .setMaxValue(20),
-    ),
-  )
-  .addSubcommand((s) => described(s.setName('scene'), 'cmd.session.scene.description'))
+  .addSubcommand((s) => described(s.setName('new'), 'cmd.session.new.description'))
   .addSubcommand((s) => described(s.setName('end'), 'cmd.session.end.description'))
   .addSubcommand((s) =>
     described(s.setName('storyteller'), 'cmd.session.storyteller.description').addUserOption((o) =>
@@ -119,26 +111,9 @@ export const session: Command = {
       ? `\n${t(locale, 'session.storyteller.set', { user: `${interaction.user}` })}`
       : '';
 
-    if (sub === 'new') {
-      const pcs = interaction.options.getInteger('player_characters', true);
-      store.newSession(channelId, pcs);
-      await interaction.reply({
-        embeds: [
-          infoEmbed(
-            t(locale, 'session.new.title'),
-            `${t(locale, 'session.new', { pcs })}${storytellerLine}`,
-          ),
-        ],
-      });
-      return;
-    }
-    store.newScene(channelId);
     await interaction.reply({
       embeds: [
-        infoEmbed(
-          t(locale, 'session.scene.title'),
-          `${t(locale, 'session.scene')}${storytellerLine}`,
-        ),
+        infoEmbed(t(locale, 'session.new.title'), `${t(locale, 'session.new')}${storytellerLine}`),
       ],
     });
   },

@@ -1,10 +1,10 @@
-import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { npcPool, resolveContest, type ContestResult } from '../dice/contest.js';
-import { rollDice } from '../dice/roller.js';
+import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { resolveContest, type ContestResult } from '../dice/contest.js';
+import { rollDice, type DieRoller } from '../dice/roller.js';
 import { buildPool, evaluate, type TestResult } from '../dice/test.js';
-import { grantQuickening } from '../game/roll.js';
 import { described, localeFor, t, tn, type Locale } from '../i18n/index.js';
-import { COLORS, formatDice, quickeningLine } from '../ui/format.js';
+import { COLORS, TERMS, formatDice } from '../ui/format.js';
+import { hungerOption } from './shared.js';
 import type { Command } from './types.js';
 
 const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contest.description')
@@ -16,13 +16,9 @@ const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contes
   )
   .addIntegerOption((o) =>
     described(o.setName('opponent_dice'), 'opt.contest.opponent_dice')
+      .setRequired(true)
       .setMinValue(0)
       .setMaxValue(30),
-  )
-  .addIntegerOption((o) =>
-    described(o.setName('opponent_npc_level'), 'opt.contest.opponent_npc_level')
-      .setMinValue(1)
-      .setMaxValue(10),
   )
   .addUserOption((o) => described(o.setName('opponent'), 'opt.contest.opponent'))
   .addIntegerOption((o) =>
@@ -31,104 +27,127 @@ const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contes
   .addIntegerOption((o) =>
     described(o.setName('opponent_attribute'), 'opt.contest.opponent_attribute')
       .setMinValue(0)
-      .setMaxValue(10),
+      .setMaxValue(15),
   )
+  .addIntegerOption((o) => hungerOption(o, 'opt.contest.hunger'))
   .addIntegerOption((o) =>
-    described(o.setName('difficulty'), 'opt.contest.difficulty').setMinValue(0).setMaxValue(15),
+    hungerOption(o, 'opt.contest.opponent_hunger').setName('opponent_hunger'),
   )
   .addStringOption((o) => described(o.setName('reason'), 'opt.contest.reason').setMaxLength(100));
+
+interface Side {
+  name: string;
+  pool: number;
+  result: TestResult;
+  /** A player character: painful and bestial failures apply. */
+  player: boolean;
+}
+
+function rollSide(dice: number, hunger: number, roller?: DieRoller): TestResult {
+  const pool = buildPool({ dice, hunger });
+  return evaluate(rollDice(pool.normal, roller), rollDice(pool.hunger, roller));
+}
 
 export const contest: Command = {
   data,
   async execute(interaction, ctx) {
-    const locale = localeFor(interaction, ctx.store);
-    const opponentDice = interaction.options.getInteger('opponent_dice');
-    const npcLevel = interaction.options.getInteger('opponent_npc_level');
-    if ((opponentDice === null) === (npcLevel === null)) {
-      await interaction.reply({
-        content: t(locale, 'contest.error.pool'),
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
+    const { store, roller } = ctx;
+    const locale = localeFor(interaction, store);
+    const me = interaction.user;
+    const opponentUser = interaction.options.getUser('opponent');
+    const myDice = interaction.options.getInteger('dice', true);
+    const theirDice = interaction.options.getInteger('opponent_dice', true);
 
-    const difficulty = interaction.options.getInteger('difficulty') ?? 0;
-    const isNpc = npcLevel !== null;
-    const myPool = buildPool({
-      dice: interaction.options.getInteger('dice', true),
-      difficulty,
-    }).total;
-    const theirPool = buildPool({
-      dice: isNpc ? npcPool(npcLevel) : opponentDice!,
-      difficulty,
-    }).total;
-    const mine = evaluate(rollDice(myPool, ctx.roller));
-    const theirs = evaluate(rollDice(theirPool, ctx.roller));
+    const myHunger = interaction.options.getInteger('hunger') ?? 0;
+    const givenTheirHunger = interaction.options.getInteger('opponent_hunger');
+    const theirHunger = givenTheirHunger ?? 0;
+
+    const mine: Side = {
+      name: me.displayName,
+      pool: myDice,
+      result: rollSide(myDice, myHunger, roller),
+      player: true,
+    };
+    const theirs: Side = {
+      name: opponentUser?.displayName ?? t(locale, 'contest.opponent'),
+      pool: theirDice,
+      result: rollSide(theirDice, theirHunger, roller),
+      player: opponentUser !== null || givenTheirHunger !== null,
+    };
 
     const outcome = resolveContest(
       {
-        successes: mine.successes,
+        successes: mine.result.successes,
         attribute: interaction.options.getInteger('attribute') ?? undefined,
       },
       {
-        successes: theirs.successes,
+        successes: theirs.result.successes,
         attribute: interaction.options.getInteger('opponent_attribute') ?? undefined,
-        npc: isNpc,
       },
     );
 
-    const me = interaction.user;
-    const opponentUser = isNpc ? null : interaction.options.getUser('opponent');
-    const myName = me.displayName;
-    const theirName = isNpc
-      ? t(locale, 'npc.name', { level: npcLevel })
-      : (opponentUser?.displayName ?? t(locale, 'contest.opponent'));
+    const title = t(locale, 'contest.title', { a: mine.name, b: theirs.name });
+    const reason = interaction.options.getString('reason');
+    const embed = new EmbedBuilder()
+      .setTitle(reason ? `${title}: ${reason}` : title)
+      .setColor(outcome.winner === 'tie' ? COLORS.neutral : COLORS.success)
+      .addFields(field(locale, mine), field(locale, theirs), {
+        name: t(locale, 'contest.result'),
+        value: describe(
+          locale,
+          outcome,
+          mine.name,
+          theirs.name,
+          Math.abs(mine.result.successes - theirs.result.successes),
+        ),
+      });
 
     const notes: string[] = [];
-    const myGain = grantQuickening(ctx.store, interaction.channelId, me.id, mine.tens);
-    const myLine = quickeningLine(locale, myGain.gained, myGain.value, myGain.overflow);
-    if (myLine) notes.push(`${myName}: ${myLine}`);
-    if (opponentUser) {
-      const gain = grantQuickening(ctx.store, interaction.channelId, opponentUser.id, theirs.tens);
-      const line = quickeningLine(locale, gain.gained, gain.value, gain.overflow);
-      if (line) notes.push(`${theirName}: ${line}`);
+    for (const [side, key] of [
+      [mine, 'a'],
+      [theirs, 'b'],
+    ] as const) {
+      if (!side.player) continue;
+      const lost = outcome.winner !== 'tie' && outcome.winner !== key;
+      if (side.result.successes === 0) notes.push(`${side.name}: **${TERMS.painful}**`);
+      if (side.result.hungerOnes > 0 && lost) notes.push(`${side.name}: **${TERMS.bestial}**`);
+      if (side.result.hungerOnes > 0 && outcome.winner === 'tie') {
+        notes.push(`${side.name}: ${t(locale, 'contest.bestialIfLost')}`);
+      }
     }
-
-    const title = t(locale, 'contest.title', { a: myName, b: theirName });
-    const embed = new EmbedBuilder()
-      .setTitle(`${title}${reasonSuffix(interaction.options.getString('reason'))}`)
-      .setColor(outcome.winner === 'tie' ? COLORS.neutral : COLORS.success)
-      .addFields(side(locale, myName, myPool, mine), side(locale, theirName, theirPool, theirs), {
-        name: t(locale, 'contest.result'),
-        value: describe(locale, outcome, myName, theirName),
-      });
-    if (notes.length) embed.addFields({ name: 'Quickening', value: notes.join('\n') });
+    if (notes.length)
+      embed.addFields({ name: t(locale, 'contest.consequences'), value: notes.join('\n') });
     await interaction.reply({ embeds: [embed] });
   },
 };
 
-function reasonSuffix(reason: string | null): string {
-  return reason ? `: ${reason}` : '';
-}
-
-function side(locale: Locale, name: string, pool: number, result: TestResult) {
+function field(locale: Locale, side: Side) {
+  const { result } = side;
+  const lines = [formatDice(result.dice)];
+  if (result.hunger.length) lines.push(`${TERMS.hunger}: ${formatDice(result.hunger)}`);
+  lines.push(tn(locale, 'roll.successes', result.successes));
   return {
-    name: `${name} (${tn(locale, 'dice.count', pool)})`,
-    value: `${formatDice(result.dice)}\n${tn(locale, 'roll.successes', result.successes)}`,
+    name: `${side.name} (${tn(locale, 'dice.count', side.pool)})`,
+    value: lines.join('\n'),
     inline: true,
   };
 }
 
-function describe(locale: Locale, result: ContestResult, a: string, b: string): string {
+/** The winner and its margin of success: the loser's margin of failure (p. 97). */
+function describe(
+  locale: Locale,
+  result: ContestResult,
+  a: string,
+  b: string,
+  margin: number,
+): string {
   const winner = result.winner === 'a' ? a : b;
   switch (result.tieBreak) {
     case undefined:
-      return t(locale, 'contest.win', { winner });
+      return `${t(locale, 'contest.win', { winner })} (${t(locale, 'roll.margin', { margin: `+${margin}` })})`;
     case 'attribute':
       return t(locale, 'contest.tie.attribute', { winner });
-    case 'initiator-or-storyteller':
-      return t(locale, 'contest.tie.npc');
-    case 'storyteller':
-      return t(locale, 'contest.tie.storyteller');
+    case 'initiator':
+      return t(locale, 'contest.tie.initiator');
   }
 }
