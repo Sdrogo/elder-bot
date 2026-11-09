@@ -7,15 +7,23 @@ import {
   MessageFlags,
   ModalBuilder,
   TextInputBuilder,
+  StringSelectMenuBuilder,
   TextInputStyle,
   type ButtonInteraction,
   type ModalSubmitInteraction,
+  type StringSelectMenuInteraction,
 } from 'discord.js';
 import { isStoryteller, storytellerOnly } from '../auth/storyteller.js';
-import { performRoll, type RollRequest } from '../game/roll.js';
+import {
+  WILLPOWER_REROLL,
+  judge,
+  performRoll,
+  rerollWithWillpower,
+  type RollRequest,
+} from '../game/roll.js';
 import type { Context } from '../commands/types.js';
 import { localeFor, t, type Locale } from '../i18n/index.js';
-import { decodeRollId, encodeRollId } from '../ui/customId.js';
+import { decodeRollId, encodeRollId, type RollRef } from '../ui/customId.js';
 import { COLORS, TERMS, button, retryRow, rollMessage } from '../ui/format.js';
 import { OnceGuard } from './once.js';
 
@@ -25,21 +33,17 @@ const STORYTELLER_ACTIONS = new Set(['bargain-yes', 'bargain-no']);
 const once = new OnceGuard();
 
 /** Claims one step of a roll message; false if someone already clicked it. */
-function claim(interaction: ButtonInteraction | ModalSubmitInteraction, step: string): boolean {
+type RollInteraction = ButtonInteraction | ModalSubmitInteraction | StringSelectMenuInteraction;
+
+function claim(interaction: RollInteraction, step: string): boolean {
   return once.claim(`${interaction.message?.id ?? interaction.id}:${step}`);
 }
 
-function alreadyUsed(
-  interaction: ButtonInteraction | ModalSubmitInteraction,
-  locale: Locale,
-): Promise<void> {
+function alreadyUsed(interaction: RollInteraction, locale: Locale): Promise<void> {
   return replyEphemeral(interaction, t(locale, 'button.alreadyUsed'));
 }
 
-async function replyEphemeral(
-  interaction: ButtonInteraction | ModalSubmitInteraction,
-  content: string,
-): Promise<void> {
+async function replyEphemeral(interaction: RollInteraction, content: string): Promise<void> {
   await interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }
 
@@ -115,7 +119,13 @@ export async function handleRollButton(
     }
 
     case 'retry': {
-      const next = { ...request, difficulty: request.difficulty + 1, retry: true };
+      // A new test: Willpower can be spent on it again.
+      const next = {
+        ...request,
+        difficulty: request.difficulty + 1,
+        retry: true,
+        willpower: false,
+      };
       const modal = new ModalBuilder()
         .setCustomId(encodeRollId('retry-modal', next))
         .setTitle(t(locale, 'retry.modal.title', { difficulty: next.difficulty }))
@@ -135,9 +145,77 @@ export async function handleRollButton(
       return;
     }
 
+    // Push Yourself (p. 104): pick up to 3 normal dice to reroll.
+    case 'wp': {
+      if (!ref.faces) return;
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(encodeRollId('wp-pick', ref.request, ref.faces))
+        .setPlaceholder(t(locale, 'willpower.pick', { max: WILLPOWER_REROLL }))
+        .setMinValues(1)
+        .setMaxValues(Math.min(WILLPOWER_REROLL, ref.faces.normal.length))
+        .addOptions(
+          ref.faces.normal.map((face, i) => ({
+            label: t(locale, 'willpower.option', { n: i + 1, face }),
+            value: String(i),
+          })),
+        );
+      await interaction.update({
+        components: [
+          new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            button(
+              encodeRollId('wp-cancel', ref.request, ref.faces),
+              t(locale, 'button.cancel'),
+              ButtonStyle.Secondary,
+            ),
+          ),
+        ],
+      });
+      return;
+    }
+
+    // Back to the roll as it was, with its buttons.
+    case 'wp-cancel': {
+      if (!ref.faces) return;
+      const response = judge(request, ref.faces.normal, ref.faces.hunger);
+      const { components } = rollMessage(locale, response, embed.data.title ?? '');
+      await interaction.update({ components });
+      return;
+    }
+
     default:
       return;
   }
+}
+
+export async function handleRollSelect(
+  interaction: StringSelectMenuInteraction,
+  ctx: Context,
+): Promise<void> {
+  const ref: RollRef | undefined = decodeRollId(interaction.customId);
+  if (!ref || ref.action !== 'wp-pick' || !ref.faces) return;
+  const locale = localeFor(interaction, ctx.store);
+  if (interaction.user.id !== ref.request.userId) {
+    await replyEphemeral(interaction, t(locale, 'button.notYours'));
+    return;
+  }
+  if (!claim(interaction, 'willpower')) return alreadyUsed(interaction, locale);
+
+  const request: RollRequest = { ...ref.request, channelId: interaction.channelId };
+  const response = rerollWithWillpower(
+    request,
+    ref.faces.normal,
+    ref.faces.hunger,
+    interaction.values.map(Number),
+    ctx.roller,
+  );
+  const original = interaction.message.embeds[0];
+  const title = original?.title ?? t(locale, 'roll.title');
+  const changes = response.rerolled.map(([from, to]) => `${from} → ${to}`).join(', ');
+  const message = rollMessage(locale, response, title, [
+    { name: TERMS.willpower, value: t(locale, 'willpower.spent', { changes }) },
+  ]);
+  await interaction.update({ content: message.content ?? '', ...message });
 }
 
 export async function handleRollModal(

@@ -3,6 +3,7 @@ import { rollDice } from '../src/dice/roller.js';
 import { buildPool, countSuccesses, evaluate, takeHalf } from '../src/dice/test.js';
 import { resolveContest } from '../src/dice/contest.js';
 import { addProlongedTest, startProlonged } from '../src/dice/prolonged.js';
+import { masqueradeLevel, threatReaction } from '../src/dice/masquerade.js';
 
 function loaded(...values: number[]) {
   let i = 0;
@@ -162,5 +163,24 @@ describe('prolonged tasks', () => {
   it('fails at once on a painful or bestial failure', () => {
     const task = startProlonged('Ritual', 7, 7);
     expect(addProlongedTest(task, 0, { disaster: true }).status).toBe('failed');
+  });
+});
+
+describe('Masquerade Tracker', () => {
+  it('names the level of each rank', () => {
+    expect([0, 2, 3, 6, 8, 10].map(masqueradeLevel)).toEqual([
+      'Superstition',
+      'Disbelief',
+      'Skepticism',
+      'Concern',
+      'Certainty',
+      'Open War',
+    ]);
+  });
+
+  it('turns threat test successes into a reaction', () => {
+    expect(threatReaction(0)).toBe('Calm Before the Storm');
+    expect(threatReaction(3)).toBe('Minor Threat');
+    expect(threatReaction(9)).toBe('Overwhelming Threat');
   });
 });

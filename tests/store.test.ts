@@ -35,3 +35,20 @@ describe('Store', () => {
     expect(store.getProlonged('c1', 'u1')).toBeUndefined();
   });
 });
+
+describe('Masquerade Tracker storage', () => {
+  let s: Store;
+  beforeEach(() => {
+    s = new Store(':memory:');
+  });
+  afterEach(() => s.close());
+
+  it('stays between 0 and 10 and survives the end of a session', () => {
+    expect(s.getMasquerade('c1')).toBe(0);
+    expect(s.setMasquerade('c1', 14)).toBe(10);
+    expect(s.setMasquerade('c1', -1)).toBe(0);
+    s.setMasquerade('c1', 4);
+    s.endSession('c1');
+    expect(s.getMasquerade('c1')).toBe(4);
+  });
+});

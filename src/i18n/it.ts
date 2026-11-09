@@ -122,6 +122,41 @@ export const it: Messages = {
   'prolonged.progress': 'Successi **{successes}/{target}** · tiri usati **{done}/{max}**',
 
   // /elder session and the Storyteller.
+  // Willpower, /elder frenzy and /elder masquerade.
+  'cmd.frenzy.description':
+    'Resisti alla frenesia: Composure + Resolve, al massimo tanti dadi quanta Umanità',
+  'opt.frenzy.type': 'Tipo di frenesia',
+  'opt.frenzy.dice': 'Composure + Resolve',
+  'opt.frenzy.humanity': 'Il tuo grado di Umanità (o Sentiero): limita i dadi',
+  'opt.frenzy.hunger': 'I tuoi dadi Hunger (0-5): la Difficoltà della frenesia da fame',
+  'opt.frenzy.difficulty':
+    'Difficoltà del Narratore (rabbia 2 ± modificatori, clan 3 + modificatore di generazione)',
+  'frenzy.title': 'resiste a una {frenzy}',
+  'frenzy.capped': "Pool di {pool} dadi, ma l'Umanità {humanity} lo limita.",
+  'frenzy.resisted': 'Resiste per il resto della scena.',
+  'frenzy.suffered': 'Il personaggio cade in {frenzy}.',
+  'frenzy.painful': 'Il personaggio cade in {frenzy} e fa qualcosa di cui si pentirà.',
+  'frenzy.error.difficulty': 'Indica la `difficulty` decisa dal Narratore.',
+  'frenzy.error.noHunger':
+    'La Difficoltà della frenesia da fame sono i tuoi dadi Hunger: indica `hunger` (almeno 1) o una `difficulty`.',
+  'cmd.masquerade.description': 'Il Masquerade Tracker di questo tavolo',
+  'cmd.masquerade.show.description': 'Mostra il Masquerade Tracker',
+  'cmd.masquerade.mark.description': 'Segna caselle dopo una violazione (Narratore)',
+  'cmd.masquerade.clear.description':
+    'Cancella caselle quando la Masquerade viene riparata (Narratore)',
+  'cmd.masquerade.set.description': 'Imposta il tracker a mano (Narratore)',
+  'cmd.masquerade.threat.description': 'Threat test: un dado per casella segnata (Narratore)',
+  'opt.masquerade.mark': 'Caselle da segnare (predefinito 1)',
+  'opt.masquerade.clear': 'Caselle da cancellare (predefinito 1)',
+  'opt.masquerade.reason': 'Cosa è successo',
+  'opt.masquerade.value': 'Caselle segnate, da 0 a 10',
+  'masquerade.title': 'Masquerade Tracker',
+  'masquerade.threat.title': 'Threat test della Masquerade',
+  'willpower.pick': 'Scegli fino a {max} dadi da ritirare (−1 Willpower)',
+  'willpower.option': 'Dado {n}: {face}',
+  'willpower.spent': '1 Willpower spesa, ritirati: {changes}.',
+  'button.cancel': 'Annulla',
+
   'auth.storytellerOnly':
     'Solo il Narratore di questo tavolo può farlo. Chi fa `/elder session new` diventa Narratore, e può passare il ruolo con `/elder session storyteller`.',
   'session.storyteller.title': 'Narratore',

@@ -3,6 +3,9 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ProlongedTask } from '../dice/prolonged.js';
 
+/** The Masquerade Tracker has 10 boxes. */
+export const MASQUERADE_BOXES = 10;
+
 /**
  * Table state, scoped by Discord channel: one channel is one game table.
  * Hunger dice are not stored: players give them with each roll.
@@ -24,9 +27,30 @@ export class Store {
       CREATE TABLE IF NOT EXISTS prolonged (
         channel_id TEXT NOT NULL, user_id TEXT NOT NULL, task TEXT NOT NULL,
         PRIMARY KEY (channel_id, user_id));
+      CREATE TABLE IF NOT EXISTS masquerade (
+        channel_id TEXT PRIMARY KEY, value INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS table_locale (
         channel_id TEXT PRIMARY KEY, locale TEXT NOT NULL);
     `);
+  }
+
+  /** Marked boxes on the Masquerade Tracker (Storyteller Packet p. 32), 0 to 10. */
+  getMasquerade(channelId: string): number {
+    const row = this.db
+      .prepare('SELECT value FROM masquerade WHERE channel_id = ?')
+      .get(channelId) as { value: number } | undefined;
+    return row?.value ?? 0;
+  }
+
+  setMasquerade(channelId: string, value: number): number {
+    const clamped = Math.min(MASQUERADE_BOXES, Math.max(0, value));
+    this.db
+      .prepare(
+        `INSERT INTO masquerade (channel_id, value) VALUES (?, ?)
+         ON CONFLICT (channel_id) DO UPDATE SET value = excluded.value`,
+      )
+      .run(channelId, clamped);
+    return clamped;
   }
 
   /** The Storyteller of a table, set by /session; undefined until someone takes the role. */
@@ -89,7 +113,10 @@ export class Store {
       .run(channelId, userId);
   }
 
-  /** End of the game at this table: everything is wiped, including the Storyteller and the language. */
+  /**
+   * End of the game at this table: everything is wiped, including the Storyteller and the language.
+   * The Masquerade Tracker stays: it belongs to the chronicle, not to one session.
+   */
   endSession(channelId: string): void {
     this.db.transaction(() => {
       for (const table of ['prolonged', 'storytellers', 'table_locale']) {

@@ -62,21 +62,21 @@ describe('rollMessage', () => {
   it("offers Beast's Bargain and Try again on a failure", () => {
     const { buttons, field } = render(base, [6, 2, 2, 2], 'en');
     expect(field('Outcome')).toBe('**Failure** · 1 success of 2 (margin −1)');
-    expect(labels(buttons)).toEqual(["Beast's Bargain", 'Try again']);
+    expect(labels(buttons)).toEqual(['Willpower', "Beast's Bargain", 'Try again']);
   });
 
   it('asks for a complication on a painful failure, with Try again only', () => {
     const { buttons, field } = render(base, [2], 'en');
     expect(field('Outcome')).toContain('**Painful Failure**');
     expect(field('Complication')).toBeDefined();
-    expect(labels(buttons)).toEqual(['Try again']);
+    expect(labels(buttons)).toEqual(['Willpower', 'Try again']);
   });
 
   it('marks a bestial failure', () => {
     const { field, buttons } = render({ ...base, hunger: 1 }, [6, 2, 3, 1], 'en');
     expect(field('Outcome')).toContain('**Bestial Failure**');
     expect(field('Bestial Failure')).toBeDefined();
-    expect(labels(buttons)).toEqual(['Try again']);
+    expect(labels(buttons)).toEqual(['Willpower', 'Try again']);
   });
 
   it('points out an automatic win when the pool is twice the Difficulty', () => {
