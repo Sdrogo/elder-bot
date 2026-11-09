@@ -44,12 +44,12 @@ If your pool is at least twice the Difficulty, the bot reminds the Storyteller t
 
 Above the roll summary the bot shows each die as an icon with its number, highest first. Hunger dice sit on a second line, in red.
 
-| Icon                        | Die | Meaning                                  |
-| --------------------------- | --- | ---------------------------------------- |
-| Grey dot (dark red: Hunger) | 1–5 | No success                               |
-| Green ankh (red: Hunger)    | 6–9 | Success                                  |
-| Bright ankh                 | 10  | Two successes                            |
-| Red skull                   | 1   | On a Hunger die: risk of Bestial Failure |
+| Icon                                  | Die | Meaning                                  |
+| ------------------------------------- | --- | ---------------------------------------- |
+| Grey d10 (dark red: Hunger)           | 1–5 | No success                               |
+| Green d10 (red: Hunger)               | 6–9 | Success                                  |
+| Bright green d10 (bright red: Hunger) | 10  | Two successes                            |
+| Black d10 with a red number           | 1   | On a Hunger die: risk of Bestial Failure |
 
 The summary below shows the pool, the Difficulty, the successes and the margin. With more than 27 dice the icons are replaced by plain numbers.
 

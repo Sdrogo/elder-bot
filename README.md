@@ -35,12 +35,12 @@ Esempio: `/elder roll dice:7 difficulty:2 hunger:1 reason:Scalare il muro`. Disc
 
 Sopra il riepilogo del tiro il bot mostra i dadi come icone grandi, dal più alto al più basso, con il numero disegnato su ciascuna. I dadi Fame stanno su una seconda riga, in rosso:
 
-- pallino grigio (rosso scuro per la Fame): da 1 a 5, fallimento;
-- ankh verde (rosso per la Fame): da 6 a 9, successo;
-- ankh acceso: 10, due successi;
-- teschio rosso: 1 su un dado Fame, rischio di Bestial Failure.
+- d10 grigio (rosso scuro per la Fame): da 1 a 5, fallimento;
+- d10 verde (rosso per la Fame): da 6 a 9, successo;
+- d10 verde acceso (rosso acceso per la Fame): 10, due successi;
+- d10 nero con il numero rosso: 1 su un dado Fame, rischio di Bestial Failure.
 
-Le icone sono emoji dell'applicazione: il bot le carica da solo all'avvio e sostituisce quelle vecchie quando cambiano. Con più di 27 dadi, o se le emoji non sono ancora caricate, i dadi compaiono come numeri nei campi **Dadi** e **Hunger**. Le immagini nascono dai disegni in `assets/dice/art`: dopo averli modificati rigenera le facce con `scripts/build-dice.sh` (serve ImageMagick).
+Le icone sono emoji dell'applicazione: il bot le carica da solo all'avvio e sostituisce quelle vecchie quando cambiano. Con più di 27 dadi, o se le emoji non sono ancora caricate, i dadi compaiono come numeri nei campi **Dadi** e **Hunger**. Le facce sono disegnate da `scripts/build-dice.sh` (serve ImageMagick): per cambiare forma o colori modifica lo script e rilancialo.
 
 Lo stato (test prolungati, Masquerade Tracker, Narratore, lingua) è salvato per canale in un file SQLite: un canale corrisponde a un tavolo di gioco. Ogni tavolo ha il suo **Narratore**: chi fa `/elder session new` in un canale che non ne ha ancora uno lo diventa, e può passare il ruolo con `/elder session storyteller user`. `/elder session end` chiude la partita: azzera lo stato del canale e libera il ruolo di Narratore, ma lascia il Masquerade Tracker, che appartiene alla cronaca. Gli amministratori del server (permesso Gestisci server) contano sempre come Narratore, così un tavolo non resta bloccato. Solo il Narratore può usare `/elder session`, modificare il Masquerade Tracker e concedere o rifiutare un Beast's Bargain.
 

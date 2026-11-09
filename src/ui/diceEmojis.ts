@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Client } from 'discord.js';
 
 // One application emoji per die value, for normal and Hunger dice, built by
-// scripts/build-dice.sh from the artwork in assets/dice/art: the value is drawn on the face
+// scripts/build-dice.sh as d10 shapes: the value is drawn on the face
 // so it always sits with its die. Hunger faces are files h1.png … h10.png.
 const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const FACES = [...VALUES.map(String), ...VALUES.map((v) => `h${v}`)];
