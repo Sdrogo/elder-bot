@@ -66,8 +66,7 @@ export function diceLine(dice: number[], hunger: number[] = []): string | undefi
     return undefined;
   }
   const normal = sortDesc(dice).map((d) => diceEmoji(d));
-  // Hunger dice share the normal faces for now: their own line sets them apart.
-  const hungry = sortDesc(hunger).map((d) => diceEmoji(d));
+  const hungry = sortDesc(hunger).map((d) => diceEmoji(d, { hunger: true }));
   if ([...normal, ...hungry].some((f) => f === undefined)) return undefined;
   return [normal, hungry]
     .filter((row) => row.length)

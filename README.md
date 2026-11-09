@@ -1,15 +1,17 @@
 # elder-bot
 
-Bot Discord per tirare i dadi con le regole del playtest di **Vampire: The Masquerade 6e (Alpha 1.0)**.
+Bot Discord per tirare i dadi con le regole del playtest di **Vampire: The Masquerade 6e (Alpha 2.0)**.
 
-Le regole vengono dal Player Packet (cap. 4, "Rules of the Night") e dallo Storyteller Packet. Non sono quelle della V5:
+Le regole vengono dal Player Packet (cap. 4, "Rules of the Night") e dallo Storyteller Packet dell'Alpha 2.0:
 
-- il pool è Attributo + Abilità − Difficoltà, mai sotto 0, e si tirano d10;
-- un dado da **8 in su** è un successo, ogni successo oltre il primo è un successo extra;
-- nessun 8+ ma almeno un 1 è un **Painful Failure** (Choose Your Pain);
-- ogni 10 dà 1 **Quickening** (massimo 5, si azzera a fine sessione);
-- con 4 o più dadi dopo la Difficoltà puoi prendere un successo base senza tirare (**Overqualified**, non in attacco o difesa);
-- niente dadi Fame e niente critici a coppie di 10.
+- il pool è Attributo + Abilità (o Disciplina, o Composure + Resolve) più bonus e malus, e si tirano d10;
+- un dado da **6 in su** è un successo, un **10 vale 2 successi**; vincere con un 10 è un **Critical Win**;
+- la **Difficoltà** è il numero di successi da ottenere (non toglie più dadi); il bot mostra il margine di successo o di fallimento;
+- nessun successo è un **Painful Failure**: oltre al fallimento arriva una complicazione;
+- i **dadi Fame** (opzione `hunger`, da 0 a 5, da scrivere a ogni tiro) sostituiscono dadi normali; un fallimento con un 1 su un dado Fame è un **Bestial Failure**;
+- **Willpower**: 1 punto per ritirare fino a 3 dadi normali, una volta per test;
+- **Beast's Bargain** dopo un fallimento semplice, **Taking Half** fuori dallo stress, **Try again** con Difficoltà +1;
+- niente più Quickening, Drama né Livello dei PNG.
 
 ## Comandi
 
@@ -17,30 +19,30 @@ La guida completa per i giocatori, in inglese, è in [docs/GUIDE.md](docs/GUIDE.
 
 Tutti i comandi stanno sotto `/elder`, così il bot aggiunge una sola voce al server.
 
-| Comando                                                                                                              | Cosa fa                                                                                                                                                                    |
-| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/elder roll dice [difficulty] [bonus] [quickening] [combat] [reason] [ignore_traits]`                               | Test standard, Power o Self-Control. Pulsanti per Overqualified, No Dice Left, Devil's Bargain, Choose Your Pain e Try again                                               |
-| `/elder contest dice (opponent_dice \| opponent_npc_level) [attribute] [opponent_attribute] [opponent] [difficulty]` | Test contrapposto. Pareggio tra PG: vince l'Attributo più alto. Contro un PNG: chi ha iniziato o decide il Narratore                                                       |
-| `/elder prolonged start \| roll \| status \| cancel`                                                                 | Test prolungato: 3, 5, 7 o 10 successi in 3, 5 o 7 tiri                                                                                                                    |
-| `/elder npc level`                                                                                                   | Test per un PNG: pool 2 × Livello, senza meccaniche da giocatore                                                                                                           |
-| `/elder quickening show \| add \| spend \| success \| set`                                                           | Quickening del giocatore nel canale                                                                                                                                        |
-| `/elder drama show \| add \| spend \| trait \| clear_traits`                                                         | Drama del Narratore. `trait` costa 2 Drama e aggiunge da −3 a +3 dadi a tutti i `/elder roll` della scena                                                                  |
-| `/elder session new \| scene \| end \| storyteller \| language`                                                      | Nuova sessione (Quickening a 0, Drama = 1 per PG), nuova scena (via scene trait e Devil's Bargain), fine sessione (azzera tutto), Narratore del canale o lingua del tavolo |
+| Comando                                                                                                             | Cosa fa                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/elder roll dice [difficulty] [bonus] [hunger] [take_half] [reason]`                                               | Test standard, Power o Self-Control. Pulsanti per Willpower, Beast's Bargain e Try again                                                   |
+| `/elder contest dice opponent_dice [opponent] [attribute] [opponent_attribute] [hunger] [opponent_hunger] [reason]` | Test contrapposto: vince chi fa più successi; in parità l'Attributo più alto, poi chi ha iniziato                                          |
+| `/elder prolonged start \| roll \| status \| cancel`                                                                | Compito prolungato: 3, 5, 7 o 10 successi in 3, 5 o 7 tiri; un Painful o Bestial Failure lo fa fallire subito                              |
+| `/elder npc dice [difficulty] [bonus] [take_half] [reason]`                                                         | Test per un PNG con il pool della sua scheda, senza meccaniche da giocatore                                                                |
+| `/elder frenzy type dice humanity [hunger] [difficulty] [bonus]`                                                    | Resistere alla frenesia: Composure + Resolve, al massimo tanti dadi quanta Umanità; per la frenesia da fame la Difficoltà sono i dadi Fame |
+| `/elder masquerade show \| mark \| clear \| set \| threat`                                                          | Masquerade Tracker del tavolo (0-10) e threat test del Narratore                                                                           |
+| `/elder session new \| end \| storyteller \| language`                                                              | Nuova sessione, fine sessione (azzera il tavolo), Narratore del canale o lingua del tavolo                                                 |
 
-Esempio: `/elder roll dice:7 difficulty:2 reason:Scalare il muro`. Discord passa da un campo all'altro col Tab.
+Esempio: `/elder roll dice:7 difficulty:2 hunger:1 reason:Scalare il muro`. Discord passa da un campo all'altro col Tab.
 
 ### Come appaiono i tiri
 
-Sopra il riepilogo del tiro il bot mostra i dadi come icone grandi, dal più alto al più basso, con il numero disegnato su ciascuna:
+Sopra il riepilogo del tiro il bot mostra i dadi come icone grandi, dal più alto al più basso, con il numero disegnato su ciascuna. I dadi Fame stanno su una seconda riga, in rosso:
 
-- teschio rosso: 1;
-- pallino grigio con la cifra: da 2 a 7, fallimento;
-- ankh verde: 8 e 9, successo;
-- ankh verde acceso: 10, successo che dà Quickening.
+- pallino grigio (rosso scuro per la Fame): da 1 a 5, fallimento;
+- ankh verde (rosso per la Fame): da 6 a 9, successo;
+- ankh acceso: 10, due successi;
+- teschio rosso: 1 su un dado Fame, rischio di Bestial Failure.
 
-Le icone sono emoji dell'applicazione: il bot le carica da solo all'avvio e sostituisce quelle vecchie quando cambiano. Con più di 27 dadi, o se le emoji non sono ancora caricate, i dadi compaiono come numeri nel campo **Dadi**. Le immagini nascono dai disegni in `assets/dice/art`: dopo averli modificati rigenera le facce con `scripts/build-dice.sh` (serve ImageMagick).
+Le icone sono emoji dell'applicazione: il bot le carica da solo all'avvio e sostituisce quelle vecchie quando cambiano. Con più di 27 dadi, o se le emoji non sono ancora caricate, i dadi compaiono come numeri nei campi **Dadi** e **Hunger**. Le immagini nascono dai disegni in `assets/dice/art`: dopo averli modificati rigenera le facce con `scripts/build-dice.sh` (serve ImageMagick).
 
-Lo stato (Quickening, Drama, scene trait, test prolungati) è salvato per canale in un file SQLite: un canale corrisponde a un tavolo di gioco. Ogni tavolo ha il suo **Narratore**: chi fa `/elder session new` in un canale che non ne ha ancora uno lo diventa, e può passare il ruolo con `/elder session storyteller user`. `/elder session end` chiude la partita: azzera lo stato del canale e libera il ruolo di Narratore. Gli amministratori del server (permesso Gestisci server) contano sempre come Narratore, così un tavolo non resta bloccato. Solo il Narratore può usare `/elder session`, `/elder drama` (tranne `show`), accettare o rifiutare un Devil's Bargain e modificare il Quickening di un altro giocatore. Chi tira non può rispondere al proprio bargain.
+Lo stato (test prolungati, Masquerade Tracker, Narratore, lingua) è salvato per canale in un file SQLite: un canale corrisponde a un tavolo di gioco. Ogni tavolo ha il suo **Narratore**: chi fa `/elder session new` in un canale che non ne ha ancora uno lo diventa, e può passare il ruolo con `/elder session storyteller user`. `/elder session end` chiude la partita: azzera lo stato del canale e libera il ruolo di Narratore, ma lascia il Masquerade Tracker, che appartiene alla cronaca. Gli amministratori del server (permesso Gestisci server) contano sempre come Narratore, così un tavolo non resta bloccato. Solo il Narratore può usare `/elder session`, modificare il Masquerade Tracker e concedere o rifiutare un Beast's Bargain.
 
 ## Lingue
 
@@ -48,7 +50,7 @@ Il bot risponde a ciascuno nella lingua del suo client Discord: inglese, italian
 
 Il Narratore può fissare la lingua del tavolo con `/elder session language`: una lingua (`English`, `Italiano`, `Español`, `Français`, `Deutsch`) vale per tutti nel canale, `Auto (Discord language)` torna alla lingua di ciascuno. `/elder session end` riporta il tavolo ad automatica.
 
-I termini di gioco del playtest restano in inglese in ogni lingua: Quickening, Drama, Painful Failure, Devil's Bargain, Overqualified, No Dice Left, Choose Your Pain, Try again, scene trait e così via.
+I termini di gioco del playtest restano in inglese in ogni lingua: Hunger, Willpower, Painful Failure, Bestial Failure, Critical Win, Beast's Bargain, Taking Half, Try again, Masquerade Tracker e così via.
 
 Per aggiungere una lingua copia `src/i18n/en.ts` in un nuovo file (ad esempio `src/i18n/pt.ts`, tipizzato `Messages` come `it.ts`), traduci i testi lasciando invariati i `{segnaposto}`, poi registralo in `src/i18n/index.ts` (`Locale`, `CATALOGS`, `LANGUAGE_NAMES` e il codice di Discord in `DISCORD_LOCALES`). I test controllano che il nuovo file abbia tutte le chiavi e gli stessi segnaposto. Dopo, registra di nuovo i comandi per pubblicare le descrizioni tradotte.
 

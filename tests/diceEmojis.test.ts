@@ -26,5 +26,13 @@ describe('dice emojis', () => {
     const b = emojiName(10, Buffer.from('new art'));
     expect(a).toMatch(/^vtm6e_d10_[0-9a-f]{8}$/);
     expect(a).not.toBe(b);
+    expect(emojiName('h1', Buffer.from('skull'))).toMatch(/^vtm6e_h1_[0-9a-f]{8}$/);
+  });
+
+  it('draws Hunger dice with their own faces, and falls back to numbers without them', () => {
+    setDiceEmojis({ ...EMOJIS, h1: '<:vtm6e_h1:1>' });
+    expect(diceLine([10], [1])).toBe(`${EMOJIS[10]}\n<:vtm6e_h1:1>`);
+    setDiceEmojis(EMOJIS);
+    expect(diceLine([10], [1])).toBeUndefined();
   });
 });

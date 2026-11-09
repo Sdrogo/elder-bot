@@ -33,13 +33,13 @@ const labels = (buttons: ReturnType<typeof render>['buttons']) =>
 
 describe('rollMessage', () => {
   it('puts the dice faces in the message text, Hunger dice on their own line', () => {
-    setDiceEmojis({ 10: '<:d10:1>', 8: '<:d8:2>', 2: '<:d2:3>', 1: '<:d1:4>' });
+    setDiceEmojis({ 10: '<:d10:1>', 8: '<:d8:2>', 2: '<:d2:3>', h1: '<:h1:4>' });
     try {
       const { content, field } = render(
         { ...base, dice: 4, modifier: 0, hunger: 1 },
         [10, 2, 8, 1],
       );
-      expect(content).toBe('<:d10:1> <:d8:2> <:d2:3>\n<:d1:4>');
+      expect(content).toBe('<:d10:1> <:d8:2> <:d2:3>\n<:h1:4>');
       expect(field('Dadi')).toBeUndefined();
     } finally {
       setDiceEmojis({});
