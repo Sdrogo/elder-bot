@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { performRoll, type RollRequest } from '../src/game/roll.js';
+import { performRoll, rerollWithWillpower, type RollRequest } from '../src/game/roll.js';
 import { decodeRollId, encodeRollId } from '../src/ui/customId.js';
 import { commands } from '../src/commands/index.js';
 
@@ -67,6 +67,36 @@ describe('performRoll', () => {
   });
 });
 
+describe('Willpower', () => {
+  it('rerolls up to 3 normal dice, never Hunger dice, once per test', () => {
+    const r = rerollWithWillpower(
+      { ...base, dice: 5, hunger: 1 },
+      [2, 3, 4, 9],
+      [1],
+      [0, 1, 2, 3],
+      loaded(8),
+    );
+    expect(r.result.dice).toEqual([8, 8, 8, 9]);
+    expect(r.result.hunger).toEqual([1]);
+    expect(r.rerolled).toEqual([
+      [2, 8],
+      [3, 8],
+      [4, 8],
+    ]);
+    expect(r.result.outcome).toBe('success');
+    expect(r.willpowerAvailable).toBe(false);
+  });
+
+  it('is offered on a player roll with normal dice', () => {
+    const r = performRoll(base, { roller: loaded(2) });
+    expect(r.kind === 'rolled' && r.willpowerAvailable).toBe(true);
+    const npc = performRoll(base, { roller: loaded(2), npc: true });
+    expect(npc.kind === 'rolled' && npc.willpowerAvailable).toBe(false);
+    const allHunger = performRoll({ ...base, hunger: 3 }, { roller: loaded(2) });
+    expect(allHunger.kind === 'rolled' && allHunger.willpowerAvailable).toBe(false);
+  });
+});
+
 describe('button ids', () => {
   it('round-trip the roll and stay under the 100 character limit', () => {
     const request = {
@@ -77,10 +107,31 @@ describe('button ids', () => {
       hunger: 5,
       takeHalf: true,
       retry: true,
+      willpower: true,
     };
     const id = encodeRollId('bargain-yes', request);
     expect(id.length).toBeLessThanOrEqual(100);
     expect(decodeRollId(id)).toEqual({ action: 'bargain-yes', request });
+  });
+
+  it('carry the dice faces for Willpower, even for the largest pool', () => {
+    const request = {
+      userId: '123456789012345678',
+      dice: 25,
+      difficulty: 15,
+      modifier: -10,
+      hunger: 5,
+      takeHalf: false,
+      retry: true,
+      willpower: false,
+    };
+    const faces = {
+      normal: [10, ...Array.from({ length: 24 }, (_, i) => (i % 9) + 1)],
+      hunger: [1, 10, 6, 6, 2],
+    };
+    const id = encodeRollId('wp-cancel', request, faces);
+    expect(id.length).toBeLessThanOrEqual(100);
+    expect(decodeRollId(id)).toEqual({ action: 'wp-cancel', request, faces });
   });
 
   it('ignores foreign ids', () => {
@@ -91,6 +142,14 @@ describe('button ids', () => {
 describe('slash commands', () => {
   it('all build valid Discord payloads with English names', () => {
     const names = commands.map((c) => c.data.toJSON().name);
-    expect(names).toEqual(['roll', 'contest', 'prolonged', 'npc', 'session']);
+    expect(names).toEqual([
+      'roll',
+      'contest',
+      'prolonged',
+      'npc',
+      'frenzy',
+      'masquerade',
+      'session',
+    ]);
   });
 });

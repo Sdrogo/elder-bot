@@ -14,7 +14,7 @@ export const ROOT = 'elder';
 type Nested = APIApplicationCommandSubcommandOption | APIApplicationCommandSubcommandGroupOption;
 
 // Every command lives under one /elder command so the bot adds a single entry to the server.
-// A command with subcommands becomes a group (/elder quickening set), any other a subcommand
+// A command with subcommands becomes a group (/elder masquerade mark), any other a subcommand
 // (/elder roll). discord.js reads options the same way at either depth, so commands don't change.
 export function elderCommand(commands: Command[]): RESTPostAPIChatInputApplicationCommandsJSONBody {
   return {

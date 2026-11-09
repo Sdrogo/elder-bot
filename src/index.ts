@@ -4,7 +4,7 @@ import { runElder } from './commands/elder.js';
 import type { Context } from './commands/types.js';
 import { loadConfig } from './config.js';
 import { localeFor, resolveLocale, t } from './i18n/index.js';
-import { handleRollButton, handleRollModal } from './interactions/rollButtons.js';
+import { handleRollButton, handleRollModal, handleRollSelect } from './interactions/rollButtons.js';
 import { Store } from './state/store.js';
 import { syncDiceEmojis } from './ui/diceEmojis.js';
 
@@ -32,6 +32,8 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
       await runElder(byName, interaction, ctx);
     } else if (interaction.isButton()) {
       await handleRollButton(interaction, ctx);
+    } else if (interaction.isStringSelectMenu()) {
+      await handleRollSelect(interaction, ctx);
     } else if (interaction.isModalSubmit()) {
       await handleRollModal(interaction, ctx);
     }

@@ -11,10 +11,10 @@ Il bot riceve da Discord solo le interazioni con i suoi comandi e pulsanti. Non 
 Per far funzionare la partita salva, per ogni canale in cui viene usato:
 
 - l'ID Discord del canale e degli utenti che tirano o che fanno da Narratore;
-- i valori di gioco: Quickening, Drama, Devil's Bargain già usati;
-- i testi scritti nei comandi che devono restare tra un tiro e l'altro: nomi degli scene trait e dei test prolungati.
+- i valori di gioco: il Masquerade Tracker e l'avanzamento dei compiti prolungati;
+- i testi scritti nei comandi che devono restare tra un tiro e l'altro: i nomi dei compiti prolungati.
 
-I risultati dei tiri, i motivi e i nomi visualizzati compaiono nei messaggi del bot su Discord ma non vengono salvati dal bot.
+I risultati dei tiri, i dadi Fame, i motivi e i nomi visualizzati compaiono nei messaggi del bot su Discord ma non vengono salvati dal bot.
 
 ## Perché
 

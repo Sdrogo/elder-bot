@@ -124,6 +124,42 @@ export const de: Messages = {
   'prolonged.progress': 'Erfolge **{successes}/{target}** · Würfe genutzt **{done}/{max}**',
 
   // /elder session and the Storyteller.
+  // Willpower, /elder frenzy and /elder masquerade.
+  'cmd.frenzy.description':
+    'Raserei widerstehen: Composure + Resolve, höchstens so viele Würfel wie Menschlichkeit',
+  'opt.frenzy.type': 'Art der Raserei',
+  'opt.frenzy.dice': 'Composure + Resolve',
+  'opt.frenzy.humanity': 'Dein Menschlichkeits- (oder Pfad-)Rang: begrenzt die Würfel',
+  'opt.frenzy.hunger': 'Deine Hunger-Würfel (0-5): Schwierigkeit der Hungerraserei',
+  'opt.frenzy.difficulty':
+    'Schwierigkeit vom Spielleiter (Wut 2 ± Modifikatoren, Clan 3 + Generationsmodifikator)',
+  'frenzy.title': 'widersteht einer {frenzy}',
+  'frenzy.capped': 'Pool von {pool} Würfeln, aber Menschlichkeit {humanity} begrenzt ihn.',
+  'frenzy.resisted': 'Widersteht für den Rest der Szene.',
+  'frenzy.suffered': 'Der Charakter verfällt in {frenzy}.',
+  'frenzy.painful': 'Der Charakter verfällt in {frenzy} und tut etwas, das er bereuen wird.',
+  'frenzy.error.difficulty': 'Gib die vom Spielleiter festgelegte `difficulty` an.',
+  'frenzy.error.noHunger':
+    'Die Schwierigkeit der Hungerraserei sind deine Hunger-Würfel: gib `hunger` (mindestens 1) oder eine `difficulty` an.',
+  'cmd.masquerade.description': 'Der Masquerade Tracker dieses Tisches',
+  'cmd.masquerade.show.description': 'Zeigt den Masquerade Tracker',
+  'cmd.masquerade.mark.description': 'Markiert Kästchen nach einem Bruch (Spielleiter)',
+  'cmd.masquerade.clear.description':
+    'Löscht Kästchen, wenn die Maskerade repariert ist (Spielleiter)',
+  'cmd.masquerade.set.description': 'Setzt den Tracker von Hand (Spielleiter)',
+  'cmd.masquerade.threat.description':
+    'Threat test: ein Würfel pro markiertem Kästchen (Spielleiter)',
+  'opt.masquerade.mark': 'Zu markierende Kästchen (Standard 1)',
+  'opt.masquerade.clear': 'Zu löschende Kästchen (Standard 1)',
+  'opt.masquerade.reason': 'Was passiert ist',
+  'opt.masquerade.value': 'Markierte Kästchen, 0 bis 10',
+  'masquerade.title': 'Masquerade Tracker',
+  'masquerade.threat.title': 'Threat test der Maskerade',
+  'willpower.pick': 'Wähle bis zu {max} Würfel zum Neuwurf (−1 Willpower)',
+  'willpower.option': 'Würfel {n}: {face}',
+  'willpower.spent': '1 Willpower ausgegeben, neu gewürfelt: {changes}.',
+  'button.cancel': 'Abbrechen',
+
   'auth.storytellerOnly':
     'Das kann nur der Spielleiter dieses Tisches. Wer `/elder session new` ausführt, wird Spielleiter und kann die Rolle mit `/elder session storyteller` weitergeben.',
   'session.storyteller.title': 'Spielleiter',

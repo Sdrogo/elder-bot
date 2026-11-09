@@ -124,6 +124,40 @@ export const fr: Messages = {
   'prolonged.progress': 'Réussites **{successes}/{target}** · jets utilisés **{done}/{max}**',
 
   // /elder session and the Storyteller.
+  // Willpower, /elder frenzy and /elder masquerade.
+  'cmd.frenzy.description':
+    "Résister à la frénésie : Composure + Resolve, au plus autant de dés que l'Humanité",
+  'opt.frenzy.type': 'Type de frénésie',
+  'opt.frenzy.dice': 'Composure + Resolve',
+  'opt.frenzy.humanity': "Ton rang d'Humanité (ou de Voie) : plafonne les dés",
+  'opt.frenzy.hunger': 'Tes dés de Hunger (0-5) : la Difficulté de la frénésie de faim',
+  'opt.frenzy.difficulty':
+    'Difficulté du Conteur (rage 2 ± modificateurs, clan 3 + modificateur de génération)',
+  'frenzy.title': 'résiste à une {frenzy}',
+  'frenzy.capped': "Réserve de {pool} dés, mais l'Humanité {humanity} la plafonne.",
+  'frenzy.resisted': 'Résiste pour le reste de la scène.',
+  'frenzy.suffered': 'Le personnage subit une {frenzy}.',
+  'frenzy.painful': "Le personnage subit une {frenzy} et fait quelque chose qu'il regrettera.",
+  'frenzy.error.difficulty': 'Indique la `difficulty` fixée par le Conteur.',
+  'frenzy.error.noHunger':
+    'La Difficulté de la frénésie de faim, ce sont tes dés de Hunger : indique `hunger` (au moins 1) ou une `difficulty`.',
+  'cmd.masquerade.description': 'Le Masquerade Tracker de cette table',
+  'cmd.masquerade.show.description': 'Affiche le Masquerade Tracker',
+  'cmd.masquerade.mark.description': 'Coche des cases après une brèche (Conteur)',
+  'cmd.masquerade.clear.description': 'Efface des cases quand la Masquerade est réparée (Conteur)',
+  'cmd.masquerade.set.description': 'Règle le tracker à la main (Conteur)',
+  'cmd.masquerade.threat.description': 'Threat test : un dé par case cochée (Conteur)',
+  'opt.masquerade.mark': 'Cases à cocher (1 par défaut)',
+  'opt.masquerade.clear': 'Cases à effacer (1 par défaut)',
+  'opt.masquerade.reason': "Ce qui s'est passé",
+  'opt.masquerade.value': 'Cases cochées, de 0 à 10',
+  'masquerade.title': 'Masquerade Tracker',
+  'masquerade.threat.title': 'Threat test de la Masquerade',
+  'willpower.pick': "Choisis jusqu'à {max} dés à relancer (−1 Willpower)",
+  'willpower.option': 'Dé {n} : {face}',
+  'willpower.spent': '1 Willpower dépensée, relancés : {changes}.',
+  'button.cancel': 'Annuler',
+
   'auth.storytellerOnly':
     'Seul le Conteur de cette table peut faire ça. Celui qui lance `/elder session new` devient Conteur, et peut passer le rôle avec `/elder session storyteller`.',
   'session.storyteller.title': 'Conteur',

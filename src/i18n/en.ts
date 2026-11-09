@@ -118,6 +118,40 @@ export const en = {
   'prolonged.progress': 'Successes **{successes}/{target}** · rolls used **{done}/{max}**',
 
   // /elder session and the Storyteller.
+  // Willpower, /elder frenzy and /elder masquerade.
+  'cmd.frenzy.description':
+    'Resist a frenzy: Composure + Resolve, at most as many dice as Humanity',
+  'opt.frenzy.type': 'Type of frenzy',
+  'opt.frenzy.dice': 'Composure + Resolve',
+  'opt.frenzy.humanity': 'Your Humanity (or Path) rank: caps the dice',
+  'opt.frenzy.hunger': 'Your Hunger dice (0-5): the Difficulty of a hunger frenzy',
+  'opt.frenzy.difficulty':
+    'Difficulty set by the Storyteller (rage 2 ± modifiers, clan 3 + generation modifier)',
+  'frenzy.title': 'resisting a {frenzy}',
+  'frenzy.capped': 'Pool of {pool} dice, but Humanity {humanity} caps it.',
+  'frenzy.resisted': 'Resisted for the rest of the scene.',
+  'frenzy.suffered': 'The character suffers a {frenzy}.',
+  'frenzy.painful': 'The character suffers a {frenzy} and does something they will regret.',
+  'frenzy.error.difficulty': 'Give the `difficulty` set by the Storyteller.',
+  'frenzy.error.noHunger':
+    "A hunger frenzy's Difficulty is your Hunger dice: give `hunger` (at least 1) or a `difficulty`.",
+  'cmd.masquerade.description': 'The Masquerade Tracker of this table',
+  'cmd.masquerade.show.description': 'Show the Masquerade Tracker',
+  'cmd.masquerade.mark.description': 'Mark boxes after a breach (Storyteller)',
+  'cmd.masquerade.clear.description': 'Clear boxes when the Masquerade is mended (Storyteller)',
+  'cmd.masquerade.set.description': 'Set the tracker by hand (Storyteller)',
+  'cmd.masquerade.threat.description': 'Threat test: one die per marked box (Storyteller)',
+  'opt.masquerade.mark': 'Boxes to mark (default 1)',
+  'opt.masquerade.clear': 'Boxes to clear (default 1)',
+  'opt.masquerade.reason': 'What happened',
+  'opt.masquerade.value': 'Marked boxes, from 0 to 10',
+  'masquerade.title': 'Masquerade Tracker',
+  'masquerade.threat.title': 'Masquerade threat test',
+  'willpower.pick': 'Pick up to {max} dice to reroll (−1 Willpower)',
+  'willpower.option': 'Die {n}: {face}',
+  'willpower.spent': '1 Willpower spent, rerolled: {changes}.',
+  'button.cancel': 'Cancel',
+
   'auth.storytellerOnly':
     "Only this table's Storyteller can do that. Whoever runs `/elder session new` becomes Storyteller, and can hand the role over with `/elder session storyteller`.",
   'session.storyteller.title': 'Storyteller',

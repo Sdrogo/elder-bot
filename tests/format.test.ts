@@ -33,13 +33,13 @@ const labels = (buttons: ReturnType<typeof render>['buttons']) =>
 
 describe('rollMessage', () => {
   it('puts the dice faces in the message text, Hunger dice on their own line', () => {
-    setDiceEmojis({ 10: '<:d10:1>', 8: '<:d8:2>', 2: '<:d2:3>', 1: '<:d1:4>' });
+    setDiceEmojis({ 10: '<:d10:1>', 8: '<:d8:2>', 2: '<:d2:3>', h1: '<:h1:4>' });
     try {
       const { content, field } = render(
         { ...base, dice: 4, modifier: 0, hunger: 1 },
         [10, 2, 8, 1],
       );
-      expect(content).toBe('<:d10:1> <:d8:2> <:d2:3>\n<:d1:4>');
+      expect(content).toBe('<:d10:1> <:d8:2> <:d2:3>\n<:h1:4>');
       expect(field('Dadi')).toBeUndefined();
     } finally {
       setDiceEmojis({});
@@ -62,21 +62,21 @@ describe('rollMessage', () => {
   it("offers Beast's Bargain and Try again on a failure", () => {
     const { buttons, field } = render(base, [6, 2, 2, 2], 'en');
     expect(field('Outcome')).toBe('**Failure** · 1 success of 2 (margin −1)');
-    expect(labels(buttons)).toEqual(["Beast's Bargain", 'Try again']);
+    expect(labels(buttons)).toEqual(['Willpower', "Beast's Bargain", 'Try again']);
   });
 
   it('asks for a complication on a painful failure, with Try again only', () => {
     const { buttons, field } = render(base, [2], 'en');
     expect(field('Outcome')).toContain('**Painful Failure**');
     expect(field('Complication')).toBeDefined();
-    expect(labels(buttons)).toEqual(['Try again']);
+    expect(labels(buttons)).toEqual(['Willpower', 'Try again']);
   });
 
   it('marks a bestial failure', () => {
     const { field, buttons } = render({ ...base, hunger: 1 }, [6, 2, 3, 1], 'en');
     expect(field('Outcome')).toContain('**Bestial Failure**');
     expect(field('Bestial Failure')).toBeDefined();
-    expect(labels(buttons)).toEqual(['Try again']);
+    expect(labels(buttons)).toEqual(['Willpower', 'Try again']);
   });
 
   it('points out an automatic win when the pool is twice the Difficulty', () => {

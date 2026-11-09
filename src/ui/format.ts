@@ -33,6 +33,7 @@ export const TERMS = {
   hunger: 'Hunger',
   tryAgain: 'Try again',
   automaticWin: 'Automatic Win',
+  willpower: 'Willpower',
 } as const;
 
 export function retryRow(request: Omit<RollRequest, 'channelId'>): ActionRowBuilder<ButtonBuilder> {
@@ -65,8 +66,7 @@ export function diceLine(dice: number[], hunger: number[] = []): string | undefi
     return undefined;
   }
   const normal = sortDesc(dice).map((d) => diceEmoji(d));
-  // Hunger dice share the normal faces for now: their own line sets them apart.
-  const hungry = sortDesc(hunger).map((d) => diceEmoji(d));
+  const hungry = sortDesc(hunger).map((d) => diceEmoji(d, { hunger: true }));
   if ([...normal, ...hungry].some((f) => f === undefined)) return undefined;
   return [normal, hungry]
     .filter((row) => row.length)
@@ -146,7 +146,12 @@ export interface RollMessage {
 }
 
 /** Renders the response of /roll, /npc and the roll buttons. `title` keeps the player's reason. */
-export function rollMessage(locale: Locale, response: RollResponse, title: string): RollMessage {
+export function rollMessage(
+  locale: Locale,
+  response: RollResponse,
+  title: string,
+  notes: APIEmbedField[] = [],
+): RollMessage {
   const { request, pool } = response;
   const embed = new EmbedBuilder()
     .setTitle(title)
@@ -187,13 +192,22 @@ export function rollMessage(locale: Locale, response: RollResponse, title: strin
     if (!response.npc && request.difficulty && pool.total >= 2 * request.difficulty) {
       fields.push({ name: TERMS.automaticWin, value: t(locale, 'roll.automaticWin') });
     }
+    if (response.willpowerAvailable) {
+      buttons.push(
+        button(
+          encodeRollId('wp', request, { normal: result.dice, hunger: result.hunger }),
+          TERMS.willpower,
+          ButtonStyle.Primary,
+        ),
+      );
+    }
     if (response.bargainAvailable) {
       buttons.push(button(encodeRollId('bargain', request), TERMS.bargain, ButtonStyle.Danger));
     }
     if (response.retryAvailable) buttons.push(retryButton(request));
   }
 
-  embed.addFields(fields);
+  embed.addFields(...fields, ...notes);
   return {
     ...(content ? { content } : {}),
     embeds: [embed],

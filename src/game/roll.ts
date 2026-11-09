@@ -15,6 +15,8 @@ export interface RollRequest {
   takeHalf: boolean;
   /** Second attempt after a failure (Trying Again, p. 98). */
   retry: boolean;
+  /** Willpower already spent on this test (Push Yourself, p. 104): one reroll per test. */
+  willpower?: boolean;
 }
 
 export type RollResponse =
@@ -31,6 +33,8 @@ export type RollResponse =
       bargainAvailable: boolean;
       /** Trying Again: once, after a failure against a Difficulty. */
       retryAvailable: boolean;
+      /** Push Yourself: reroll up to 3 normal dice, once per test. */
+      willpowerAvailable: boolean;
       /** An NPC roll: no player mechanics (Hunger, bargain, pain, Try again). */
       npc: boolean;
     };
@@ -65,11 +69,32 @@ export function performRoll(request: RollRequest, options: RollOptions = {}): Ro
   }
   if (pool.total === 0) return { kind: 'no-dice', request, pool };
 
-  const result = evaluate(
+  return judge(
+    request,
     rollDice(pool.normal, options.roller),
     rollDice(pool.hunger, options.roller),
-    { difficulty, failureIsPainful: request.retry },
+    npc,
   );
+}
+
+/** Most normal dice a player can pick to reroll; also the most a Discord menu can list. */
+export const WILLPOWER_REROLL = 3;
+export const WILLPOWER_MAX_DICE = 25;
+
+/** Evaluates rolled dice and works out which follow-ups the roller is offered. */
+export function judge(
+  request: RollRequest,
+  normal: number[],
+  hunger: number[],
+  npc = false,
+): Extract<RollResponse, { kind: 'rolled' }> {
+  const pool = buildPool({
+    dice: request.dice,
+    modifier: request.modifier,
+    hunger: npc ? 0 : request.hunger,
+  });
+  const difficulty = request.difficulty > 0 ? request.difficulty : undefined;
+  const result = evaluate(normal, hunger, { difficulty, failureIsPainful: request.retry });
   if (npc && result.outcome === 'painful-failure') {
     result.outcome = difficulty === undefined ? 'open' : 'failure';
   }
@@ -85,6 +110,31 @@ export function performRoll(request: RollRequest, options: RollOptions = {}): Ro
       !request.retry &&
       difficulty !== undefined &&
       (result.outcome === 'failure' || result.outcome === 'painful-failure'),
+    willpowerAvailable:
+      !npc && !request.willpower && normal.length > 0 && normal.length <= WILLPOWER_MAX_DICE,
     npc,
   };
+}
+
+/**
+ * Push Yourself (p. 104): spend 1 Willpower to reroll up to 3 normal dice, never Hunger dice.
+ * `picked` are indexes into `normal`.
+ */
+export function rerollWithWillpower(
+  request: RollRequest,
+  normal: number[],
+  hunger: number[],
+  picked: number[],
+  roller?: DieRoller,
+): Extract<RollResponse, { kind: 'rolled' }> & { rerolled: [number, number][] } {
+  const chosen = [...new Set(picked)]
+    .filter((i) => Number.isInteger(i) && i >= 0 && i < normal.length)
+    .slice(0, WILLPOWER_REROLL);
+  const fresh = rollDice(chosen.length, roller);
+  const next = [...normal];
+  const rerolled: [number, number][] = chosen.map((i, k) => {
+    next[i] = fresh[k]!;
+    return [normal[i]!, fresh[k]!];
+  });
+  return { ...judge({ ...request, willpower: true }, next, hunger), rerolled };
 }

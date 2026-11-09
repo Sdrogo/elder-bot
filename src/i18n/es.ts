@@ -124,6 +124,40 @@ export const es: Messages = {
   'prolonged.progress': 'Éxitos **{successes}/{target}** · tiradas usadas **{done}/{max}**',
 
   // /elder session and the Storyteller.
+  // Willpower, /elder frenzy and /elder masquerade.
+  'cmd.frenzy.description':
+    'Resistir el frenesí: Composure + Resolve, como máximo tantos dados como Humanidad',
+  'opt.frenzy.type': 'Tipo de frenesí',
+  'opt.frenzy.dice': 'Composure + Resolve',
+  'opt.frenzy.humanity': 'Tu rango de Humanidad (o Senda): limita los dados',
+  'opt.frenzy.hunger': 'Tus dados de Hunger (0-5): la Dificultad del frenesí de hambre',
+  'opt.frenzy.difficulty':
+    'Dificultad del Narrador (ira 2 ± modificadores, clan 3 + modificador de generación)',
+  'frenzy.title': 'resiste un {frenzy}',
+  'frenzy.capped': 'Reserva de {pool} dados, pero la Humanidad {humanity} la limita.',
+  'frenzy.resisted': 'Resiste durante el resto de la escena.',
+  'frenzy.suffered': 'El personaje sufre un {frenzy}.',
+  'frenzy.painful': 'El personaje sufre un {frenzy} y hace algo de lo que se arrepentirá.',
+  'frenzy.error.difficulty': 'Indica la `difficulty` que fija el Narrador.',
+  'frenzy.error.noHunger':
+    'La Dificultad del frenesí de hambre son tus dados de Hunger: indica `hunger` (al menos 1) o una `difficulty`.',
+  'cmd.masquerade.description': 'El Masquerade Tracker de esta mesa',
+  'cmd.masquerade.show.description': 'Muestra el Masquerade Tracker',
+  'cmd.masquerade.mark.description': 'Marca casillas tras una brecha (Narrador)',
+  'cmd.masquerade.clear.description': 'Borra casillas cuando se repara la Masquerade (Narrador)',
+  'cmd.masquerade.set.description': 'Fija el tracker a mano (Narrador)',
+  'cmd.masquerade.threat.description': 'Threat test: un dado por casilla marcada (Narrador)',
+  'opt.masquerade.mark': 'Casillas a marcar (por defecto 1)',
+  'opt.masquerade.clear': 'Casillas a borrar (por defecto 1)',
+  'opt.masquerade.reason': 'Qué ha pasado',
+  'opt.masquerade.value': 'Casillas marcadas, de 0 a 10',
+  'masquerade.title': 'Masquerade Tracker',
+  'masquerade.threat.title': 'Threat test de la Masquerade',
+  'willpower.pick': 'Elige hasta {max} dados para repetir (−1 Willpower)',
+  'willpower.option': 'Dado {n}: {face}',
+  'willpower.spent': '1 Willpower gastada, repetidos: {changes}.',
+  'button.cancel': 'Cancelar',
+
   'auth.storytellerOnly':
     'Solo el Narrador de esta mesa puede hacerlo. Quien ejecuta `/elder session new` pasa a ser Narrador, y puede ceder el rol con `/elder session storyteller`.',
   'session.storyteller.title': 'Narrador',
