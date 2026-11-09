@@ -1,7 +1,7 @@
 {
   "name": "elder-bot",
   "version": "0.1.0",
-  "description": "Discord dice roller for the Vampire: The Masquerade 6e playtest (Alpha 1.0)",
+  "description": "Discord dice roller for the Vampire: The Masquerade 6e playtest (Alpha 2.0)",
   "private": true,
   "type": "module",
   "engines": {

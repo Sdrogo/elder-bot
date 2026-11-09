@@ -19,25 +19,25 @@ describe('/elder', () => {
   });
 
   it('turns commands with subcommands into groups', () => {
-    const quickening = byName.get('quickening');
-    expect(quickening?.type).toBe(ApplicationCommandOptionType.SubcommandGroup);
-    expect(
-      quickening && 'options' in quickening && quickening.options?.map((o) => o.name),
-    ).toContain('set');
+    const prolonged = byName.get('prolonged');
+    expect(prolonged?.type).toBe(ApplicationCommandOptionType.SubcommandGroup);
+    expect(prolonged && 'options' in prolonged && prolonged.options?.map((o) => o.name)).toContain(
+      'roll',
+    );
   });
 
   it('translates the descriptions into Italian at every level, keeping English names', () => {
-    expect(json.description_localizations?.it).toBe('Tiri e risorse di Vampire: The Masquerade 6e');
-    const drama = byName.get('drama');
-    expect(drama?.description_localizations?.it).toBe('Drama del Narratore in questo canale');
-    const trait =
-      drama && 'options' in drama ? drama.options?.find((o) => o.name === 'trait') : undefined;
-    expect(trait?.description).toBe(
-      'Create a scene trait (2 Drama): bonus or penalty to every roll in the scene',
+    expect(json.description_localizations?.it).toBe('Tiri di dado per Vampire: The Masquerade 6e');
+    const prolonged = byName.get('prolonged');
+    expect(prolonged?.description_localizations?.it).toBe(
+      'Compito prolungato: somma i successi di più tiri',
     );
-    expect(trait?.description_localizations?.it).toBe(
-      'Crea uno scene trait (2 Drama): bonus o penalità a tutti i tiri della scena',
-    );
+    const start =
+      prolonged && 'options' in prolonged
+        ? prolonged.options?.find((o) => o.name === 'start')
+        : undefined;
+    expect(start?.description).toBe('Start a prolonged task');
+    expect(start?.description_localizations?.it).toBe('Apre un compito prolungato');
     const roll = byName.get('roll');
     const dice =
       roll && 'options' in roll ? roll.options?.find((o) => o.name === 'dice') : undefined;

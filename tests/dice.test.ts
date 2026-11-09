@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rollDice } from '../src/dice/roller.js';
-import { buildPool, canTakeOverqualified, evaluate } from '../src/dice/test.js';
-import { basicSuccessCost, gainQuickening } from '../src/dice/quickening.js';
-import { npcPool, resolveContest } from '../src/dice/contest.js';
+import { buildPool, countSuccesses, evaluate, takeHalf } from '../src/dice/test.js';
+import { resolveContest } from '../src/dice/contest.js';
 import { addProlongedTest, startProlonged } from '../src/dice/prolonged.js';
 
 function loaded(...values: number[]) {
@@ -11,83 +10,99 @@ function loaded(...values: number[]) {
 }
 
 describe('buildPool', () => {
-  it('subtracts Difficulty from Attribute + Skill (Adrian: 3 + 3, Difficulty 2)', () => {
-    expect(buildPool({ dice: 6, difficulty: 2 })).toEqual({
-      base: 6,
-      afterDifficulty: 4,
-      total: 4,
-    });
+  it('adds bonuses to Attribute + Skill; Difficulty removes nothing', () => {
+    expect(buildPool({ dice: 7, modifier: 1 })).toEqual({ total: 8, hunger: 0, normal: 8 });
   });
 
   it('never goes below 0', () => {
-    expect(buildPool({ dice: 2, difficulty: 5 }).total).toBe(0);
-    expect(buildPool({ dice: 2, modifier: -3 }).base).toBe(0);
+    expect(buildPool({ dice: 2, modifier: -3 }).total).toBe(0);
   });
 
-  it('adds bonuses before Difficulty (Ulfred: 4 + 3 + 1 focus, Difficulty 2)', () => {
-    expect(buildPool({ dice: 7, modifier: 1, difficulty: 2 }).total).toBe(6);
-  });
-
-  it('adds Quickening dice after Difficulty (Ulfred dodge: 1 die + 2 Quickening)', () => {
-    const pool = buildPool({ dice: 4, difficulty: 3, quickening: 2 });
-    expect(pool.afterDifficulty).toBe(1);
-    expect(pool.total).toBe(3);
+  it('swaps normal dice for Hunger dice, never more than the pool', () => {
+    expect(buildPool({ dice: 6, hunger: 2 })).toEqual({ total: 6, hunger: 2, normal: 4 });
+    expect(buildPool({ dice: 2, hunger: 4 })).toEqual({ total: 2, hunger: 2, normal: 0 });
+    expect(buildPool({ dice: 9, hunger: 8 }).hunger).toBe(5);
   });
 });
 
-describe('canTakeOverqualified', () => {
-  it('needs 4+ dice after Difficulty', () => {
-    expect(canTakeOverqualified(buildPool({ dice: 6, difficulty: 2 }), false)).toBe(true);
-    expect(canTakeOverqualified(buildPool({ dice: 5, difficulty: 2 }), false)).toBe(false);
-  });
-
-  it('does not count Quickening dice', () => {
-    expect(canTakeOverqualified(buildPool({ dice: 3, quickening: 2 }), false)).toBe(false);
-  });
-
-  it('is never allowed on attack or defense tests', () => {
-    expect(canTakeOverqualified(buildPool({ dice: 8 }), true)).toBe(false);
+describe('takeHalf', () => {
+  it('is half the pool rounded up', () => {
+    expect(takeHalf(5)).toBe(3);
+    expect(takeHalf(6)).toBe(3);
+    expect(takeHalf(0)).toBe(0);
   });
 });
 
 describe('evaluate', () => {
-  it('succeeds on any 8+ (Adrian: 2, 4, 7, 8)', () => {
-    const r = evaluate([2, 4, 7, 8]);
-    expect(r.outcome).toBe('success');
-    expect(r.successes).toBe(1);
-    expect(r.extraSuccesses).toBe(0);
-  });
-
-  it('counts extra successes beyond the first', () => {
-    const r = evaluate([8, 9, 10, 3, 1]);
+  it('succeeds on 6+ (Adrian: 2, 5, 4, 6, 6, 8 against Difficulty 2)', () => {
+    const r = evaluate([2, 5, 4, 6, 6, 8], [], { difficulty: 2 });
     expect(r.successes).toBe(3);
-    expect(r.extraSuccesses).toBe(2);
     expect(r.outcome).toBe('success');
+    expect(r.margin).toBe(1);
+    expect(r.criticalWin).toBe(false);
   });
 
-  it('a 1 does not spoil a success', () => {
-    expect(evaluate([1, 1, 8]).outcome).toBe('success');
+  it('counts a 10 as two successes and makes a win critical', () => {
+    expect(countSuccesses([10, 6, 3])).toBe(3);
+    const r = evaluate([10, 2], [], { difficulty: 2 });
+    expect(r.outcome).toBe('success');
+    expect(r.criticalWin).toBe(true);
   });
 
-  it('fails with no 8+ and no 1', () => {
-    expect(evaluate([2, 5, 7]).outcome).toBe('failure');
+  it('fails with fewer successes than the Difficulty, giving the margin of failure', () => {
+    const r = evaluate([6, 3], [], { difficulty: 3 });
+    expect(r.outcome).toBe('failure');
+    expect(r.margin).toBe(-2);
   });
 
-  it('is a painful failure with no 8+ and at least one 1', () => {
-    expect(evaluate([1, 5, 7]).outcome).toBe('painful-failure');
+  it('is a painful failure with no successes, even without a 1', () => {
+    expect(evaluate([2, 5], [], { difficulty: 1 }).outcome).toBe('painful-failure');
+    expect(evaluate([2, 5]).outcome).toBe('painful-failure');
+  });
+
+  it('a 1 on a normal die means nothing', () => {
+    const r = evaluate([1, 1, 3], [], { difficulty: 2 });
+    expect(r.outcome).toBe('painful-failure');
+    expect(r.bestial).toBe(false);
+  });
+
+  it('a failure with a 1 on a Hunger die is bestial', () => {
+    expect(evaluate([7], [1], { difficulty: 2 })).toMatchObject({
+      outcome: 'failure',
+      bestial: true,
+    });
+  });
+
+  it('painful and bestial can stack', () => {
+    expect(evaluate([3], [1], { difficulty: 2 })).toMatchObject({
+      outcome: 'painful-failure',
+      bestial: true,
+    });
+  });
+
+  it('a Hunger 1 does not spoil a win', () => {
+    expect(evaluate([8, 9], [1], { difficulty: 2 })).toMatchObject({
+      outcome: 'success',
+      bestial: false,
+    });
+  });
+
+  it('Hunger dice succeed on 6+ like normal dice', () => {
+    expect(evaluate([], [6, 10], { difficulty: 3 }).outcome).toBe('success');
+  });
+
+  it('without a Difficulty the roll stays open, and flags a Hunger 1', () => {
+    const r = evaluate([8], [1]);
+    expect(r.outcome).toBe('open');
+    expect(r.bestial).toBe(false);
+    expect(r.hungerOnes).toBe(1);
+    expect(r.margin).toBeUndefined();
   });
 
   it('treats any failure as painful when trying again', () => {
-    expect(evaluate([2, 5], { failureIsPainful: true }).outcome).toBe('painful-failure');
-    expect(evaluate([9], { failureIsPainful: true }).outcome).toBe('success');
-  });
-
-  it('counts each 10 for Quickening (Ulfred: two 10s)', () => {
-    expect(evaluate([10, 10]).tens).toBe(2);
-  });
-
-  it('6s and 7s are not successes, unlike V5', () => {
-    expect(evaluate([6, 7, 6]).successes).toBe(0);
+    const opts = { difficulty: 2, failureIsPainful: true };
+    expect(evaluate([6, 2], [], opts).outcome).toBe('painful-failure');
+    expect(evaluate([6, 9], [], opts).outcome).toBe('success');
   });
 });
 
@@ -104,49 +119,26 @@ describe('rollDice', () => {
   });
 });
 
-describe('Quickening', () => {
-  it('caps at 5 and reports the overflow for the Beast or Nature tracker', () => {
-    expect(gainQuickening(4, 3)).toEqual({ value: 5, gained: 1, overflow: 2 });
-    expect(gainQuickening(0, 2)).toEqual({ value: 2, gained: 2, overflow: 0 });
-  });
-
-  it('costs 3 for a basic success with Skill dots, 5 without', () => {
-    expect(basicSuccessCost(true)).toBe(3);
-    expect(basicSuccessCost(false)).toBe(5);
-  });
-});
-
 describe('contested tests', () => {
   it('more successes win', () => {
     expect(resolveContest({ successes: 2 }, { successes: 1 })).toEqual({ winner: 'a' });
-    expect(resolveContest({ successes: 0 }, { successes: 1, npc: true })).toEqual({ winner: 'b' });
+    expect(resolveContest({ successes: 0 }, { successes: 1 })).toEqual({ winner: 'b' });
   });
 
-  it('a tie between characters goes to the higher Attribute', () => {
+  it('a tie goes to the higher Attribute', () => {
     expect(resolveContest({ successes: 1, attribute: 2 }, { successes: 1, attribute: 4 })).toEqual({
       winner: 'b',
       tieBreak: 'attribute',
     });
   });
 
-  it('a tie with equal or unknown Attributes is left to the Storyteller', () => {
+  it('then to whoever initiated the contest', () => {
     expect(
       resolveContest({ successes: 1, attribute: 3 }, { successes: 1, attribute: 3 }).tieBreak,
-    ).toBe('storyteller');
+    ).toBe('initiator');
     expect(resolveContest({ successes: 1 }, { successes: 1, attribute: 3 }).tieBreak).toBe(
-      'storyteller',
+      'initiator',
     );
-  });
-
-  it('a tie against an NPC ignores Attributes', () => {
-    expect(resolveContest({ successes: 1, attribute: 5 }, { successes: 1, npc: true })).toEqual({
-      winner: 'tie',
-      tieBreak: 'initiator-or-storyteller',
-    });
-  });
-
-  it('NPCs roll twice their Level', () => {
-    expect(npcPool(3)).toBe(6);
   });
 });
 
@@ -165,5 +157,10 @@ describe('prolonged tasks', () => {
     let task = startProlonged('Research', 7, 3);
     for (const s of [2, 1]) task = addProlongedTest(task, s).task;
     expect(addProlongedTest(task, 1).status).toBe('failed');
+  });
+
+  it('fails at once on a painful or bestial failure', () => {
+    const task = startProlonged('Ritual', 7, 7);
+    expect(addProlongedTest(task, 0, { disaster: true }).status).toBe('failed');
   });
 });

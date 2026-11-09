@@ -10,12 +10,13 @@ import { performRoll } from '../game/roll.js';
 import { choice, described, localeFor, t, type Locale } from '../i18n/index.js';
 import {
   COLORS,
+  TERMS,
+  consequenceFields,
   formatDice,
   formatPool,
   outcomeLine,
-  quickeningLine,
-  rollErrorText,
 } from '../ui/format.js';
+import { hungerOption } from './shared.js';
 import type { Command } from './types.js';
 
 const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prolonged.description')
@@ -48,18 +49,9 @@ const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prol
           .setMaxValue(30),
       )
       .addIntegerOption((o) =>
-        described(o.setName('difficulty'), 'opt.prolonged.difficulty')
-          .setMinValue(0)
-          .setMaxValue(15),
-      )
-      .addIntegerOption((o) =>
         described(o.setName('bonus'), 'opt.prolonged.bonus').setMinValue(-10).setMaxValue(10),
       )
-      .addIntegerOption((o) =>
-        described(o.setName('quickening'), 'opt.prolonged.quickening')
-          .setMinValue(0)
-          .setMaxValue(5),
-      ),
+      .addIntegerOption((o) => hungerOption(o, 'opt.prolonged.hunger')),
   )
   .addSubcommand((s) => described(s.setName('status'), 'cmd.prolonged.status.description'))
   .addSubcommand((s) => described(s.setName('cancel'), 'cmd.prolonged.cancel.description'));
@@ -108,27 +100,18 @@ export const prolonged: Command = {
     }
 
     const response = performRoll(
-      store,
       {
         channelId,
         userId,
         dice: interaction.options.getInteger('dice', true),
-        difficulty: interaction.options.getInteger('difficulty') ?? 0,
+        difficulty: 0,
         modifier: interaction.options.getInteger('bonus') ?? 0,
-        quickening: interaction.options.getInteger('quickening') ?? 0,
-        combat: false,
+        hunger: interaction.options.getInteger('hunger') ?? 0,
+        takeHalf: false,
         retry: false,
-        applyTraits: true,
       },
-      { roller, skipOverqualified: true },
+      { roller },
     );
-    if (response.kind === 'error') {
-      await interaction.reply({
-        content: rollErrorText(locale, response),
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
     if (response.kind !== 'rolled') {
       await interaction.reply({
         content: t(locale, 'prolonged.noDice'),
@@ -137,40 +120,39 @@ export const prolonged: Command = {
       return;
     }
 
-    const { task, status } = addProlongedTest(current, response.result.successes);
+    const { result } = response;
+    // Each roll only adds successes; a roll with none is a painful failure (bestial too with a
+    // Hunger 1), and either ends the task (p. 112).
+    const disaster = result.outcome === 'painful-failure';
+    const { task, status } = addProlongedTest(current, result.successes, { disaster });
     if (status === 'ongoing') store.saveProlonged(channelId, userId, task);
     else store.deleteProlonged(channelId, userId);
 
-    const embed = taskEmbed(locale, task, interaction.user.displayName).addFields(
-      {
-        name: 'Pool',
-        value: formatPool(locale, response.request, response.pool, response.traitModifier),
-      },
-      {
+    const embed = taskEmbed(locale, task, interaction.user.displayName).addFields({
+      name: 'Pool',
+      value: formatPool(locale, response.request, response.pool),
+    });
+    if (result.dice.length) {
+      embed.addFields({
         name: t(locale, 'roll.field.dice'),
-        value: formatDice(response.result.dice),
+        value: formatDice(result.dice),
         inline: true,
-      },
-      {
-        name: t(locale, 'roll.field.outcome'),
-        value: outcomeLine(locale, response.result),
-        inline: true,
-      },
-    );
-    const q = quickeningLine(
-      locale,
-      response.quickening.gained,
-      response.quickening.total,
-      response.quickening.overflow,
-    );
-    if (q) embed.addFields({ name: 'Quickening', value: q });
-    if (response.result.outcome === 'painful-failure') {
-      embed.addFields({ name: 'Painful Failure', value: t(locale, 'prolonged.painful') });
+      });
     }
-    if (status === 'completed') {
+    if (result.hunger.length) {
+      embed.addFields({ name: TERMS.hunger, value: formatDice(result.hunger), inline: true });
+    }
+    embed.addFields(
+      { name: t(locale, 'roll.field.outcome'), value: outcomeLine(locale, result) },
+      ...consequenceFields(locale, result),
+    );
+    if (disaster) {
+      embed.setColor(result.bestial ? COLORS.bestial : COLORS.painful).setFooter({
+        text: t(locale, 'prolonged.disaster'),
+      });
+    } else if (status === 'completed') {
       embed.setColor(COLORS.success).setFooter({ text: t(locale, 'prolonged.completed') });
-    }
-    if (status === 'failed') {
+    } else if (status === 'failed') {
       embed.setColor(COLORS.painful).setFooter({ text: t(locale, 'prolonged.failed') });
     }
     await interaction.reply({ embeds: [embed] });

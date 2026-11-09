@@ -1,6 +1,6 @@
 /**
  * Remembers which one-shot actions were already applied, so a double click on a button
- * (or a modal submitted twice) does not grant Quickening or Drama twice.
+ * (or a modal submitted twice) does not resolve a bargain or a retry twice.
  * Kept in memory: after a restart old buttons work once more, which is harmless.
  */
 export class OnceGuard {

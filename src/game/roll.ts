@@ -1,139 +1,90 @@
-import { gainQuickening, type QuickeningGain } from '../dice/quickening.js';
 import { rollDice, type DieRoller } from '../dice/roller.js';
-import {
-  buildPool,
-  canTakeOverqualified,
-  evaluate,
-  type Pool,
-  type TestResult,
-} from '../dice/test.js';
-import type { Store } from '../state/store.js';
+import { buildPool, evaluate, takeHalf, type Pool, type TestResult } from '../dice/test.js';
 
 export interface RollRequest {
   channelId: string;
   userId: string;
   dice: number;
+  /** Successes needed; 0 means none given (open roll, contested test). */
   difficulty: number;
-  /** Bonuses and penalties chosen by the player; scene traits are added on top. */
+  /** Bonuses and penalties chosen by the player. */
   modifier: number;
-  /** Quickening dice the player spends from their own pool. */
-  quickening: number;
-  /** Attack or defense test: no [Overqualified]. */
-  combat: boolean;
-  /** Second attempt after a failure (Trying Again, p. 79). */
+  /** Hunger dice in the pool, already resolved from the option or the stored value. */
+  hunger: number;
+  /** Taking Half (p. 94): no roll, half the pool as successes. */
+  takeHalf: boolean;
+  /** Second attempt after a failure (Trying Again, p. 98). */
   retry: boolean;
-  /** Apply the channel's Drama scene traits. */
-  applyTraits: boolean;
 }
 
 export type RollResponse =
-  /** The player tried to spend more Quickening than they have. */
-  | { kind: 'error'; available: number; requested: number }
-  | { kind: 'overqualified'; request: RollRequest; pool: Pool; traitModifier: number }
-  | { kind: 'no-dice'; request: RollRequest; pool: Pool; traitModifier: number }
+  /** Taking Half: no dice rolled. */
+  | { kind: 'half'; request: RollRequest; pool: Pool; successes: number; won?: boolean }
+  /** Penalties left no dice: the test fails automatically (Impairment, p. 105). */
+  | { kind: 'no-dice'; request: RollRequest; pool: Pool }
   | {
       kind: 'rolled';
       request: RollRequest;
       pool: Pool;
-      traitModifier: number;
       result: TestResult;
-      /** Quickening after spending and after the 10s. */
-      quickening: QuickeningGain & { total: number };
+      /** Beast's Bargain: only after a plain failure, never on a retry. */
       bargainAvailable: boolean;
-      /** An NPC roll: no player mechanics (Quickening, bargain, pain, Try again). */
+      /** Trying Again: once, after a failure against a Difficulty. */
+      retryAvailable: boolean;
+      /** An NPC roll: no player mechanics (Hunger, bargain, pain, Try again). */
       npc: boolean;
     };
 
 export interface RollOptions {
   roller?: DieRoller;
-  /** The player already chose to roll instead of taking a basic success. */
-  skipOverqualified?: boolean;
+  npc?: boolean;
 }
-
-const NO_QUICKENING = { value: 0, gained: 0, overflow: 0, total: 0 };
 
 /**
- * A test for an NPC: the dice are simply rolled. Quickening, Overqualified, No Dice Left,
- * Devil's Bargain, Choose Your Pain and Try again belong to the players, and an NPC
- * that rolls no successes just fails.
+ * Rolls a test. NPCs roll the plain pool: no Hunger, no Beast's Bargain, no Trying Again,
+ * and a roll with no successes is just a failure.
  */
-export function performNpcRoll(
-  store: Store,
-  request: RollRequest,
-  options: Pick<RollOptions, 'roller'> = {},
-): Extract<RollResponse, { kind: 'rolled' }> {
-  const traitModifier = request.applyTraits ? store.traitModifier(request.channelId) : 0;
+export function performRoll(request: RollRequest, options: RollOptions = {}): RollResponse {
+  const npc = options.npc ?? false;
   const pool = buildPool({
     dice: request.dice,
-    difficulty: request.difficulty,
-    modifier: request.modifier + traitModifier,
+    modifier: request.modifier,
+    hunger: npc ? 0 : request.hunger,
   });
-  const result = evaluate(rollDice(pool.total, options.roller));
-  if (result.outcome === 'painful-failure') result.outcome = 'failure';
+  const difficulty = request.difficulty > 0 ? request.difficulty : undefined;
+
+  if (request.takeHalf && !request.retry) {
+    const successes = takeHalf(pool.total);
+    return {
+      kind: 'half',
+      request,
+      pool,
+      successes,
+      won: difficulty === undefined ? undefined : successes >= difficulty,
+    };
+  }
+  if (pool.total === 0) return { kind: 'no-dice', request, pool };
+
+  const result = evaluate(
+    rollDice(pool.normal, options.roller),
+    rollDice(pool.hunger, options.roller),
+    { difficulty, failureIsPainful: request.retry },
+  );
+  if (npc && result.outcome === 'painful-failure') {
+    result.outcome = difficulty === undefined ? 'open' : 'failure';
+  }
+  const plainFailure = result.outcome === 'failure' && !result.bestial;
   return {
     kind: 'rolled',
     request,
     pool,
-    traitModifier,
     result,
-    quickening: NO_QUICKENING,
-    bargainAvailable: false,
-    npc: true,
+    bargainAvailable: !npc && plainFailure && !request.retry,
+    retryAvailable:
+      !npc &&
+      !request.retry &&
+      difficulty !== undefined &&
+      (result.outcome === 'failure' || result.outcome === 'painful-failure'),
+    npc,
   };
-}
-
-export function performRoll(
-  store: Store,
-  request: RollRequest,
-  options: RollOptions = {},
-): RollResponse {
-  const { channelId, userId } = request;
-  const available = store.getQuickening(channelId, userId);
-  if (request.quickening > available) {
-    return { kind: 'error', available, requested: request.quickening };
-  }
-
-  const traitModifier = request.applyTraits ? store.traitModifier(channelId) : 0;
-  const pool = buildPool({
-    dice: request.dice,
-    difficulty: request.difficulty,
-    modifier: request.modifier + traitModifier,
-    quickening: request.quickening,
-  });
-
-  if (!options.skipOverqualified && !request.retry && canTakeOverqualified(pool, request.combat)) {
-    return { kind: 'overqualified', request, pool, traitModifier };
-  }
-  if (pool.total === 0) return { kind: 'no-dice', request, pool, traitModifier };
-
-  const result = evaluate(rollDice(pool.total, options.roller), {
-    failureIsPainful: request.retry,
-  });
-  const afterSpend = available - request.quickening;
-  const gain = gainQuickening(afterSpend, result.tens);
-  store.setQuickening(channelId, userId, gain.value);
-
-  return {
-    kind: 'rolled',
-    request,
-    pool,
-    traitModifier,
-    result,
-    quickening: { ...gain, total: gain.value },
-    bargainAvailable:
-      result.outcome === 'failure' && !request.retry && !store.hasUsedBargain(channelId, userId),
-    npc: false,
-  };
-}
-
-/** Adds Quickening to a player, capped at 5; returns how much spilled onto the Beast or Nature tracker. */
-export function grantQuickening(
-  store: Store,
-  channelId: string,
-  userId: string,
-  amount: number,
-): QuickeningGain {
-  const gain = gainQuickening(store.getQuickening(channelId, userId), amount);
-  store.setQuickening(channelId, userId, gain.value);
-  return gain;
 }
