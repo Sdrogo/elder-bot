@@ -13,11 +13,12 @@
     "dev": "tsx watch src/index.ts",
     "deploy-commands": "node dist/deploy-commands.js",
     "deploy-commands:dev": "tsx src/deploy-commands.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p overlay",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "overlay": "node overlay/src/server.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

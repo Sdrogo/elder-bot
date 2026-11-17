@@ -54,6 +54,10 @@ I termini di gioco del playtest restano in inglese in ogni lingua: Hunger, Willp
 
 Per aggiungere una lingua copia `src/i18n/en.ts` in un nuovo file (ad esempio `src/i18n/pt.ts`, tipizzato `Messages` come `it.ts`), traduci i testi lasciando invariati i `{segnaposto}`, poi registralo in `src/i18n/index.ts` (`Locale`, `CATALOGS`, `LANGUAGE_NAMES` e il codice di Discord in `DISCORD_LOCALES`). I test controllano che il nuovo file abbia tutte le chiavi e gli stessi segnaposto. Dopo, registra di nuovo i comandi per pubblicare le descrizioni tradotte.
 
+## Overlay per OBS
+
+La cartella [`overlay/`](overlay/README.md) contiene **Elder Overlay**, un programma separato dal bot. Mostra in OBS i tracciati dei personaggi (Health, Vitae, Willpower, Humanity, Hunger dice e Masquerade Tracker) come cornici attorno alle webcam, e si comanda da un pannello in OBS o dallo Stream Deck. Gira solo sul PC di chi trasmette e non viene incluso nell'immagine Docker del bot.
+
 ## Sviluppo in locale
 
 Serve Node.js 22.

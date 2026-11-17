@@ -1,0 +1,13 @@
+{
+  "name": "elder-overlay",
+  "version": "0.1.0",
+  "description": "OBS overlay for the Vampire: The Masquerade 6e trackers, run on the streamer's own PC",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/server.ts"
+  }
+}
