@@ -115,6 +115,9 @@ describe('overlay server', () => {
   it('puts the token only in the dock page', async () => {
     expect(await (await fetch(overlay.url + '/dock')).text()).toContain(TOKEN);
     expect(await (await fetch(overlay.url + '/frame?pg=x')).text()).not.toContain(TOKEN);
+    const scene = await fetch(overlay.url + '/scena');
+    expect(scene.status).toBe(200);
+    expect(await scene.text()).not.toContain(TOKEN);
     expect(await (await fetch(overlay.url + '/api/state')).text()).not.toContain(TOKEN);
   });
 

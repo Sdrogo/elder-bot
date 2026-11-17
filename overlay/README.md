@@ -30,17 +30,19 @@ Il programma ascolta su `http://127.0.0.1:7777`. Per cambiare porta imposta la v
 1. **Pannello**: menu _Docks → Custom Browser Docks_, nome `Elder Overlay`, URL `http://127.0.0.1:7777/dock`. Da qui crei i personaggi con "+ Nuovo".
 2. **Cattura di Discord**: una sola _Cattura finestra_ di Discord in vista griglia. Tieni la finestra di Discord sempre alla stessa dimensione.
 3. **Un ritaglio per giocatore**: copia la cattura e incollala con _Incolla (riferimento)_, così il costo resta quello di una cattura sola. Su ogni copia ritaglia la webcam di un giocatore con Alt+trascina, o con il filtro _Ritaglia/Riempi_.
-4. **Una Browser Source per cornice**: URL `http://127.0.0.1:7777/frame?pg=<id>`, dove l'id è quello che il pannello mostra in "Indirizzi per OBS e Stream Deck" (per esempio `lucrezia`). Per lo Storyteller usa `?pg=storyteller`. Lascia il CSS personalizzato predefinito: lo sfondo è già trasparente.
-5. **Un gruppo per giocatore**: metti nel gruppo il ritaglio sotto e la cornice sopra, poi spostali e ridimensionali insieme. La cornice si adatta a qualsiasi dimensione.
+4. **Una sola Browser Source per tutte le cornici**: URL `http://127.0.0.1:7777/scena`, larghezza 1920, altezza 1080, posizione 0,0, sopra tutti i ritagli. Lascia il CSS personalizzato predefinito: lo sfondo è già trasparente. La pagina disegna una cornice per personaggio, tutte della stessa dimensione e in posizioni fisse, più quella dello Storyteller per ultima: 2 colonne fino a 4 cornici, 3 colonne oltre.
+5. **Metti ogni ritaglio nella sua cornice**: nel pannello apri "Posizioni dei ritagli nella scena", che elenca per ogni personaggio X, Y, larghezza e altezza. In OBS seleziona il ritaglio, premi Ctrl+E (_Modifica trasformazione_) e inserisci _Posizione_ X e Y; poi imposta _Tipo di riquadro di delimitazione_ su "Adatta all'interno" e _Dimensione del riquadro_ con larghezza e altezza. Le posizioni cambiano solo se aggiungi o togli un personaggio.
 6. **Facoltativo**: sul ritaglio, il filtro _Maschera immagine/fusione_ arrotonda gli angoli della webcam.
 
 Se qualcuno entra o esce dalla chiamata, Discord ridispone la griglia e quel ritaglio va rifatto.
+
+Preferisci una sorgente per cornice? `http://127.0.0.1:7777/frame?pg=<id>` (l'id è nel pannello, per esempio `lucrezia`) o `?pg=storyteller` disegna una sola cornice che riempie la Browser Source.
 
 ### Stile
 
 Le cornici mostrano i numeri (Health 5/7, Vitae 9/10…). Il danno baneful e le violations compaiono come nota rossa sotto il numero, e la Fame è un d10 rosso con il numero dentro. Per avere le caselle della scheda aggiungi `&stile=caselle` all'URL della Browser Source.
 
-Targhette, numeri e dadi hanno sempre la stessa dimensione, pensata per una scena 1920×1080: ridimensionando la Browser Source cambia solo la cornice. Per ingrandirli o rimpicciolirli aggiungi `&scala=`, per esempio `&scala=1.2` o `&scala=0.8` (da 0.3 a 3).
+Targhette, numeri e dadi hanno sempre la stessa dimensione, pensata per una scena 1920×1080: nella pagina `/scena` e ridimensionando una Browser Source `/frame` cambia solo la cornice. Per ingrandirli o rimpicciolirli aggiungi `&scala=`, per esempio `&scala=1.2` o `&scala=0.8` (da 0.3 a 3).
 
 ## Simboli di clan e sette
 
