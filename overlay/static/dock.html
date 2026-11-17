@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="elder-token" content="{{TOKEN}}" />
+    <title>Elder Overlay · pannello</title>
+    <link rel="stylesheet" href="/static/dock.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Elder Overlay</h1>
+      <span id="conn" class="conn">collegamento…</span>
+    </header>
+
+    <nav id="tabs" class="tabs" aria-label="Personaggi"></nav>
+
+    <section id="char" hidden>
+      <div id="rows" class="rows"></div>
+      <details>
+        <summary>Massimi, nome e clan</summary>
+        <div id="maxrows" class="rows"></div>
+        <label class="field">Nome <input id="edit-name" maxlength="32" autocomplete="off" /></label>
+        <label class="field"
+          >Clan
+          <select id="edit-clan"></select
+        ></label>
+        <div class="actions">
+          <button type="button" id="save-char">Salva nome e clan</button>
+          <button type="button" id="remove-char" class="danger">Elimina personaggio</button>
+        </div>
+      </details>
+      <details>
+        <summary>Indirizzi per OBS e Stream Deck</summary>
+        <label class="field">Browser Source <input id="url-frame" readonly /></label>
+        <label class="field">Stream Deck, Health −1 <input id="url-deck" readonly /></label>
+        <p class="hint">
+          Stream Deck: richiesta <b>POST</b> a questo indirizzo con l'header
+          <code>X-Elder-Token</code> uguale al contenuto di <code>overlay/data/token.txt</code>.
+          Cambia <code>track</code> (health, vitae, willpower, humanity, hunger) e
+          <code>delta</code> (-1, 1) per gli altri tasti.
+        </p>
+      </details>
+    </section>
+
+    <section id="new" hidden>
+      <h2>Nuovo personaggio</h2>
+      <label class="field">Nome <input id="new-name" maxlength="32" autocomplete="off" /></label>
+      <label class="field"
+        >Clan
+        <select id="new-clan"></select
+      ></label>
+      <label class="field"
+        >Stamina <input id="new-stamina" type="number" min="1" max="10" value="2"
+      /></label>
+      <label class="field"
+        >Vitae massima <input id="new-vitae" type="number" min="1" max="30" value="10"
+      /></label>
+      <label class="field"
+        >Composure + Resolve <input id="new-will" type="number" min="1" max="10" value="4"
+      /></label>
+      <label class="field"
+        >Humanity <input id="new-humanity" type="number" min="0" max="10" value="6"
+      /></label>
+      <p class="hint">
+        Health = Stamina + 5 · Vitae = 5 + 5 × generation modifier · Willpower = Composure + Resolve
+      </p>
+      <button type="button" id="add-char">Aggiungi</button>
+    </section>
+
+    <section class="chronicle">
+      <h2>Cronaca</h2>
+      <div class="row">
+        <span class="n">Masquerade</span>
+        <button type="button" id="masq-dec" aria-label="Masquerade meno 1">−</button>
+        <span class="v" id="masq-v">0 / 10</span>
+        <button type="button" id="masq-inc" aria-label="Masquerade più 1">+</button>
+      </div>
+      <label class="field"
+        >Setta
+        <select id="sect"></select
+      ></label>
+      <label class="field">Cornice Storyteller <input id="url-st" readonly /></label>
+    </section>
+
+    <p id="status" class="status" role="status"></p>
+
+    <script src="/static/common.js"></script>
+    <script src="/static/dock.js"></script>
+  </body>
+</html>
