@@ -1,7 +1,7 @@
 /* Elder Overlay frame: one Browser Source per character (or the Storyteller).
    The page is transparent; only the frame, plates and trackers are drawn.
-   Sizes use cqw of .virt, which is as wide as a 16:9 scene holding two frames per row,
-   so the frame keeps the same proportions at any Browser Source size. */
+   Sizes use cqw of .virt, which has a fixed width, so plates and numbers keep the same
+   size at any Browser Source size; ?scala=1.2 makes them bigger, ?scala=0.8 smaller. */
 :root {
   --fg: #ece6dc;
   --muted: #b3abbb;
@@ -27,7 +27,9 @@ body {
   color: var(--fg);
 }
 .virt {
-  width: 217.4vw;
+  /* Fixed size, whatever the Browser Source size: 1 cqw = 19.2 px, as on a 1920×1080 canvas.
+     ?scala= multiplies it. Only the frame lines follow the Browser Source size. */
+  width: calc(1920px * var(--scale, 1));
   height: 0;
   container-type: inline-size;
 }
@@ -108,7 +110,8 @@ body {
   display: flex;
   align-items: center;
   gap: 0.9cqw;
-  max-width: 60%;
+  /* leave room for the Hunger plate on the right */
+  max-width: calc(100% - 15cqw);
   background: var(--plate);
   padding: 0.35cqw 1.1cqw 0.45cqw;
   border: 0.12cqw solid rgba(236, 230, 220, 0.6);
@@ -129,6 +132,11 @@ body {
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
+  /* when space is short the clan name gives way before the character's name */
+  flex-shrink: 20;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sym {
   width: 2.9cqw;

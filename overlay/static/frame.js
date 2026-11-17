@@ -7,6 +7,10 @@ const params = new URLSearchParams(window.location.search);
 const pg = params.get('pg') || '';
 // Numbers by default; ?stile=caselle draws the boxes of the character sheet instead.
 const boxStyle = params.get('stile') === 'caselle';
+// ?scala=1.2 makes plates and numbers bigger; the frame always fills the Browser Source.
+const scale = Number(params.get('scala'));
+if (scale >= 0.3 && scale <= 3)
+  document.documentElement.style.setProperty('--scale', String(scale));
 const root = document.getElementById('root');
 const SVG = 'http://www.w3.org/2000/svg';
 

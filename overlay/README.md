@@ -40,6 +40,8 @@ Se qualcuno entra o esce dalla chiamata, Discord ridispone la griglia e quel rit
 
 Le cornici mostrano i numeri (Health 5/7, Vitae 9/10…). Il danno baneful e le violations compaiono come nota rossa sotto il numero, e la Fame è un d10 rosso con il numero dentro. Per avere le caselle della scheda aggiungi `&stile=caselle` all'URL della Browser Source.
 
+Targhette, numeri e dadi hanno sempre la stessa dimensione, pensata per una scena 1920×1080: ridimensionando la Browser Source cambia solo la cornice. Per ingrandirli o rimpicciolirli aggiungi `&scala=`, per esempio `&scala=1.2` o `&scala=0.8` (da 0.3 a 3).
+
 ## Simboli di clan e sette
 
 I simboli sono marchi di Paradox Interactive, quindi non stanno nel repository. Metti i PNG in `overlay/symbols/`: devono essere sagome bianche su sfondo trasparente, perché il programma le colora con il colore del clan. Se un file manca, la targhetta mostra solo il nome.
