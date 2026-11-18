@@ -70,10 +70,26 @@ describe('trackers', () => {
     expect(adjust(state, 'lucrezia', 'health', 'current', 1)).toBe(false);
     expect(adjust(state, 'lucrezia', 'health', 'current', -2)).toBe(true);
     expect(state.characters[0]?.health.current).toBe(5);
-    setValue(state, 'lucrezia', 'hunger', 'current', 9);
-    expect(state.characters[0]?.hunger).toBe(5);
     setValue(state, null, 'masquerade', 'current', 12);
     expect(state.chronicle.masquerade).toBe(10);
+  });
+
+  it('derives Hunger dice from Vitae, as in the Hunger Dice per Vitae table', () => {
+    const state = withLucrezia();
+    const hungerAt = (max: number, current: number) => {
+      setValue(state, 'lucrezia', 'vitae', 'max', max);
+      setValue(state, 'lucrezia', 'vitae', 'current', current);
+      return state.characters[0]?.hunger;
+    };
+    // neonates 10: 10 → 0, 9-8 → 1, 7-6 → 2, 5-4 → 3, 3-2 → 4, 1-0 → 5
+    expect([10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((v) => hungerAt(10, v))).toEqual([
+      0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5,
+    ]);
+    // ancillae 15: 14-12 → 1, 11-9 → 2, 2-0 → 5
+    expect([15, 14, 12, 11, 9, 2, 0].map((v) => hungerAt(15, v))).toEqual([0, 1, 1, 2, 2, 5, 5]);
+    // elders 20: 19-16 → 1, 15-12 → 2, 3-0 → 5
+    expect([20, 19, 16, 15, 12, 3, 0].map((v) => hungerAt(20, v))).toEqual([0, 1, 1, 2, 2, 5, 5]);
+    expect(() => adjust(state, 'lucrezia', 'hunger', 'current', 1)).toThrow(StateError);
   });
 
   it('crosses out Health boxes with baneful damage', () => {
@@ -101,7 +117,6 @@ describe('trackers', () => {
   it('rejects unknown tracks, fields, characters and non-integers', () => {
     const state = withLucrezia();
     expect(() => adjust(state, 'lucrezia', 'blood', 'current', 1)).toThrow(StateError);
-    expect(() => adjust(state, 'lucrezia', 'hunger', 'max', 1)).toThrow(StateError);
     expect(() => adjust(state, 'nobody', 'health', 'current', 1)).toThrow(StateError);
     expect(() => adjust(state, 'lucrezia', 'health', 'current', '1.5')).toThrow(StateError);
     expect(() => adjust(state, 'lucrezia', 'health', 'current', 1000)).toThrow(StateError);
@@ -113,7 +128,7 @@ describe('restore', () => {
   it('round-trips a saved state', () => {
     const state = withLucrezia();
     adjust(state, 'lucrezia', 'health', 'baneful', 1);
-    adjust(state, 'lucrezia', 'hunger', 'current', 3);
+    adjust(state, 'lucrezia', 'vitae', 'current', -4);
     setValue(state, null, 'masquerade', 'current', 4);
     setSect(state, 'anarch');
     expect(restore(JSON.parse(JSON.stringify(state)))).toEqual(state);
@@ -123,12 +138,12 @@ describe('restore', () => {
     const state = restore({
       characters: [
         { name: '<img onerror=x>', clan: 'nope' },
-        { name: 'Ok', clan: 'gangrel', hunger: 99 },
+        { name: 'Ok', clan: 'gangrel', hunger: 99, vitae: { max: 10, current: 7 } },
       ],
       chronicle: { masquerade: 'lots', sect: 'x' },
     });
     expect(state.characters.map((c) => c.id)).toEqual(['ok']);
-    expect(state.characters[0]?.hunger).toBe(5);
+    expect(state.characters[0]?.hunger).toBe(2);
     expect(state.chronicle).toEqual({ masquerade: 0, sect: 'camarilla' });
     expect(restore(null)).toEqual(emptyState());
   });

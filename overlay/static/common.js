@@ -33,16 +33,17 @@ window.ELDER = {
    * the Storyteller). Each rectangle is where a webcam crop goes in OBS, so it keeps the
    * 16:9 shape of a Discord webcam tile. Picks the column count that gives the biggest
    * tiles, centres the grid, and centres a last row that is not full. The name and Hunger
-   * plates stick out above each tile, so rows leave room for them.
+   * The passe-partout band adds about 45 px above each tile (name) and 70 px below it
+   * (trackers), so rows leave room for both.
    */
   sceneLayout(n) {
     const W = 1920;
     const H = 1080;
     const top = 60;
     const side = 30;
-    const bottom = 30;
+    const bottom = 85;
     const gapX = 40;
-    const gapY = 70;
+    const gapY = 135;
     const ratio = 16 / 9;
     const count = Math.max(1, n);
     let best = { cols: 1, rows: 1, w: 0, h: 0 };

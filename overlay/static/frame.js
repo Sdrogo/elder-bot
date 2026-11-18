@@ -98,8 +98,19 @@ function numberCell(kind, label, current, max, note, hot) {
     `nb ${kind}${hot ? ' hot' : ''}`,
     el('span', 'nl', label),
     value,
-    el('span', 'nx', note),
+    typeof note === 'string' ? el('span', 'nx', note) : note,
   );
+}
+
+/** The Hunger die that sits beside Vitae: a small d10 with the number of Hunger dice. */
+function hungerDie(c, before) {
+  const die = d10(c.hunger > 0, c.hunger);
+  die.classList.add('hg');
+  if (before && before.hunger !== c.hunger) die.classList.add('hot');
+  const wrap = el('span', 'nx hunger');
+  wrap.title = `Hunger ${c.hunger}`;
+  wrap.append(die);
+  return wrap;
 }
 
 function numbers(c, b) {
@@ -114,7 +125,7 @@ function numbers(c, b) {
       'Health',
       h.current,
       usable,
-      h.baneful ? `\u2715${h.baneful} baneful` : '',
+      h.baneful ? `\u2715${h.baneful}` : '',
       b &&
         (b.health.current !== h.current ||
           b.health.baneful !== h.baneful ||
@@ -130,10 +141,10 @@ function numbers(c, b) {
     ),
     numberCell(
       'vitae',
-      'Vitae',
+      'Vitae · Hunger',
       c.vitae.current,
       c.vitae.max,
-      '',
+      hungerDie(c, b),
       b && (b.vitae.current !== c.vitae.current || b.vitae.max !== c.vitae.max),
     ),
     numberCell(
@@ -141,13 +152,11 @@ function numbers(c, b) {
       'Humanity',
       c.humanity.rank,
       null,
-      v ? `\u2715${v} violation${v > 1 ? 's' : ''}` : '',
+      v ? `\u2715${v}` : '',
       b && (b.humanity.rank !== c.humanity.rank || b.humanity.violations !== v),
     ),
   );
 }
-
-const corners = () => ['tl', 'tr', 'bl', 'br'].map((p) => el('i', `corner ${p}`));
 
 function changes(a, b) {
   if (!a || !b) return [];
@@ -186,29 +195,20 @@ function renderCharacter(c, before) {
     el('span', 'nm', c.name),
     el('span', 'cl', (CLANS[c.clan] || CLANS.caitiff).name),
   );
-  const dice = el('div', 'hunger', el('span', 't', 'Hunger'));
+  let rail;
   if (boxStyle) {
-    now.hunger.forEach((cls, i) => {
-      const die = d10(cls === 'on');
-      if (old && old.hunger[i] !== cls) die.classList.add('hot');
-      dice.append(die);
-    });
-  } else {
-    const die = d10(c.hunger > 0, c.hunger);
-    if (before && before.hunger !== c.hunger) die.classList.add('hot');
-    dice.append(die);
-  }
-  const rail = boxStyle
-    ? el(
-        'div',
-        'rail',
-        track('health', 'Health', now.health, old && old.health),
-        track('willpower', 'Willpower', now.willpower, old && old.willpower),
-        track('vitae', 'Vitae', now.vitae, old && old.vitae),
-        track('humanity', 'Humanity', now.humanity, old && old.humanity),
-      )
-    : numbers(c, before);
-  frame.append(...corners(), plate, dice, rail);
+    const vitae = track('vitae', 'Vitae', now.vitae, old && old.vitae);
+    vitae.append(hungerDie(c, before));
+    rail = el(
+      'div',
+      'rail',
+      track('health', 'Health', now.health, old && old.health),
+      track('willpower', 'Willpower', now.willpower, old && old.willpower),
+      vitae,
+      track('humanity', 'Humanity', now.humanity, old && old.humanity),
+    );
+  } else rail = numbers(c, before);
+  frame.append(el('i', 'pp'), plate, rail);
   toast(frame, changes(before, c)[0]);
   return frame;
 }
@@ -229,7 +229,7 @@ function renderStoryteller(chronicle, before) {
   }
   const masqTrack = el('div', 'trk', el('span', '', 'Masquerade'), bar);
   masqTrack.append(el('span', 'mv', `${chronicle.masquerade}/10`));
-  frame.append(...corners(), plate, el('div', 'rail', masqTrack));
+  frame.append(el('i', 'pp'), plate, el('div', 'rail', masqTrack));
   if (before && before.masquerade !== chronicle.masquerade) {
     const d = chronicle.masquerade - before.masquerade;
     toast(frame, `Masquerade ${d > 0 ? '+' : '−'}${Math.abs(d)} · ${chronicle.masquerade}/10`);
@@ -273,6 +273,10 @@ function render(state) {
       const before = prev && prev.characters.find((x) => x.id === pg);
       root.replaceChildren(renderCharacter(c, before));
     }
+  }
+  // A clan name squeezed to a sliver reads as a stray letter: hide it when it does not fit.
+  for (const cl of root.querySelectorAll('.plate .cl')) {
+    if (cl.scrollWidth > cl.clientWidth + 1) cl.hidden = true;
   }
   prev = state;
 }
