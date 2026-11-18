@@ -1,8 +1,10 @@
-/* global window, document, EventSource, Image, URLSearchParams, setTimeout, clearTimeout */
-// One OBS Browser Source: the frame of one character (?pg=<id>) or of the Storyteller (?pg=storyteller).
+/* global window, document, EventSource, Image, URLSearchParams, setTimeout */
+// OBS Browser Source. /scena draws every frame on one fixed 1920×1080 page;
+// /frame?pg=<id> (or ?pg=storyteller) draws a single frame that fills the source.
 'use strict';
 
-const { CLANS, SECTS, el } = window.ELDER;
+const { CLANS, SECTS, el, sceneLayout } = window.ELDER;
+const sceneMode = window.location.pathname === '/scena';
 const params = new URLSearchParams(window.location.search);
 const pg = params.get('pg') || '';
 // Numbers by default; ?stile=caselle draws the boxes of the character sheet instead.
@@ -15,7 +17,6 @@ const root = document.getElementById('root');
 const SVG = 'http://www.w3.org/2000/svg';
 
 let prev = null;
-let toastTimer;
 const symbolOk = new Map();
 
 function symbol(key, frame) {
@@ -170,8 +171,7 @@ function toast(frame, text) {
   const t = el('div', 'toast', text);
   frame.append(t);
   window.requestAnimationFrame(() => t.classList.add('show'));
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  setTimeout(() => t.classList.remove('show'), 2600);
 }
 
 function renderCharacter(c, before) {
@@ -209,8 +209,8 @@ function renderCharacter(c, before) {
       )
     : numbers(c, before);
   frame.append(...corners(), plate, dice, rail);
-  root.replaceChildren(frame);
   toast(frame, changes(before, c)[0]);
+  return frame;
 }
 
 function renderStoryteller(chronicle, before) {
@@ -230,16 +230,39 @@ function renderStoryteller(chronicle, before) {
   const masqTrack = el('div', 'trk', el('span', '', 'Masquerade'), bar);
   masqTrack.append(el('span', 'mv', `${chronicle.masquerade}/10`));
   frame.append(...corners(), plate, el('div', 'rail', masqTrack));
-  root.replaceChildren(frame);
   if (before && before.masquerade !== chronicle.masquerade) {
     const d = chronicle.masquerade - before.masquerade;
     toast(frame, `Masquerade ${d > 0 ? '+' : '−'}${Math.abs(d)} · ${chronicle.masquerade}/10`);
   }
+  return frame;
+}
+
+function renderScene(state) {
+  // Characters in the order they were added, the Storyteller last; slots never move
+  // unless a character is added or removed.
+  const frames = state.characters.map((c) =>
+    renderCharacter(c, prev && prev.characters.find((x) => x.id === c.id)),
+  );
+  frames.push(renderStoryteller(state.chronicle, prev && prev.chronicle));
+  const slots = sceneLayout(frames.length);
+  root.replaceChildren(
+    ...frames.map((frame, i) => {
+      const r = slots[i];
+      const slot = el('div', 'slot', frame);
+      slot.style.left = `${r.x}px`;
+      slot.style.top = `${r.y}px`;
+      slot.style.width = `${r.w}px`;
+      slot.style.height = `${r.h}px`;
+      return slot;
+    }),
+  );
 }
 
 function render(state) {
-  if (pg === 'storyteller') {
-    renderStoryteller(state.chronicle, prev && prev.chronicle);
+  if (sceneMode) {
+    renderScene(state);
+  } else if (pg === 'storyteller') {
+    root.replaceChildren(renderStoryteller(state.chronicle, prev && prev.chronicle));
   } else {
     const c = state.characters.find((x) => x.id === pg);
     if (!c) {
@@ -248,7 +271,7 @@ function render(state) {
       );
     } else {
       const before = prev && prev.characters.find((x) => x.id === pg);
-      renderCharacter(c, before);
+      root.replaceChildren(renderCharacter(c, before));
     }
   }
   prev = state;

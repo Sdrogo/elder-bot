@@ -80,7 +80,17 @@
         >Setta
         <select id="sect"></select
       ></label>
+      <label class="field">Scena intera <input id="url-scene" readonly /></label>
       <label class="field">Cornice Storyteller <input id="url-st" readonly /></label>
+      <details>
+        <summary>Posizioni dei ritagli nella scena</summary>
+        <p class="hint">
+          Browser Source <code>/scena</code> a 1920×1080, sopra tutto. In OBS metti ogni ritaglio di
+          Discord in questo rettangolo: seleziona il ritaglio, Ctrl+E, Posizione = X, Y e Riquadro
+          di delimitazione "Adatta all’interno" = L × A.
+        </p>
+        <ul id="slots" class="slots"></ul>
+      </details>
     </section>
 
     <p id="status" class="status" role="status"></p>

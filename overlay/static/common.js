@@ -28,6 +28,30 @@ window.ELDER = {
     sabbat: 'Sabbat',
     none: '',
   },
+  /**
+   * Fixed slots of the /scena page on a 1920×1080 canvas, one per frame (characters, then
+   * the Storyteller). Each rectangle is where the webcam crop goes in OBS; the name and
+   * Hunger plates stick out above it, so rows leave room for them.
+   */
+  sceneLayout(n) {
+    const W = 1920;
+    const H = 1080;
+    const top = 60;
+    const side = 30;
+    const bottom = 30;
+    const gapX = 40;
+    const gapY = 70;
+    const cols = n <= 4 ? 2 : 3;
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const w = Math.floor((W - 2 * side - (cols - 1) * gapX) / cols);
+    const h = Math.floor((H - top - bottom - (rows - 1) * gapY) / rows);
+    return Array.from({ length: n }, (_, i) => ({
+      x: side + (i % cols) * (w + gapX),
+      y: top + Math.floor(i / cols) * (h + gapY),
+      w,
+      h,
+    }));
+  },
   /** el('div', 'a b', child, 'text') builds an element; strings become text nodes, never HTML. */
   el(tag, cls, ...children) {
     const e = document.createElement(tag);

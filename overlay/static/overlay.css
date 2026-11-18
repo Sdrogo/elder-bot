@@ -457,3 +457,11 @@ body {
     animation: none;
   }
 }
+
+/* /scena: every frame on one 1920×1080 page, each in a fixed slot */
+.slot {
+  position: absolute;
+}
+.slot .frame {
+  inset: 0;
+}

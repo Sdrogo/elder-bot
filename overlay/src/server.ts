@@ -223,7 +223,7 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
         }
         if (path === '/dock')
           return send(res, 200, page('dock.html', { TOKEN: token }), 'text/html; charset=utf-8');
-        if (path === '/frame')
+        if (path === '/frame' || path === '/scena')
           return send(res, 200, page('frame.html'), 'text/html; charset=utf-8');
         if (path === '/api/state') return send(res, 200, state);
         if (path.startsWith('/static/')) {
@@ -323,6 +323,7 @@ async function main() {
   const overlay = await startOverlay({ port, dataDir: join(OVERLAY_DIR, 'data') });
   console.log(`Elder Overlay is running on ${overlay.url} (only this PC can reach it).`);
   console.log(`  OBS dock:          ${overlay.url}/dock`);
+  console.log(`  Whole scene:       ${overlay.url}/scena (one 1920x1080 Browser Source)`);
   console.log(`  Character frame:   ${overlay.url}/frame?pg=<character id>`);
   console.log(`  Storyteller frame: ${overlay.url}/frame?pg=storyteller`);
   console.log(

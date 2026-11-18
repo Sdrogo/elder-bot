@@ -3,7 +3,7 @@
 // local server, which pushes it to the frames and to this dock.
 'use strict';
 
-const { CLANS, SECTS, el } = window.ELDER;
+const { CLANS, SECTS, el, sceneLayout } = window.ELDER;
 const token = document.querySelector('meta[name="elder-token"]').content;
 const $ = (id) => document.getElementById(id);
 const origin = window.location.origin;
@@ -139,6 +139,15 @@ function render() {
     state.chronicle.sect,
   );
   $('url-st').value = `${origin}/frame?pg=storyteller`;
+  $('url-scene').value = `${origin}/scena`;
+  const names = [...state.characters.map((c) => c.name), 'Storyteller'];
+  const slots = sceneLayout(names.length);
+  $('slots').replaceChildren(
+    ...names.map((name, i) => {
+      const r = slots[i];
+      return el('li', '', el('b', '', name), ` · X ${r.x}, Y ${r.y} · ${r.w} × ${r.h}`);
+    }),
+  );
 }
 
 fillSelect(
@@ -181,7 +190,8 @@ $('remove-char').onclick = async () => {
 $('masq-dec').onclick = () => post('/api/adjust', { track: 'masquerade', delta: -1 });
 $('masq-inc').onclick = () => post('/api/adjust', { track: 'masquerade', delta: 1 });
 $('sect').onchange = (e) => post('/api/chronicle/sect', { sect: e.target.value });
-for (const id of ['url-frame', 'url-deck', 'url-st']) $(id).onfocus = (e) => e.target.select();
+for (const id of ['url-frame', 'url-deck', 'url-st', 'url-scene'])
+  $(id).onfocus = (e) => e.target.select();
 
 const events = new EventSource('/events');
 events.onopen = () => {
