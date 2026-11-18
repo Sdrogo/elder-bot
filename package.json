@@ -21,19 +21,19 @@
     "overlay": "node overlay/src/server.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
-    "discord.js": "^14.27.0",
-    "dotenv": "^18.0.8"
+    "better-sqlite3": "^13.2.0",
+    "discord.js": "^14.28.1",
+    "dotenv": "^18.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^26.6.5",
-    "eslint": "^10.13.0",
-    "prettier": "^3.9.10",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.15.0",
+    "prettier": "^3.10.1",
     "tsx": "^4.23.15",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.72.0",
-    "vitest": "^5.0.5"
+    "typescript": "~7.0.2",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
   }
 }
