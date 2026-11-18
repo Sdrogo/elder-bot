@@ -8,7 +8,7 @@ Le regole vengono dal Player Packet (cap. 4, "Rules of the Night") e dallo Story
 - un dado da **6 in su** è un successo, un **10 vale 2 successi**; vincere con un 10 è un **Critical Win**;
 - la **Difficoltà** è il numero di successi da ottenere (non toglie più dadi); il bot mostra il margine di successo o di fallimento;
 - nessun successo è un **Painful Failure**: oltre al fallimento arriva una complicazione;
-- i **dadi Fame** (opzione `hunger`, da 0 a 5, da scrivere a ogni tiro) sostituiscono dadi normali; un fallimento con un 1 su un dado Fame è un **Bestial Failure**;
+- i **dadi Fame** (opzione `hunger`, da 0 a 5, oppure calcolati dalla Vitae del personaggio salvato) sostituiscono dadi normali; un fallimento con un 1 su un dado Fame è un **Bestial Failure**;
 - **Willpower**: 1 punto per ritirare fino a 3 dadi normali, una volta per test;
 - **Beast's Bargain** dopo un fallimento semplice, **Taking Half** fuori dallo stress, **Try again** con Difficoltà +1;
 - niente più Quickening, Drama né Livello dei PNG.
@@ -25,9 +25,11 @@ Tutti i comandi stanno sotto `/elder`, così il bot aggiunge una sola voce al se
 | `/elder contest dice opponent_dice [opponent] [attribute] [opponent_attribute] [hunger] [opponent_hunger] [reason]` | Test contrapposto: vince chi fa più successi; in parità l'Attributo più alto, poi chi ha iniziato                                          |
 | `/elder prolonged start \| roll \| status \| cancel`                                                                | Compito prolungato: 3, 5, 7 o 10 successi in 3, 5 o 7 tiri; un Painful o Bestial Failure lo fa fallire subito                              |
 | `/elder npc dice [difficulty] [bonus] [take_half] [reason]`                                                         | Test per un PNG con il pool della sua scheda, senza meccaniche da giocatore                                                                |
-| `/elder frenzy type dice humanity [hunger] [difficulty] [bonus]`                                                    | Resistere alla frenesia: Composure + Resolve, al massimo tanti dadi quanta Umanità; per la frenesia da fame la Difficoltà sono i dadi Fame |
+| `/elder frenzy type [dice] [humanity] [hunger] [difficulty] [bonus]`                                                | Resistere alla frenesia: Composure + Resolve, al massimo tanti dadi quanta Umanità; per la frenesia da fame la Difficoltà sono i dadi Fame |
 | `/elder masquerade show \| mark \| clear \| set \| threat`                                                          | Masquerade Tracker del tavolo (0-10) e threat test del Narratore                                                                           |
-| `/elder session new \| end \| storyteller \| language`                                                              | Nuova sessione, fine sessione (azzera il tavolo), Narratore del canale o lingua del tavolo                                                 |
+| `/elder session new [chronicle] \| end \| storyteller \| language`                                                  | Nuova sessione (con `chronicle` il canale gioca quella Cronaca), fine sessione, Narratore del canale o lingua del tavolo                   |
+| `/elder character create \| sheet \| list \| set \| edit \| give \| delete`                                         | Personaggi dei giocatori, salvati sul VPS: scheda con pulsanti + e −, Hunger calcolata dalla Vitae                                         |
+| `/elder chronicle create \| list \| live \| invite \| remove \| edit \| archive`                                    | Cronache del Narratore: giocatori, Masquerade Tracker, setta e Cronaca in onda                                                             |
 
 Esempio: `/elder roll dice:7 difficulty:2 hunger:1 reason:Scalare il muro`. Discord passa da un campo all'altro col Tab.
 
@@ -115,6 +117,16 @@ Il bot gira in un container Docker su qualsiasi VPS Linux (Debian o Ubuntu), anc
 ```bash
 cd ~/elder-bot && git pull && docker compose up -d --build
 ```
+
+### Backup
+
+Da quando il bot salva personaggi e Cronache, il database va copiato ogni notte. Sulla VPS, con `crontab -e`, aggiungi questa riga: alle 4:15 copia il database con il comando `.backup` di SQLite (sicuro anche con il bot acceso) e tiene le ultime 14 copie in `~/elder-bot-backup`.
+
+```cron
+15 4 * * * mkdir -p ~/elder-bot-backup && docker run --rm -v elder-bot_elder-bot-data:/data -v ~/elder-bot-backup:/backup alpine:3.22 sh -c 'apk add -q sqlite && sqlite3 /data/elder-bot.db ".backup /backup/elder-bot-$(date +\%F).db"' && ls -1t ~/elder-bot-backup/*.db | tail -n +15 | xargs -r rm
+```
+
+Il nome del volume dipende dalla cartella: se non è `elder-bot_elder-bot-data`, controllalo con `docker volume ls`. Per ripristinare, ferma il bot, copia un file di backup nel volume come `elder-bot.db` e riavvia.
 
 Se l'aggiornamento cambia i comandi (nomi o opzioni), registrali di nuovo con `docker compose run --rm elder-bot node dist/deploy-commands.js`: sostituisce quelli vecchi. Ogni tanto aggiungi `--pull` alla build (`docker compose build --pull && docker compose up -d`) per scaricare le patch di sicurezza dell'immagine Node. I dati restano nel volume `elder-bot-data` e `restart: unless-stopped` riavvia il bot anche dopo un reboot.
 

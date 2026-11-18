@@ -1,4 +1,5 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { runsChronicle } from '../auth/campaign.js';
 import { isStoryteller, storytellerOnly } from '../auth/storyteller.js';
 import {
   LANGUAGE_NAMES,
@@ -10,13 +11,20 @@ import {
   t,
 } from '../i18n/index.js';
 import { infoEmbed } from '../ui/format.js';
+import { characterLine } from '../ui/sheet.js';
+import { replyEphemeral, suggestChronicles } from './campaignShared.js';
+import { chronicleOption } from './chronicle.js';
 import type { Command } from './types.js';
 
 /** `/elder session language` value that drops the table language and follows each user's Discord. */
 export const AUTO_LANGUAGE = 'auto';
 
 const data = described(new SlashCommandBuilder().setName('session'), 'cmd.session.description')
-  .addSubcommand((s) => described(s.setName('new'), 'cmd.session.new.description'))
+  .addSubcommand((s) =>
+    described(s.setName('new'), 'cmd.session.new.description').addStringOption(
+      chronicleOption('opt.session.chronicle'),
+    ),
+  )
   .addSubcommand((s) => described(s.setName('end'), 'cmd.session.end.description'))
   .addSubcommand((s) =>
     described(s.setName('storyteller'), 'cmd.session.storyteller.description').addUserOption((o) =>
@@ -37,6 +45,9 @@ const data = described(new SlashCommandBuilder().setName('session'), 'cmd.sessio
 
 export const session: Command = {
   data,
+  async autocomplete(interaction, ctx) {
+    await suggestChronicles(interaction, ctx);
+  },
   async execute(interaction, { store }) {
     const locale = localeFor(interaction, store);
     const channelId = interaction.channelId;
@@ -105,15 +116,43 @@ export const session: Command = {
       return;
     }
 
+    // /elder session new chronicle: plays that Chronicle here and puts it on air.
+    const chosen = interaction.options.getString('chronicle');
+    const { campaign } = store;
+    const chronicle =
+      chosen && /^\d+$/.test(chosen) ? campaign.getChronicle(Number(chosen)) : undefined;
+    if (chosen && (!chronicle || chronicle.archived || chronicle.guildId !== interaction.guildId)) {
+      await replyEphemeral(interaction, locale, 'chronicle.notFound');
+      return;
+    }
+    if (chronicle && !runsChronicle(interaction, chronicle)) {
+      await replyEphemeral(interaction, locale, 'chronicle.storytellerOnly');
+      return;
+    }
+    if (chronicle) {
+      store.bindChronicle(channelId, chronicle.id);
+      campaign.setLive(chronicle.id);
+    }
+
     const claimed = current === undefined;
     if (claimed) store.setStoryteller(channelId, interaction.user.id);
     const storytellerLine = claimed
       ? `\n${t(locale, 'session.storyteller.set', { user: `${interaction.user}` })}`
       : '';
 
+    // With a Chronicle, the table sees who plays and their trackers.
+    const playing = chronicle ?? campaign.chronicleByChannel(channelId);
+    const members = playing ? campaign.members(playing.id) : [];
+    const chronicleText = playing
+      ? `\n\n${t(locale, 'session.new.chronicle', { name: playing.name })}` +
+        (members.length ? `\n\n${members.map((m) => characterLine(m)).join('\n\n')}` : '')
+      : '';
     await interaction.reply({
       embeds: [
-        infoEmbed(t(locale, 'session.new.title'), `${t(locale, 'session.new')}${storytellerLine}`),
+        infoEmbed(
+          t(locale, 'session.new.title'),
+          `${t(locale, 'session.new')}${storytellerLine}${chronicleText}`.slice(0, 4000),
+        ),
       ],
     });
   },
