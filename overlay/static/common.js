@@ -30,8 +30,10 @@ window.ELDER = {
   },
   /**
    * Fixed slots of the /scena page on a 1920×1080 canvas, one per frame (characters, then
-   * the Storyteller). Each rectangle is where the webcam crop goes in OBS; the name and
-   * Hunger plates stick out above it, so rows leave room for them.
+   * the Storyteller). Each rectangle is where a webcam crop goes in OBS, so it keeps the
+   * 16:9 shape of a Discord webcam tile. Picks the column count that gives the biggest
+   * tiles, centres the grid, and centres a last row that is not full. The name and Hunger
+   * plates stick out above each tile, so rows leave room for them.
    */
   sceneLayout(n) {
     const W = 1920;
@@ -41,16 +43,26 @@ window.ELDER = {
     const bottom = 30;
     const gapX = 40;
     const gapY = 70;
-    const cols = n <= 4 ? 2 : 3;
-    const rows = Math.max(1, Math.ceil(n / cols));
-    const w = Math.floor((W - 2 * side - (cols - 1) * gapX) / cols);
-    const h = Math.floor((H - top - bottom - (rows - 1) * gapY) / rows);
-    return Array.from({ length: n }, (_, i) => ({
-      x: side + (i % cols) * (w + gapX),
-      y: top + Math.floor(i / cols) * (h + gapY),
-      w,
-      h,
-    }));
+    const ratio = 16 / 9;
+    const count = Math.max(1, n);
+    let best = { cols: 1, rows: 1, w: 0, h: 0 };
+    for (let cols = 1; cols <= count; cols++) {
+      const rows = Math.ceil(count / cols);
+      const maxW = (W - 2 * side - (cols - 1) * gapX) / cols;
+      const maxH = (H - top - bottom - (rows - 1) * gapY) / rows;
+      const w = Math.floor(Math.min(maxW, maxH * ratio));
+      if (w > best.w) best = { cols, rows, w, h: Math.floor(w / ratio) };
+    }
+    const { cols, rows, w, h } = best;
+    const gridH = rows * h + (rows - 1) * gapY;
+    const y0 = top + Math.floor((H - top - bottom - gridH) / 2);
+    return Array.from({ length: n }, (_, i) => {
+      const row = Math.floor(i / cols);
+      const inRow = Math.min(cols, n - row * cols);
+      const rowW = inRow * w + (inRow - 1) * gapX;
+      const x0 = Math.floor((W - rowW) / 2);
+      return { x: x0 + (i % cols) * (w + gapX), y: y0 + row * (h + gapY), w, h };
+    });
   },
   /** el('div', 'a b', child, 'text') builds an element; strings become text nodes, never HTML. */
   el(tag, cls, ...children) {
