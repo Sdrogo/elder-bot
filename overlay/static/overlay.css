@@ -1,4 +1,4 @@
-/* Elder Overlay frame: one Browser Source per character (or the Storyteller).
+/* Elder Overlay frames: a passe-partout around each webcam (or the Storyteller).
    The page is transparent; only the frame, plates and trackers are drawn.
    Sizes use cqw of .virt, which has a fixed width, so plates and numbers keep the same
    size at any Browser Source size; ?scala=1.2 makes them bigger, ?scala=0.8 smaller. */
@@ -12,6 +12,8 @@
   --will: #9fb4e6;
   --human: #3fae4a;
   --gold: #c9a45c;
+  --band: rgba(16, 12, 18, 0.88);
+  --edge: rgba(236, 230, 220, 0.4);
   --display: 'IM Fell English SC', 'Cormorant SC', Georgia, serif;
   --cond: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
 }
@@ -43,93 +45,76 @@ body {
   text-shadow: 0 0 0.4cqw #000;
 }
 
+/* Passe-partout: .frame is the webcam rectangle; .pp is one dark band around it, with the
+   name in the top band and the trackers in the bottom one. --top/--side/--bottom are the
+   band widths. */
 .frame {
   position: absolute;
-  top: 3.6cqw;
-  left: 1.4cqw;
-  right: 1.4cqw;
-  /* room for the tracker plate that hangs below the frame */
-  bottom: 5.4cqw;
-  border-radius: 0.3cqw;
+  --top: 2.3cqw;
+  --side: 0.55cqw;
+  --bottom: 3.7cqw;
+  top: calc(var(--top) + 0.3cqw);
+  left: calc(var(--side) + 0.3cqw);
+  right: calc(var(--side) + 0.3cqw);
+  bottom: calc(var(--bottom) + 0.3cqw);
   --clan: var(--blood);
 }
-.frame::before,
 .frame::after {
+  /* clan-coloured hairline around the webcam */
   content: '';
   position: absolute;
-  pointer-events: none;
-  z-index: 0;
-}
-.frame::before {
   inset: 0;
-  border: 0.16cqw solid rgba(236, 230, 220, 0.7);
-  border-radius: 0.3cqw;
-}
-.frame::after {
-  inset: 0.45cqw;
-  border: 0.1cqw solid var(--clan);
-  opacity: 0.85;
-  border-radius: 0.15cqw;
-}
-.corner {
-  position: absolute;
   z-index: 1;
-  width: 1.2cqw;
-  height: 1.2cqw;
-  transform: rotate(45deg);
-  background: var(--plate);
-  border: 0.16cqw solid rgba(236, 230, 220, 0.8);
+  pointer-events: none;
+  border-radius: 0.2cqw;
+  box-shadow: 0 0 0 0.1cqw var(--clan);
 }
-.corner::after {
-  content: '';
+.pp {
   position: absolute;
-  inset: 0.3cqw;
-  background: var(--clan);
-}
-.corner.tl {
-  top: -0.6cqw;
-  left: -0.6cqw;
-}
-.corner.tr {
-  top: -0.6cqw;
-  right: -0.6cqw;
-}
-.corner.bl {
-  bottom: -0.6cqw;
-  left: -0.6cqw;
-}
-.corner.br {
-  bottom: -0.6cqw;
-  right: -0.6cqw;
+  z-index: 0;
+  top: calc(-1 * var(--top));
+  left: calc(-1 * var(--side));
+  right: calc(-1 * var(--side));
+  bottom: calc(-1 * var(--bottom));
+  padding: var(--top) var(--side) var(--bottom);
+  border-radius: 0.55cqw;
+  background: var(--band);
+  box-shadow: inset 0 0 0 0.07cqw var(--edge);
+  /* cut the webcam out of the band */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
 }
 
 .plate {
   position: absolute;
   z-index: 2;
-  top: -1.5cqw;
-  left: 2.2cqw;
+  top: calc(-1 * var(--top));
+  height: var(--top);
+  left: 0.5cqw;
+  right: 0.5cqw;
   display: flex;
   align-items: center;
-  gap: 0.9cqw;
-  /* leave room for the Hunger plate on the right */
-  max-width: calc(100% - 15cqw);
-  background: var(--plate);
-  padding: 0.35cqw 1.1cqw 0.45cqw;
-  border: 0.12cqw solid rgba(236, 230, 220, 0.6);
-  border-bottom: 0.25cqw solid var(--clan);
+  gap: 0.6cqw;
+  min-width: 0;
 }
 .plate .nm {
   font-family: var(--display);
-  font-size: 1.9cqw;
+  font-size: 1.45cqw;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 .plate .cl {
   font-family: var(--cond);
-  font-size: 0.95cqw;
-  letter-spacing: 0.16em;
+  font-size: 0.72cqw;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
@@ -140,8 +125,8 @@ body {
   text-overflow: ellipsis;
 }
 .sym {
-  width: 2.9cqw;
-  height: 2.9cqw;
+  width: 1.7cqw;
+  height: 1.7cqw;
   flex: none;
   background: var(--clan);
   -webkit-mask: var(--m) center / contain no-repeat;
@@ -152,32 +137,6 @@ body {
 }
 .st .sym {
   background: var(--fg);
-}
-.st .plate {
-  /* no Hunger plate on the Storyteller frame */
-  max-width: calc(100% - 4.4cqw);
-  border-bottom-color: var(--gold);
-}
-
-.hunger {
-  position: absolute;
-  z-index: 2;
-  top: -1.65cqw;
-  right: 2.2cqw;
-  display: flex;
-  align-items: center;
-  gap: 0.3cqw;
-  background: var(--plate);
-  padding: 0.3cqw 0.7cqw;
-  border: 0.12cqw solid rgba(192, 38, 45, 0.7);
-}
-.hunger .t {
-  font-family: var(--cond);
-  font-size: 0.95cqw;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #e0454b;
-  margin-right: 0.3cqw;
 }
 .hd {
   width: 1.9cqw;
@@ -211,19 +170,18 @@ body {
 }
 
 .rail {
-  /* Hangs below the frame, like the name plate above it, so the webcam stays clear. */
+  /* the bottom band of the passe-partout */
   position: absolute;
   z-index: 2;
-  top: calc(100% - 0.6cqw);
-  left: 2.2cqw;
-  right: 2.2cqw;
-  padding: 0.45cqw 1.1cqw 0.5cqw;
-  background: var(--plate);
-  border: 0.12cqw solid rgba(236, 230, 220, 0.6);
-  border-top: 0.25cqw solid var(--clan);
+  top: 100%;
+  height: var(--bottom);
+  left: 0.5cqw;
+  right: 0.5cqw;
+  padding: 0.25cqw 0.2cqw 0.2cqw;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.45cqw 1.6cqw;
+  align-content: center;
+  gap: 0.25cqw 1.4cqw;
 }
 .st .rail {
   grid-template-columns: 1fr;
@@ -383,8 +341,8 @@ body {
   align-items: baseline;
   column-gap: 0.4cqw;
   min-width: 0;
-  border-left: 0.22cqw solid var(--c);
-  padding-left: 0.6cqw;
+  border-left: 0.16cqw solid var(--c);
+  padding-left: 0.55cqw;
 }
 .nb.health {
   --c: var(--health);
@@ -401,8 +359,8 @@ body {
 .nl {
   grid-area: l;
   font-family: var(--cond);
-  font-size: 0.85cqw;
-  letter-spacing: 0.12em;
+  font-size: 0.72cqw;
+  letter-spacing: 0.14em;
   white-space: nowrap;
   overflow: hidden;
   text-transform: uppercase;
@@ -413,14 +371,14 @@ body {
   white-space: nowrap;
   font-family: var(--cond);
   font-weight: 600;
-  font-size: 2.3cqw;
+  font-size: 2cqw;
   line-height: 0.95;
   color: var(--c);
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 0.4cqw #000;
 }
 .nv small {
-  font-size: 1.2cqw;
+  font-size: 1.05cqw;
   font-weight: 500;
   color: var(--fg);
   opacity: 0.6;
@@ -443,6 +401,31 @@ body {
   width: 2.7cqw;
   height: 3.1cqw;
 }
+/* the Hunger die beside Vitae */
+.nx.hunger {
+  overflow: visible;
+  align-self: end;
+  justify-self: start;
+  margin-left: 0.2cqw;
+}
+.hd.big.hg {
+  width: 2.1cqw;
+  height: 2.4cqw;
+  margin-bottom: -0.2cqw;
+}
+.hd.big.hg text {
+  font-size: 20px;
+}
+.trk .nx.hunger {
+  grid-area: auto;
+  align-self: center;
+  margin: 0;
+}
+.trk .hd.big.hg {
+  width: 1.5cqw;
+  height: 1.7cqw;
+  margin: 0;
+}
 .hd.big text {
   font-family: var(--cond);
   font-weight: 700;
@@ -451,6 +434,9 @@ body {
 }
 .hd.big:not(.on) text {
   fill: rgba(236, 230, 220, 0.6);
+}
+.trk.vitae {
+  grid-template-columns: 5.4cqw minmax(0, 1fr) auto;
 }
 .st .trk {
   grid-template-columns: auto minmax(0, 1fr) auto;
