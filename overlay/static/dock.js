@@ -91,7 +91,14 @@ function renderCharacter(c) {
   $('rows').replaceChildren(
     trackRow(c, 'health', 'current', 'Health', '', `${h.current} / ${h.max - h.baneful}`),
     trackRow(c, 'health', 'baneful', 'Health', 'baneful', String(h.baneful)),
-    trackRow(c, 'vitae', 'current', 'Vitae', '', `${c.vitae.current} / ${c.vitae.max}`),
+    trackRow(
+      c,
+      'vitae',
+      'current',
+      'Vitae',
+      `Hunger ${c.hunger}`,
+      `${c.vitae.current} / ${c.vitae.max}`,
+    ),
     trackRow(
       c,
       'willpower',
@@ -102,7 +109,6 @@ function renderCharacter(c) {
     ),
     trackRow(c, 'humanity', 'current', 'Humanity', 'rank', String(c.humanity.rank)),
     trackRow(c, 'humanity', 'violations', 'Humanity', 'violations', String(c.humanity.violations)),
-    trackRow(c, 'hunger', 'current', 'Hunger', 'dadi', `${c.hunger} / 5`),
   );
   $('maxrows').replaceChildren(
     trackRow(c, 'health', 'max', 'Health', 'massimo', String(h.max)),

@@ -36,7 +36,7 @@ export interface Character {
   willpower: { max: number; current: number };
   /** 10-box Humanity tracker: rank filled from the left, violations marked from the right. */
   humanity: { rank: number; violations: number };
-  /** Hunger dice, 0-5. The bot does not store them, so the overlay keeps its own count. */
+  /** Hunger dice, 0-5. Not set by hand: they follow Vitae (see hungerFor). */
   hunger: number;
 }
 
@@ -45,7 +45,7 @@ export interface OverlayState {
   chronicle: { masquerade: number; sect: Sect };
 }
 
-export type Track = 'health' | 'vitae' | 'willpower' | 'humanity' | 'hunger' | 'masquerade';
+export type Track = 'health' | 'vitae' | 'willpower' | 'humanity' | 'masquerade';
 export type Field = 'current' | 'max' | 'baneful' | 'violations';
 
 export const LIMITS = {
@@ -66,6 +66,17 @@ export function emptyState(): OverlayState {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Hunger dice for a Vitae value (Player Packet, Hunger Dice per Vitae, p. 103): one die each
+ * time about a fifth of the maximum is spent. With maximum 10 (neonates) 9-8 Vitae give 1
+ * die and 1-0 give 5; with 15 (ancillae) 14-12 give 1; with 20 (elders) 19-16 give 1.
+ */
+export function hungerFor(vitae: { max: number; current: number }): number {
+  if (vitae.max <= 0) return 0;
+  const spent = vitae.max - vitae.current;
+  return clamp(Math.ceil((spent * LIMITS.hunger) / vitae.max), 0, LIMITS.hunger);
+}
 
 function int(value: unknown, what: string): number {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
@@ -123,7 +134,7 @@ export interface NewCharacter {
   humanity?: unknown;
 }
 
-/** Adds a character at full Health, Vitae and Willpower, Humanity 6 unless given, Hunger 0. */
+/** Adds a character at full Health, Vitae and Willpower (so Hunger 0), Humanity 6 unless given. */
 export function addCharacter(state: OverlayState, input: NewCharacter): Character {
   if (state.characters.length >= LIMITS.characters) {
     throw new StateError(`at most ${LIMITS.characters} characters`);
@@ -224,6 +235,7 @@ export function setValue(
         t.max = clamp(value, 1, cap);
         t.current = Math.min(t.current, t.max);
       } else throw badField(track, f);
+      if (track === 'vitae') c.hunger = hungerFor(c.vitae);
       break;
     }
     case 'humanity': {
@@ -236,13 +248,9 @@ export function setValue(
       break;
     }
     case 'hunger':
-      if (f !== 'current') throw badField(track, f);
-      c.hunger = clamp(value, 0, LIMITS.hunger);
-      break;
+      throw new StateError('Hunger follows Vitae; change vitae instead');
     default:
-      throw new StateError(
-        'unknown track; use health, vitae, willpower, humanity, hunger or masquerade',
-      );
+      throw new StateError('unknown track; use health, vitae, willpower, humanity or masquerade');
   }
   return before !== JSON.stringify(c);
 }
@@ -266,9 +274,7 @@ export function getValue(state: OverlayState, pg: unknown, track: unknown, field
     case 'hunger':
       return c.hunger;
     default:
-      throw new StateError(
-        'unknown track; use health, vitae, willpower, humanity, hunger or masquerade',
-      );
+      throw new StateError('unknown track; use health, vitae, willpower, humanity or masquerade');
   }
 }
 
@@ -313,7 +319,6 @@ export function restore(raw: unknown): OverlayState {
       setValue(state, c.id, 'willpower', 'max', x.willpower?.max ?? c.willpower.max);
       setValue(state, c.id, 'willpower', 'current', x.willpower?.current ?? c.willpower.max);
       setValue(state, c.id, 'humanity', 'violations', x.humanity?.violations ?? 0);
-      setValue(state, c.id, 'hunger', 'current', x.hunger ?? 0);
     } catch {
       // skip a malformed character
     }

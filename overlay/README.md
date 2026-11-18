@@ -40,7 +40,7 @@ Preferisci una sorgente per cornice? `http://127.0.0.1:7777/frame?pg=<id>` (l'id
 
 ### Stile
 
-Le cornici mostrano i numeri (Health 5/7, Vitae 9/10…) su una targhetta appesa sotto la cornice, così la webcam resta libera. Il danno baneful e le violations compaiono come ✕ rossa accanto al numero (Health 5/5 ✕2), e la Fame è un d10 rosso con il numero dentro, in alto a destra. Per avere le caselle della scheda aggiungi `&stile=caselle` all'URL della Browser Source. Con una Browser Source `/frame` la cornice lascia sotto di sé lo spazio per la targhetta: allinea il ritaglio della webcam alla cornice, non al bordo della sorgente.
+Le cornici mostrano i numeri (Health 5/7, Vitae 9/10…) su una targhetta appesa sotto la cornice, così la webcam resta libera. Il danno baneful e le violations compaiono come ✕ rossa accanto al numero (Health 5/5 ✕2), e la Fame è un d10 rosso con il numero dentro, in alto a destra. I dadi Hunger non si cambiano a mano: seguono la Vitae come nella tabella Hunger Dice per Vitae (Player Packet p. 103), un dado ogni quinto circa di Vitae speso. Con massimo 10 (neonate) 9-8 Vitae danno 1 dado e 1-0 ne danno 5; con 15 (ancilla) e 20 (elder) le soglie si allargano allo stesso modo. Per avere le caselle della scheda aggiungi `&stile=caselle` all'URL della Browser Source. Con una Browser Source `/frame` la cornice lascia sotto di sé lo spazio per la targhetta: allinea il ritaglio della webcam alla cornice, non al bordo della sorgente.
 
 Targhette, numeri e dadi hanno sempre la stessa dimensione, pensata per una scena 1920×1080: nella pagina `/scena` e ridimensionando una Browser Source `/frame` cambia solo la cornice. Per ingrandirli o rimpicciolirli aggiungi `&scala=`, per esempio `&scala=1.2` o `&scala=0.8` (da 0.3 a 3).
 
@@ -66,7 +66,7 @@ http://127.0.0.1:7777/api/adjust?pg=lucrezia&track=health&delta=-1
 | Parametro | Valori                                                                                                        |
 | --------- | ------------------------------------------------------------------------------------------------------------- |
 | `pg`      | id del personaggio (non serve per `masquerade`)                                                               |
-| `track`   | `health`, `vitae`, `willpower`, `humanity`, `hunger`, `masquerade`                                            |
+| `track`   | `health`, `vitae`, `willpower`, `humanity`, `masquerade`                                                      |
 | `field`   | `current` (predefinito); `baneful` e `max` per Health; `max` per Vitae e Willpower; `violations` per Humanity |
 | `delta`   | quanto aggiungere, per esempio `-1` o `1` (predefinito `1`)                                                   |
 

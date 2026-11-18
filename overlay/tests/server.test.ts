@@ -46,12 +46,13 @@ describe('overlay server', () => {
 
   it('adds a character and adjusts a tracker, returning the new value', async () => {
     expect((await post('/api/characters/add', { name: 'Nina', clan: 'tremere' })).status).toBe(200);
-    const res = await post('/api/adjust?pg=nina&track=hunger&delta=2', {});
-    expect(await res.json()).toEqual({ ok: true, value: 2 });
+    const res = await post('/api/adjust?pg=nina&track=vitae&delta=-3', {});
+    expect(await res.json()).toEqual({ ok: true, value: 7 });
     const state = (await (await fetch(overlay.url + '/api/state')).json()) as {
       characters: { hunger: number }[];
     };
     expect(state.characters[0]?.hunger).toBe(2);
+    expect((await post('/api/adjust?pg=nina&track=hunger&delta=1', {})).status).toBe(400);
   });
 
   it('accepts form bodies and a Bearer token, as Stream Deck plugins send', async () => {
@@ -127,7 +128,7 @@ describe('overlay server', () => {
     const reader = res.body!.getReader();
     const first = new TextDecoder().decode((await reader.read()).value);
     expect(first).toContain('"id":"nina"');
-    await post('/api/adjust', { pg: 'nina', track: 'hunger', delta: 1 });
+    await post('/api/adjust', { pg: 'nina', track: 'vitae', delta: -1 });
     const next = new TextDecoder().decode((await reader.read()).value);
     expect(next).toContain('"hunger":1');
     await reader.cancel();
