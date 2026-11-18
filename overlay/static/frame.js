@@ -114,7 +114,7 @@ function numbers(c, b) {
       'Health',
       h.current,
       usable,
-      h.baneful ? `\u2715${h.baneful} baneful` : '',
+      h.baneful ? `\u2715${h.baneful}` : '',
       b &&
         (b.health.current !== h.current ||
           b.health.baneful !== h.baneful ||
@@ -141,7 +141,7 @@ function numbers(c, b) {
       'Humanity',
       c.humanity.rank,
       null,
-      v ? `\u2715${v} violation${v > 1 ? 's' : ''}` : '',
+      v ? `\u2715${v}` : '',
       b && (b.humanity.rank !== c.humanity.rank || b.humanity.violations !== v),
     ),
   );
@@ -273,6 +273,10 @@ function render(state) {
       const before = prev && prev.characters.find((x) => x.id === pg);
       root.replaceChildren(renderCharacter(c, before));
     }
+  }
+  // A clan name squeezed to a sliver reads as a stray letter: hide it when it does not fit.
+  for (const cl of root.querySelectorAll('.plate .cl')) {
+    if (cl.scrollWidth > cl.clientWidth + 1) cl.hidden = true;
   }
   prev = state;
 }

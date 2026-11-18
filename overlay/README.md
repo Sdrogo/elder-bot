@@ -40,7 +40,7 @@ Preferisci una sorgente per cornice? `http://127.0.0.1:7777/frame?pg=<id>` (l'id
 
 ### Stile
 
-Le cornici mostrano i numeri (Health 5/7, Vitae 9/10…). Il danno baneful e le violations compaiono come nota rossa sotto il numero, e la Fame è un d10 rosso con il numero dentro. Per avere le caselle della scheda aggiungi `&stile=caselle` all'URL della Browser Source.
+Le cornici mostrano i numeri (Health 5/7, Vitae 9/10…) su una targhetta appesa sotto la cornice, così la webcam resta libera. Il danno baneful e le violations compaiono come ✕ rossa accanto al numero (Health 5/5 ✕2), e la Fame è un d10 rosso con il numero dentro, in alto a destra. Per avere le caselle della scheda aggiungi `&stile=caselle` all'URL della Browser Source. Con una Browser Source `/frame` la cornice lascia sotto di sé lo spazio per la targhetta: allinea il ritaglio della webcam alla cornice, non al bordo della sorgente.
 
 Targhette, numeri e dadi hanno sempre la stessa dimensione, pensata per una scena 1920×1080: nella pagina `/scena` e ridimensionando una Browser Source `/frame` cambia solo la cornice. Per ingrandirli o rimpicciolirli aggiungi `&scala=`, per esempio `&scala=1.2` o `&scala=0.8` (da 0.3 a 3).
 

@@ -48,7 +48,8 @@ body {
   top: 3.6cqw;
   left: 1.4cqw;
   right: 1.4cqw;
-  bottom: 1.4cqw;
+  /* room for the tracker plate that hangs below the frame */
+  bottom: 5.4cqw;
   border-radius: 0.3cqw;
   --clan: var(--blood);
 }
@@ -153,6 +154,8 @@ body {
   background: var(--fg);
 }
 .st .plate {
+  /* no Hunger plate on the Storyteller frame */
+  max-width: calc(100% - 4.4cqw);
   border-bottom-color: var(--gold);
 }
 
@@ -208,13 +211,16 @@ body {
 }
 
 .rail {
+  /* Hangs below the frame, like the name plate above it, so the webcam stays clear. */
   position: absolute;
   z-index: 2;
-  left: 0.8cqw;
-  right: 0.8cqw;
-  bottom: 0.8cqw;
-  padding: 2.6cqw 1.2cqw 0.7cqw;
-  background: linear-gradient(180deg, transparent, rgba(10, 8, 12, 0.82) 45%);
+  top: calc(100% - 0.6cqw);
+  left: 2.2cqw;
+  right: 2.2cqw;
+  padding: 0.45cqw 1.1cqw 0.5cqw;
+  background: var(--plate);
+  border: 0.12cqw solid rgba(236, 230, 220, 0.6);
+  border-top: 0.25cqw solid var(--clan);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.45cqw 1.6cqw;
@@ -224,7 +230,7 @@ body {
 }
 .trk {
   display: grid;
-  grid-template-columns: 6cqw 1fr;
+  grid-template-columns: 5.4cqw minmax(0, 1fr);
   align-items: center;
   gap: 0.5cqw;
   min-width: 0;
@@ -243,9 +249,10 @@ body {
   min-width: 0;
 }
 .b {
-  width: 1.05cqw;
-  height: 1.05cqw;
+  /* same size on every track; in narrow frames ten boxes still fit the plate */
   flex: none;
+  width: min(1.05cqw, calc((100% - 2.7cqw) / 10));
+  aspect-ratio: 1;
   transform: rotate(45deg);
   border: 0.12cqw solid rgba(236, 230, 220, 0.45);
   position: relative;
@@ -298,7 +305,9 @@ body {
   gap: 0.3cqw;
 }
 .seg {
-  width: 1.9cqw;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 1.9cqw;
   height: 0.9cqw;
   background: rgba(255, 255, 255, 0.12);
   transition: background 0.3s;
@@ -363,16 +372,19 @@ body {
 /* Numbers style (default) */
 .rail.num {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0 1.2cqw;
-  padding-top: 3.2cqw;
+  gap: 0 1cqw;
 }
 .nb {
   display: grid;
-  grid-template-rows: auto auto 1.2cqw;
-  gap: 0.1cqw;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'l l'
+    'v x';
+  align-items: baseline;
+  column-gap: 0.4cqw;
   min-width: 0;
-  border-left: 0.25cqw solid var(--c);
-  padding-left: 0.7cqw;
+  border-left: 0.22cqw solid var(--c);
+  padding-left: 0.6cqw;
 }
 .nb.health {
   --c: var(--health);
@@ -387,29 +399,37 @@ body {
   --c: var(--human);
 }
 .nl {
+  grid-area: l;
   font-family: var(--cond);
-  font-size: 0.95cqw;
-  letter-spacing: 0.14em;
+  font-size: 0.85cqw;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  overflow: hidden;
   text-transform: uppercase;
   opacity: 0.85;
 }
 .nv {
+  grid-area: v;
+  white-space: nowrap;
   font-family: var(--cond);
   font-weight: 600;
-  font-size: 3cqw;
+  font-size: 2.3cqw;
   line-height: 0.95;
   color: var(--c);
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 0.4cqw #000;
 }
 .nv small {
-  font-size: 1.5cqw;
+  font-size: 1.2cqw;
   font-weight: 500;
   color: var(--fg);
   opacity: 0.6;
   margin-left: 0.15cqw;
 }
 .nx {
+  grid-area: x;
+  min-width: 0;
+  overflow: hidden;
   font-family: var(--cond);
   font-size: 0.9cqw;
   letter-spacing: 0.06em;
@@ -433,8 +453,7 @@ body {
   fill: rgba(236, 230, 220, 0.6);
 }
 .st .trk {
-  grid-template-columns: 6cqw auto auto;
-  justify-content: start;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 .mv {
   font-family: var(--cond);
