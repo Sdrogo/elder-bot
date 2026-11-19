@@ -1,4 +1,4 @@
-/* global document, fetch, FormData, location, navigator, setTimeout, URLSearchParams */
+/* global document, window, fetch, FormData, location, navigator, setTimeout, URLSearchParams */
 // ElderBot web panel. No framework: the page asks /api/me and draws the cards.
 // Names come from users, so every text goes in with textContent, never as HTML.
 
@@ -40,14 +40,24 @@ const TEXT = {
     down: 'Sposta dopo',
     remove: 'Togli',
     'overlay.title': 'Overlay di OBS',
+    'overlay.pages':
+      'Browser Source di OBS: le cornici della Cronaca in onda, aggiornate a ogni modifica. Scena intera a 1920×1080.',
+    'overlay.scene': 'Scena intera',
+    'overlay.storyteller': 'Cornice del Narratore',
+    'overlay.newPages': 'Nuovi indirizzi',
+    'overlay.deck': 'Chiave per lo Stream Deck',
+    'overlay.slots': 'Posizioni dei ritagli nella scena',
+    'overlay.slotsNote':
+      'In OBS metti ogni ritaglio della webcam nel suo rettangolo: Ctrl+E, Posizione = X, Y e riquadro "Adatta all’interno" = L × A. Cambiano solo se cambia il numero di PG.',
     'overlay.none':
-      'Crea una chiave e incollala nel pannello di Elder Overlay: le cornici seguiranno la Cronaca in onda.',
+      'Serve per cambiare i tracciati dallo Stream Deck (o per collegare Elder Overlay sul PC).',
     'overlay.since': 'Chiave attiva dal',
     'overlay.create': 'Crea la chiave',
     'overlay.renew': 'Nuova chiave',
     'overlay.revoke': 'Revoca',
     'overlay.once':
-      'Copiala adesso: non la vedrai più. In Elder Overlay incolla indirizzo e chiave.',
+      "Copiala adesso: non la vedrai più. Lo Stream Deck la manda nell'header X-Elder-Token, con una richiesta POST come questa.",
+    'overlay.example': 'Esempio di tasto (Vitae −1)',
     'overlay.address': 'Indirizzo',
     'overlay.key': 'Chiave',
     copy: 'Copia',
@@ -90,14 +100,23 @@ const TEXT = {
     down: 'Move later',
     remove: 'Remove',
     'overlay.title': 'OBS overlay',
-    'overlay.none':
-      'Make a key and paste it in the Elder Overlay dock: the frames will follow the Chronicle on air.',
+    'overlay.pages':
+      'OBS Browser Sources: the frames of the Chronicle on air, updated on every change. Whole scene at 1920×1080.',
+    'overlay.scene': 'Whole scene',
+    'overlay.storyteller': 'Storyteller frame',
+    'overlay.newPages': 'New addresses',
+    'overlay.deck': 'Stream Deck key',
+    'overlay.slots': 'Where the crops go in the scene',
+    'overlay.slotsNote':
+      'In OBS put each webcam crop in its rectangle: Ctrl+E, Position = X, Y and bounding box "Scale to inner bounds" = W × H. They change only when the number of characters does.',
+    'overlay.none': 'Moves trackers from the Stream Deck (or links Elder Overlay on your PC).',
     'overlay.since': 'Key active since',
     'overlay.create': 'Make the key',
     'overlay.renew': 'New key',
     'overlay.revoke': 'Revoke',
     'overlay.once':
-      "Copy it now: you won't see it again. In Elder Overlay paste the address and the key.",
+      "Copy it now: you won't see it again. The Stream Deck sends it in the X-Elder-Token header, with a POST request like this one.",
+    'overlay.example': 'Example key (Vitae −1)',
     'overlay.address': 'Address',
     'overlay.key': 'Key',
     copy: 'Copy',
@@ -441,6 +460,45 @@ function copyField(label, value) {
 function overlayBox(newKey) {
   const box = el('div', 'overlay-box');
   box.append(el('h3', '', tr('overlay.title')));
+
+  // The OBS addresses carry the view key: they can only show the frames.
+  const pages = me.overlay;
+  if (pages) {
+    const base = `${location.origin}/overlay`;
+    const v = `v=${encodeURIComponent(pages.viewKey)}`;
+    box.append(
+      el('p', 'note', tr('overlay.pages')),
+      copyField(tr('overlay.scene'), `${base}/scena?${v}`),
+      copyField(tr('overlay.storyteller'), `${base}/frame?pg=storyteller&${v}`),
+      ...pages.characters.map((c) => copyField(c.name, `${base}/frame?pg=${c.id}&${v}`)),
+    );
+    const layout = window.ELDER?.sceneLayout;
+    if (layout) {
+      const names = [...pages.characters.map((c) => c.name), 'Storyteller'];
+      const slots = layout(names.length);
+      const details = el('details', 'slots');
+      const list = el('ul');
+      list.append(
+        ...names.map((name, i) => {
+          const r = slots[i];
+          return el('li', '', `${name} · X ${r.x}, Y ${r.y} · ${r.w} × ${r.h}`);
+        }),
+      );
+      details.append(
+        el('summary', '', tr('overlay.slots')),
+        el('p', 'note', tr('overlay.slotsNote')),
+        list,
+      );
+      box.append(details);
+    }
+    const renew = el('div', 'actions');
+    renew.append(
+      confirmButton(tr('overlay.newPages'), () => change('POST', '/api/overlay-view-key')),
+    );
+    box.append(renew);
+  }
+
+  box.append(el('h4', '', tr('overlay.deck')));
   const actions = el('div', 'actions');
   const make = async () => {
     const response = await fetch('/api/overlay-key', {
@@ -454,10 +512,14 @@ function overlayBox(newKey) {
     document.getElementById('overlay').replaceChildren(overlayBox(key));
   };
   if (newKey) {
+    const first = pages?.characters[0]?.id ?? 'pg';
     box.append(
       el('p', 'note', tr('overlay.once')),
-      copyField(tr('overlay.address'), location.origin),
       copyField(tr('overlay.key'), newKey),
+      copyField(
+        tr('overlay.example'),
+        `${location.origin}/api/overlay/adjust?pg=${first}&track=vitae&delta=-1`,
+      ),
     );
   } else if (me.overlayKey) {
     const since = new Date(me.overlayKey).toLocaleString(lang);
@@ -468,7 +530,7 @@ function overlayBox(newKey) {
     );
   } else {
     box.append(el('p', 'note', tr('overlay.none')));
-    actions.append(button(tr('overlay.create'), make, 'primary'));
+    actions.append(button(tr('overlay.create'), make));
   }
   if (actions.childElementCount) box.append(actions);
   return box;

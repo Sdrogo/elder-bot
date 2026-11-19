@@ -7,6 +7,8 @@ services:
       DATABASE_PATH: /data/elder-bot.db
     volumes:
       - elder-bot-data:/data
+      # Clan and sect symbols for the OBS frames (Paradox IP, not in git): copy the PNGs here.
+      - ./symbols:/app/symbols:ro
     restart: unless-stopped
     # Hardening: only /data is writable, no Linux capabilities, no privilege escalation.
     read_only: true

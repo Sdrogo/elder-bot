@@ -2,6 +2,8 @@
 
 Overlay per OBS con i tracciati dei personaggi di **Vampire: The Masquerade 6e (Alpha 2.0)**: Health, Vitae, Willpower, Humanity, Hunger dice e il Masquerade Tracker dello Storyteller. Ogni giocatore ha una cornice attorno alla propria webcam di Discord.
 
+> Usi il pannello web del bot? Le stesse cornici le serve anche il bot, senza installare niente sul PC: vedi [Overlay di OBS dal bot](../README.md#overlay-di-obs-dal-bot). Questo programma resta utile per giocare senza il bot o senza VPS.
+
 È un piccolo programma che gira **solo sul tuo PC**, accanto a OBS. Può funzionare da solo, oppure collegarsi al pannello web del bot e mostrare la Cronaca in onda (vedi [Collegamento al bot](#collegamento-al-bot)). In entrambi i casi sul tuo PC non apre niente verso Internet.
 
 - **Cornici**: ogni personaggio è una Browser Source di OBS, con sfondo trasparente.

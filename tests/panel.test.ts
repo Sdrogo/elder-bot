@@ -529,6 +529,76 @@ describe('web sessions', () => {
   });
 });
 
+describe('overlay pages for OBS', () => {
+  it('need the view key and stream the Chronicle on air as it changes', async () => {
+    const ch = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Testament',
+      sect: 'anarch',
+    });
+    const pc = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Lucrezia',
+      clan: 'toreador',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 4, resolve: 2 }),
+    });
+    if (typeof ch !== 'object' || typeof pc !== 'object') throw new Error('setup');
+    store.campaign.setLive(ch.id);
+    store.campaign.join(ch.id, pc.id);
+    const v = store.viewKeys.get('111');
+
+    expect((await get('/overlay/scena')).status).toBe(401);
+    expect((await get('/overlay/scena?v=elv_wrong')).status).toBe(401);
+    const page = await get(`/overlay/scena?v=${v}`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-security-policy')).toContain('fonts.googleapis.com');
+    expect(await page.text()).toContain('static/frame.js');
+    expect((await get('/overlay/static/frame.js')).status).toBe(200);
+    expect((await get('/overlay/static/../../package.json')).status).not.toBe(200);
+    expect((await get(`/overlay/symbols/brujah.png?v=${v}`)).status).toBe(404);
+
+    const controller = new AbortController();
+    const events = await fetch(`${base}/overlay/events?v=${v}`, { signal: controller.signal });
+    const reader = events.body!.getReader();
+    const next = async () => {
+      let text = '';
+      while (!text.includes('\n\n')) text += new TextDecoder().decode((await reader.read()).value);
+      return JSON.parse(/data: (.*)/.exec(text)![1]!) as {
+        characters: { id: string; vitae: { current: number } }[];
+        chronicle: { masquerade: number };
+      };
+    };
+    const first = await next();
+    expect(first.characters[0]).toMatchObject({ id: 'lucrezia', vitae: { current: 10 } });
+    store.campaign.setTrack(pc.id, 'vitae', 7, '222');
+    const second = await next();
+    expect(second.characters[0]!.vitae.current).toBe(7);
+    controller.abort();
+
+    store.viewKeys.renew('111');
+    expect((await get(`/overlay/scena?v=${v}`)).status).toBe(401);
+  });
+
+  it('take Stream Deck keys with the token in a header and the values in the address', async () => {
+    const ch = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Testament',
+      sect: 'anarch',
+    });
+    if (typeof ch !== 'object') throw new Error('setup');
+    store.campaign.setLive(ch.id);
+    const key = store.overlayKeys.create('111');
+    const res = await fetch(`${base}/api/overlay/adjust?track=masquerade&delta=2`, {
+      method: 'POST',
+      headers: { 'x-elder-token': key },
+    });
+    expect(await res.json()).toEqual({ ok: true, value: 2 });
+  });
+});
+
 describe('overlay keys', () => {
   it('keep only a hash and replace the old key', async () => {
     const { default: Database } = await import('better-sqlite3');
