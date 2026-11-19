@@ -126,6 +126,51 @@ button,
   font-size: 14px;
 }
 
+.track .label {
+  min-width: 78px;
+}
+
+.track .value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.track .value strong {
+  min-width: 34px;
+  text-align: center;
+}
+
+button.step {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  line-height: 1;
+  font-size: 16px;
+}
+
+button.step:hover,
+button:hover {
+  border-color: var(--quiet);
+}
+
+button.primary {
+  background: var(--blood);
+  border-color: var(--blood);
+  font-weight: 600;
+}
+
+button.danger {
+  border-color: var(--blood);
+  color: #ff8a9a;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .track .boxes {
   letter-spacing: 1px;
   font-family: ui-monospace, monospace;
@@ -154,4 +199,66 @@ button,
   padding: 1px 6px;
   font-size: 12px;
   margin-left: 6px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notice {
+  background: var(--blood-soft);
+  border: 1px solid var(--blood);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sheet-form {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0 12px;
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.card .sheet-form {
+  border: 0;
+  padding: 0;
+  margin: 10px 0 0;
+  background: transparent;
+}
+
+.field {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.field input,
+.field select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.attributes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }

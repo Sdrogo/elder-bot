@@ -15,10 +15,17 @@
       <button id="logout" type="button" data-t="logout">Esci</button>
     </header>
     <main>
+      <p class="notice" id="notice" role="status" hidden></p>
       <section>
-        <h2 data-t="characters.title">I miei personaggi</h2>
+        <div class="section-head">
+          <h2 data-t="characters.title">I miei personaggi</h2>
+          <button id="new-character" type="button" data-t="characters.new">
+            Nuovo personaggio
+          </button>
+        </div>
+        <div id="new-character-slot"></div>
         <p class="empty" id="characters-empty" data-t="characters.empty" hidden>
-          Non hai ancora personaggi. Su Discord: /elder character create.
+          Non hai ancora personaggi.
         </p>
         <div class="cards" id="characters"></div>
       </section>

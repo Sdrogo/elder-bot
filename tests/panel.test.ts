@@ -38,6 +38,7 @@ beforeEach(async () => {
     clientId: '42',
     clientSecret: 'shh',
     fetchFn: fakeDiscord,
+    guildsOf: async () => [{ id: 'g', name: 'Tavolo' }],
   });
   server = createServer((req, res) => void handle(req, res));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -168,6 +169,137 @@ describe('web panel', () => {
     expect((await get('/app.js')).headers.get('content-type')).toContain('javascript');
     expect((await get('/../package.json')).status).toBe(401);
     expect((await get('/%2e%2e/package.json')).status).toBe(401);
+  });
+});
+
+describe('panel changes', () => {
+  /** Logs in as 111 and returns a sender of changes with the session's CSRF token. */
+  async function asUser() {
+    const cookie = await login();
+    const me = (await (await get('/api/me', cookie)).json()) as { csrf: string };
+    return (method: string, path: string, body?: unknown, csrf = me.csrf) =>
+      fetch(base + path, {
+        method,
+        headers: {
+          cookie,
+          'content-type': 'application/json',
+          'x-csrf-token': csrf,
+          origin: PUBLIC,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+  }
+
+  const sheet = { tier: 'neonate' as const, stamina: 3, composure: 4, resolve: 2 };
+
+  it('creates a character on a server the user shares with the bot', async () => {
+    const send = await asUser();
+    const body = { guild: 'g', name: 'Lucia', clan: 'toreador', ...sheet };
+    const res = await send('POST', '/api/characters', body);
+    expect(res.status).toBe(200);
+    const { character } = (await res.json()) as { character: { health: { max: number } } };
+    expect(character.health.max).toBe(8);
+    expect(store.campaign.charactersOwnedBy('111')).toHaveLength(1);
+
+    expect((await send('POST', '/api/characters', body)).status).toBe(409);
+    expect((await send('POST', '/api/characters', { ...body, guild: 'other' })).status).toBe(400);
+    expect((await send('POST', '/api/characters', { ...body, stamina: 11 })).status).toBe(400);
+    expect((await send('POST', '/api/characters', { ...body, clan: 'x' })).status).toBe(400);
+  });
+
+  it('moves trackers one step within the rules', async () => {
+    const mine = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Test',
+      clan: 'malkavian',
+      values: newCharacter(sheet),
+    });
+    if (typeof mine !== 'object') throw new Error('setup');
+    const send = await asUser();
+    const step = (track: string, delta: number) =>
+      send('POST', `/api/characters/${mine.id}/track`, { track, delta });
+
+    expect((await step('vitae', -3)).status).toBe(200);
+    expect((await step('health', 1)).status).toBe(200);
+    const after = store.campaign.getCharacter(mine.id)!;
+    expect(after.values.vitae).toBe(7);
+    expect(after.values.health).toBe(8);
+    expect((await step('hunger', 1)).status).toBe(400);
+    expect((await step('vitae', 1.5)).status).toBe(400);
+  });
+
+  it('refuses changes without the CSRF token or to other people characters', async () => {
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altro',
+      clan: 'brujah',
+      values: newCharacter(sheet),
+    });
+    if (typeof theirs !== 'object') throw new Error('setup');
+    const send = await asUser();
+    const path = `/api/characters/${theirs.id}/track`;
+    expect((await send('POST', path, { track: 'vitae', delta: -1 })).status).toBe(404);
+    expect((await send('DELETE', `/api/characters/${theirs.id}`)).status).toBe(404);
+    const mine = await send('POST', '/api/characters', {
+      guild: 'g',
+      name: 'A',
+      clan: 'ventrue',
+      ...sheet,
+    });
+    const { character } = (await mine.json()) as { character: { id: number } };
+    const forged = await send('POST', `/api/characters/${character.id}`, { name: 'B' }, 'wrong');
+    expect(forged.status).toBe(403);
+    expect(store.campaign.getCharacter(character.id)?.name).toBe('A');
+  });
+
+  it('lets the Storyteller change but not delete a player character', async () => {
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altro',
+      clan: 'brujah',
+      values: newCharacter(sheet),
+    });
+    const chronicle = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Testament',
+      sect: 'camarilla',
+    });
+    if (typeof theirs !== 'object' || typeof chronicle !== 'object') throw new Error('setup');
+    store.campaign.join(chronicle.id, theirs.id);
+    const send = await asUser();
+    const res = await send('POST', `/api/characters/${theirs.id}/track`, {
+      track: 'willpower',
+      delta: -1,
+    });
+    expect(res.status).toBe(200);
+    expect(store.campaign.getCharacter(theirs.id)?.values.willpower).toBe(5);
+    expect((await send('DELETE', `/api/characters/${theirs.id}`)).status).toBe(403);
+  });
+
+  it('edits and deletes the user own character', async () => {
+    const send = await asUser();
+    const created = await send('POST', '/api/characters', {
+      guild: 'g',
+      name: 'Lucia',
+      clan: 'toreador',
+      ...sheet,
+    });
+    const { character } = (await created.json()) as { character: { id: number } };
+    const edit = await send('POST', `/api/characters/${character.id}`, {
+      name: 'Lucia Bianchi',
+      tier: 'ancilla',
+      stamina: 5,
+    });
+    expect(edit.status).toBe(200);
+    const saved = store.campaign.getCharacter(character.id)!;
+    expect(saved.name).toBe('Lucia Bianchi');
+    expect(saved.values).toMatchObject({ tier: 'ancilla', stamina: 5 });
+    expect((await send('DELETE', `/api/characters/${character.id}`)).status).toBe(204);
+    expect(store.campaign.getCharacter(character.id)).toBeUndefined();
   });
 });
 
