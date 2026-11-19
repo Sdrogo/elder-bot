@@ -2,6 +2,7 @@ import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { performRoll } from '../game/roll.js';
 import { described, localeFor, t } from '../i18n/index.js';
 import { rollMessage } from '../ui/format.js';
+import { rollerHunger } from './campaignShared.js';
 import { hungerOption } from './shared.js';
 import type { Command } from './types.js';
 
@@ -23,16 +24,10 @@ const data = described(new SlashCommandBuilder().setName('frenzy'), 'cmd.frenzy.
       .addChoices(...FRENZY_TYPES.map((v) => ({ name: FRENZY_NAMES[v], value: v }))),
   )
   .addIntegerOption((o) =>
-    described(o.setName('dice'), 'opt.frenzy.dice')
-      .setRequired(true)
-      .setMinValue(0)
-      .setMaxValue(20),
+    described(o.setName('dice'), 'opt.frenzy.dice').setMinValue(0).setMaxValue(20),
   )
   .addIntegerOption((o) =>
-    described(o.setName('humanity'), 'opt.frenzy.humanity')
-      .setRequired(true)
-      .setMinValue(0)
-      .setMaxValue(10),
+    described(o.setName('humanity'), 'opt.frenzy.humanity').setMinValue(0).setMaxValue(10),
   )
   .addIntegerOption((o) => hungerOption(o, 'opt.frenzy.hunger'))
   .addIntegerOption((o) =>
@@ -53,7 +48,23 @@ export const frenzy: Command = {
   async execute(interaction, ctx) {
     const locale = localeFor(interaction, ctx.store);
     const type = interaction.options.getString('type', true) as FrenzyType;
-    const hunger = interaction.options.getInteger('hunger') ?? 0;
+    // Values not typed come from the roller's character at this channel's Chronicle.
+    const character = ctx.store.campaign.activeCharacter(
+      interaction.channelId,
+      interaction.user.id,
+    );
+    const { hunger } = rollerHunger(interaction, ctx, locale);
+    const dice =
+      interaction.options.getInteger('dice') ??
+      (character ? character.values.composure + character.values.resolve : null);
+    const humanity = interaction.options.getInteger('humanity') ?? character?.values.humanity;
+    if (dice === null || humanity === undefined) {
+      await interaction.reply({
+        content: t(locale, 'frenzy.error.noCharacter'),
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
     const difficulty =
       interaction.options.getInteger('difficulty') ?? (type === 'hunger' ? hunger : null);
     if (!difficulty) {
@@ -64,10 +75,9 @@ export const frenzy: Command = {
       return;
     }
 
-    const humanity = interaction.options.getInteger('humanity', true);
     const modifier = interaction.options.getInteger('bonus') ?? 0;
     // The cap applies to the final pool, bonuses included.
-    const pool = Math.max(0, interaction.options.getInteger('dice', true) + modifier);
+    const pool = Math.max(0, dice + modifier);
     const capped = Math.min(pool, humanity);
     const response = performRoll(
       {

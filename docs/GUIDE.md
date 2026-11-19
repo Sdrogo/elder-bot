@@ -1,12 +1,13 @@
 # ElderBot user guide
 
-ElderBot rolls dice for **Vampire: The Masquerade 6th Edition** using the playtest rules (Alpha 2.0). It does the math, shows every die and offers the follow-ups the rules allow: Willpower, Beast's Bargain, Try again. It does not store character sheets: you type how many dice you roll, and how many of them are Hunger dice.
+ElderBot rolls dice for **Vampire: The Masquerade 6th Edition** using the playtest rules (Alpha 2.0). It does the math, shows every die and offers the follow-ups the rules allow: Willpower, Beast's Bargain, Try again. You type how many dice you roll. If your character is saved in the bot and plays in the channel's Chronicle, the bot also knows your Vitae, so it works out your Hunger dice, takes Willpower when you reroll and caps frenzy dice at your Humanity.
 
 Every command lives under `/elder`. Discord shows each option as a field: type `/elder roll`, fill in `dice`, press Tab to move to the next option.
 
 ## Contents
 
 - [Tables and the Storyteller](#tables-and-the-storyteller)
+- [Characters and Chronicles](#characters-and-chronicles)
 - [How a roll works](#how-a-roll-works)
 - [Reading a roll](#reading-a-roll)
 - [After the roll: buttons](#after-the-roll-buttons)
@@ -26,10 +27,46 @@ Only the Storyteller can:
 - mark, clear or set the Masquerade Tracker and roll the threat test (anyone can look with `/elder masquerade show`);
 - grant or refuse a Beast's Bargain.
 
+## Characters and Chronicles
+
+Each player can save characters in the bot, several per player. A character keeps its trackers: Health (and baneful damage), Vitae, Willpower, Humanity (and violations). The bot works out the maxima from the sheet: Health = Stamina + 5, Willpower = Composure + Resolve, Vitae 5/10/15/20 by tier (Ghoul, Neonate or Duskborn, Ancilla, Elder).
+
+**Hunger dice are never typed on the sheet**: they come from the Vitae you have left, as in the Hunger Dice per Vitae table (Player Packet p. 103). A neonate at 10 Vitae has 0 Hunger dice, at 7 has 2, at 1 has 5.
+
+A **Chronicle** is a Storyteller's game: its players' characters, its Masquerade Tracker and its sect. A Storyteller can run several Chronicles; one at a time is **on air**, the one the OBS overlay shows.
+
+| Command                                                                                  | Who                | What it does                                                                      |
+| ---------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------- |
+| `/elder character create name clan tier stamina composure resolve [humanity]`            | Anyone             | Creates a character at full Health, Vitae and Willpower, Humanity 6 unless given  |
+| `/elder character sheet [character] [public]`                                            | Anyone             | The sheet with − and + buttons for each tracker. Only you see it, unless `public` |
+| `/elder character list`                                                                  | Anyone             | Your characters and their Chronicles                                              |
+| `/elder character set track value [character]`                                           | Owner, Storyteller | Sets a tracker to an exact value                                                  |
+| `/elder character edit [character] [name] [clan] [tier] [stamina] [composure] [resolve]` | Owner, Storyteller | Changes the sheet; current values follow the new maxima                           |
+| `/elder character give user character`                                                   | Owner              | Offers the character to another player, who accepts with a button                 |
+| `/elder character delete character`                                                      | Owner              | Deletes it, after a confirmation                                                  |
+| `/elder chronicle create name [sect]`                                                    | Anyone             | Creates a Chronicle; you are its Storyteller. Your first one goes on air          |
+| `/elder chronicle invite user [chronicle]`                                               | Storyteller        | The player chooses which character to bring                                       |
+| `/elder chronicle remove character`                                                      | Storyteller        | Takes a character out; the player keeps it                                        |
+| `/elder chronicle live [chronicle]`                                                      | Storyteller        | Puts the Chronicle on air                                                         |
+| `/elder chronicle list`                                                                  | Storyteller        | Your Chronicles, their characters and which is on air                             |
+| `/elder chronicle edit [chronicle] [name] [sect]`                                        | Storyteller        | Renames it or changes its sect                                                    |
+| `/elder chronicle archive chronicle`                                                     | Storyteller        | Hides it and frees its channel and characters; nothing is deleted                 |
+
+The owner, the Storyteller of the character's Chronicle and server admins can change a character; only the owner can give it away or delete it. A character plays in one Chronicle at a time.
+
+To play a Chronicle in a channel, the Storyteller runs `/elder session new chronicle:<name>`. From then on, in that channel:
+
+- every roll without `hunger` takes your Hunger dice from your character's Vitae, and says so under the roll; typing `hunger` still wins;
+- the **Willpower** button takes 1 Willpower from your character, and is refused at 0;
+- `/elder frenzy` takes Composure + Resolve and Humanity from your character if you leave them out;
+- `/elder masquerade` works on the Chronicle's tracker, which follows the Chronicle to any channel.
+
+When you pick a `character` or `chronicle`, Discord suggests names as you type. Leave it empty to use your character at this table, or your only one.
+
 ## How a roll works
 
 1. **Pool** = Attribute + Skill (or Discipline, or Composure + Resolve), plus or minus any bonus or penalty dice: assist, focus, story assets, Impairment.
-2. **Hunger dice**: if your character has any (0–5), give them with `hunger`. They replace normal dice one for one; they are not extra dice.
+2. **Hunger dice**: if your character has any (0–5), give them with `hunger`, or let the bot take them from your saved character (see above). They replace normal dice one for one; they are not extra dice.
 3. Roll d10s:
    - every die showing **6 or more** is a success, and a **10** counts as **two**;
    - successes equal to or above the **Difficulty** win. Winning with at least one 10 is a **Critical Win**;
@@ -103,10 +140,10 @@ NPCs don't use the players' mechanics: no Hunger dice, Willpower, Beast's Bargai
 
 Resist a frenzy with a Self-Control test.
 
-`/elder frenzy type dice humanity [hunger] [difficulty] [bonus]`
+`/elder frenzy type [dice] [humanity] [hunger] [difficulty] [bonus]`
 
 - `type`: Hunger, Rage, Fear or Clan Frenzy.
-- `dice`: Composure + Resolve. `humanity`: your Humanity (or Path) rank; you never roll more dice than that.
+- `dice`: Composure + Resolve. `humanity`: your Humanity (or Path) rank; you never roll more dice than that. With a saved character at this table both are optional.
 - **Hunger Frenzy**: the Difficulty is your Hunger dice, so `hunger` is enough. For the others the Storyteller gives the `difficulty`: Rage 2 ± modifiers, Fear from its table, Clan 3 + generation modifier.
 - Win: you resist for the rest of the scene. Failure: you suffer the frenzy. Painful Failure: you suffer it and do something you will regret.
 
@@ -135,7 +172,7 @@ The tracker belongs to the chronicle: `/elder session end` doesn't reset it.
 
 ### `/elder session`
 
-- `new`: start a session. On a table without a Storyteller, you become it.
+- `new [chronicle]`: start a session. On a table without a Storyteller, you become it. With `chronicle`, this channel plays that Chronicle and it goes on air.
 - `end`: end the game on this table. Prolonged tasks and table language are reset, and the Storyteller role is freed. The Masquerade Tracker stays.
 - `storyteller [user]`: show the Storyteller, or hand the role to `user`.
 - `language language`: the table's language (see below).
@@ -148,11 +185,12 @@ The Storyteller can fix one language for the whole table with `/elder session la
 
 ## Typical session
 
-1. The Storyteller opens the table: `/elder session new`.
-2. Players roll: `/elder roll dice:6 difficulty:2 hunger:2 reason:Pick the lock`.
-3. A failed roll? Press **Willpower** to reroll up to 3 dice, ask for a **Beast's Bargain**, or **Try again** another way.
-4. Someone bares their fangs in public: `/elder masquerade mark reason:Fangs in the hotel lobby`.
-5. When the chronicle is over, `/elder session end` clears the table.
+1. Once: the Storyteller runs `/elder chronicle create name:Nights of Rome` and `/elder chronicle invite user:@player`; each player creates a character with `/elder character create` and picks it from the invitation.
+2. The Storyteller opens the table: `/elder session new chronicle:Nights of Rome`.
+3. Players roll: `/elder roll dice:6 difficulty:2 reason:Pick the lock`. Hunger dice come from their Vitae; spending Vitae is a click on the sheet (`/elder character sheet`).
+4. A failed roll? Press **Willpower** to reroll up to 3 dice, ask for a **Beast's Bargain**, or **Try again** another way.
+5. Someone bares their fangs in public: `/elder masquerade mark reason:Fangs in the hotel lobby`.
+6. When the chronicle is over, `/elder session end` clears the table.
 
 ---
 

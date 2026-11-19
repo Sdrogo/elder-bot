@@ -1,3 +1,5 @@
+import { character } from './character.js';
+import { chronicle } from './chronicle.js';
 import { contest } from './contest.js';
 import { frenzy } from './frenzy.js';
 import { masquerade } from './masquerade.js';
@@ -7,4 +9,14 @@ import { roll } from './roll.js';
 import { session } from './session.js';
 import type { Command } from './types.js';
 
-export const commands: Command[] = [roll, contest, prolonged, npc, frenzy, masquerade, session];
+export const commands: Command[] = [
+  roll,
+  contest,
+  prolonged,
+  npc,
+  frenzy,
+  masquerade,
+  session,
+  character,
+  chronicle,
+];

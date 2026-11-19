@@ -150,6 +150,8 @@ describe('slash commands', () => {
       'frenzy',
       'masquerade',
       'session',
+      'character',
+      'chronicle',
     ]);
   });
 });

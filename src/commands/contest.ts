@@ -4,6 +4,8 @@ import { rollDice, type DieRoller } from '../dice/roller.js';
 import { buildPool, evaluate, type TestResult } from '../dice/test.js';
 import { described, localeFor, t, tn, type Locale } from '../i18n/index.js';
 import { COLORS, TERMS, formatDice } from '../ui/format.js';
+import { hungerDice } from '../game/character.js';
+import { rollerHunger } from './campaignShared.js';
 import { hungerOption } from './shared.js';
 import type { Command } from './types.js';
 
@@ -58,9 +60,14 @@ export const contest: Command = {
     const myDice = interaction.options.getInteger('dice', true);
     const theirDice = interaction.options.getInteger('opponent_dice', true);
 
-    const myHunger = interaction.options.getInteger('hunger') ?? 0;
+    // Hunger dice not typed come from each player's character at this channel's Chronicle.
+    const myHunger = rollerHunger(interaction, ctx, locale).hunger;
     const givenTheirHunger = interaction.options.getInteger('opponent_hunger');
-    const theirHunger = givenTheirHunger ?? 0;
+    const theirCharacter = opponentUser
+      ? store.campaign.activeCharacter(interaction.channelId, opponentUser.id)
+      : undefined;
+    const theirHunger =
+      givenTheirHunger ?? (theirCharacter ? hungerDice(theirCharacter.values) : 0);
 
     const mine: Side = {
       name: me.displayName,

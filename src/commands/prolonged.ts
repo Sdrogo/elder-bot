@@ -16,6 +16,7 @@ import {
   formatPool,
   outcomeLine,
 } from '../ui/format.js';
+import { rollerHunger } from './campaignShared.js';
 import { hungerOption } from './shared.js';
 import type { Command } from './types.js';
 
@@ -106,7 +107,7 @@ export const prolonged: Command = {
         dice: interaction.options.getInteger('dice', true),
         difficulty: 0,
         modifier: interaction.options.getInteger('bonus') ?? 0,
-        hunger: interaction.options.getInteger('hunger') ?? 0,
+        hunger: rollerHunger(interaction, { store }, locale).hunger,
         takeHalf: false,
         retry: false,
       },

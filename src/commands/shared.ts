@@ -7,6 +7,7 @@ import { MAX_HUNGER } from '../dice/test.js';
 import { performRoll, type RollRequest } from '../game/roll.js';
 import { described, localeFor, type MessageKey } from '../i18n/index.js';
 import { rollMessage } from '../ui/format.js';
+import { rollerHunger } from './campaignShared.js';
 import type { Context } from './types.js';
 
 /** Options shared by /roll and /npc. NPCs have no Hunger dice. */
@@ -44,18 +45,20 @@ export async function replyWithRoll(
   { npc = false }: { npc?: boolean } = {},
 ): Promise<void> {
   const locale = localeFor(interaction, ctx.store);
+  const fromCharacter = npc ? { hunger: 0 } : rollerHunger(interaction, ctx, locale);
   const request: RollRequest = {
     channelId: interaction.channelId,
     userId: interaction.user.id,
     dice,
     difficulty: interaction.options.getInteger('difficulty') ?? 0,
     modifier: interaction.options.getInteger('bonus') ?? 0,
-    hunger: npc ? 0 : (interaction.options.getInteger('hunger') ?? 0),
+    hunger: fromCharacter.hunger,
     takeHalf: interaction.options.getBoolean('take_half') ?? false,
     retry: false,
   };
   const response = performRoll(request, { roller: ctx.roller, npc });
   const reason = interaction.options.getString('reason');
   const fullTitle = `${interaction.user.displayName}: ${reason ?? title}`;
-  await interaction.reply(rollMessage(locale, response, fullTitle));
+  const notes = fromCharacter.note ? [fromCharacter.note] : [];
+  await interaction.reply(rollMessage(locale, response, fullTitle, notes));
 }

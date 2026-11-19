@@ -1,5 +1,6 @@
 import {
   ApplicationCommandOptionType,
+  type AutocompleteInteraction,
   type APIApplicationCommandOption,
   type APIApplicationCommandSubcommandGroupOption,
   type APIApplicationCommandSubcommandOption,
@@ -57,4 +58,18 @@ export async function runElder(
   const name =
     interaction.options.getSubcommandGroup(false) ?? interaction.options.getSubcommand(false);
   if (name) await commands.get(name)?.execute(interaction, ctx);
+}
+
+/** Passes an autocomplete request to the command under /elder that asked for it. */
+export async function autocompleteElder(
+  commands: Map<string, Command>,
+  interaction: AutocompleteInteraction,
+  ctx: Context,
+): Promise<void> {
+  if (interaction.commandName !== ROOT) return;
+  const name =
+    interaction.options.getSubcommandGroup(false) ?? interaction.options.getSubcommand(false);
+  const command = name ? commands.get(name) : undefined;
+  if (command?.autocomplete) await command.autocomplete(interaction, ctx);
+  else await interaction.respond([]);
 }

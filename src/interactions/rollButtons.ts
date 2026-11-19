@@ -22,6 +22,7 @@ import {
   type RollRequest,
 } from '../game/roll.js';
 import type { Context } from '../commands/types.js';
+import { willpowerMax } from '../game/character.js';
 import { localeFor, t, type Locale } from '../i18n/index.js';
 import { decodeRollId, encodeRollId, type RollRef } from '../ui/customId.js';
 import { COLORS, TERMS, button, retryRow, rollMessage } from '../ui/format.js';
@@ -148,6 +149,12 @@ export async function handleRollButton(
     // Push Yourself (p. 104): pick up to 3 normal dice to reroll.
     case 'wp': {
       if (!ref.faces) return;
+      // A character at this table pays from its tracker: none left, no reroll.
+      const spender = store.campaign.activeCharacter(channelId, request.userId);
+      if (spender && spender.values.willpower <= 0) {
+        await replyEphemeral(interaction, t(locale, 'willpower.none', { name: spender.name }));
+        return;
+      }
       const menu = new StringSelectMenuBuilder()
         .setCustomId(encodeRollId('wp-pick', ref.request, ref.faces))
         .setPlaceholder(t(locale, 'willpower.pick', { max: WILLPOWER_REROLL }))
@@ -212,9 +219,25 @@ export async function handleRollSelect(
   const original = interaction.message.embeds[0];
   const title = original?.title ?? t(locale, 'roll.title');
   const changes = response.rerolled.map(([from, to]) => `${from} → ${to}`).join(', ');
-  const message = rollMessage(locale, response, title, [
-    { name: TERMS.willpower, value: t(locale, 'willpower.spent', { changes }) },
-  ]);
+  let spent = t(locale, 'willpower.spent', { changes });
+  const { campaign } = ctx.store;
+  const spender = campaign.activeCharacter(interaction.channelId, ref.request.userId);
+  if (spender) {
+    const after = campaign.setTrack(
+      spender.id,
+      'willpower',
+      spender.values.willpower - 1,
+      interaction.user.id,
+    );
+    if (after) {
+      spent += `\n${t(locale, 'willpower.left', {
+        name: after.name,
+        left: after.values.willpower,
+        max: willpowerMax(after.values),
+      })}`;
+    }
+  }
+  const message = rollMessage(locale, response, title, [{ name: TERMS.willpower, value: spent }]);
   await interaction.update({ content: message.content ?? '', ...message });
 }
 

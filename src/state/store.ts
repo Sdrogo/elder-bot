@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ProlongedTask } from '../dice/prolonged.js';
+import { Campaign } from './campaign.js';
 
 /** The Masquerade Tracker has 10 boxes. */
 export const MASQUERADE_BOXES = 10;
@@ -12,6 +13,8 @@ export const MASQUERADE_BOXES = 10;
  */
 export class Store {
   private db: Database.Database;
+  /** Characters and Chronicles, in the same database. */
+  readonly campaign: Campaign;
 
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -32,10 +35,13 @@ export class Store {
       CREATE TABLE IF NOT EXISTS table_locale (
         channel_id TEXT PRIMARY KEY, locale TEXT NOT NULL);
     `);
+    this.campaign = new Campaign(this.db);
   }
 
   /** Marked boxes on the Masquerade Tracker (Storyteller Packet p. 32), 0 to 10. */
   getMasquerade(channelId: string): number {
+    const chronicle = this.campaign.chronicleByChannel(channelId);
+    if (chronicle) return chronicle.masquerade;
     const row = this.db
       .prepare('SELECT value FROM masquerade WHERE channel_id = ?')
       .get(channelId) as { value: number } | undefined;
@@ -44,6 +50,11 @@ export class Store {
 
   setMasquerade(channelId: string, value: number): number {
     const clamped = Math.min(MASQUERADE_BOXES, Math.max(0, value));
+    const chronicle = this.campaign.chronicleByChannel(channelId);
+    if (chronicle) {
+      this.campaign.setMasquerade(chronicle.id, clamped);
+      return clamped;
+    }
     this.db
       .prepare(
         `INSERT INTO masquerade (channel_id, value) VALUES (?, ?)
@@ -51,6 +62,24 @@ export class Store {
       )
       .run(channelId, clamped);
     return clamped;
+  }
+
+  /**
+   * Plays a Chronicle in this channel. The Masquerade Tracker kept for the channel before
+   * Chronicles existed moves to the Chronicle, unless the Chronicle already has boxes marked.
+   */
+  bindChronicle(channelId: string, chronicleId: number): void {
+    this.db.transaction(() => {
+      const old = this.db
+        .prepare('SELECT value FROM masquerade WHERE channel_id = ?')
+        .get(channelId) as { value: number } | undefined;
+      this.campaign.bindChannel(chronicleId, channelId);
+      const chronicle = this.campaign.getChronicle(chronicleId);
+      if (old && chronicle && chronicle.masquerade === 0) {
+        this.campaign.setMasquerade(chronicleId, old.value);
+      }
+      this.db.prepare('DELETE FROM masquerade WHERE channel_id = ?').run(channelId);
+    })();
   }
 
   /** The Storyteller of a table, set by /session; undefined until someone takes the role. */

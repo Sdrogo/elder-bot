@@ -1,6 +1,6 @@
 # Informativa sulla privacy di ElderBot
 
-Ultimo aggiornamento: 21 ottobre 2026
+Ultimo aggiornamento: 18 novembre 2026
 
 ElderBot è un bot Discord che tira i dadi per Vampire: The Masquerade 6ª edizione. Questa pagina spiega quali dati tratta, perché e per quanto tempo.
 
@@ -14,6 +14,13 @@ Per far funzionare la partita salva, per ogni canale in cui viene usato:
 - i valori di gioco: il Masquerade Tracker e l'avanzamento dei compiti prolungati;
 - i testi scritti nei comandi che devono restare tra un tiro e l'altro: i nomi dei compiti prolungati.
 
+Se un giocatore crea un personaggio, o un Narratore una Cronaca, il bot salva anche, per ogni server:
+
+- l'ID Discord del proprietario del personaggio e del Narratore della Cronaca;
+- il personaggio: nome, clan, livello di gioco, Stamina, Composure, Resolve e i tracciati (Health, Vitae, Willpower, Humanity);
+- la Cronaca: nome, setta, Masquerade Tracker, canale in cui si gioca e quali personaggi ne fanno parte;
+- un registro delle modifiche ai tracciati (chi, cosa, quando), cancellato dopo 30 giorni.
+
 I risultati dei tiri, i dadi Fame, i motivi e i nomi visualizzati compaiono nei messaggi del bot su Discord ma non vengono salvati dal bot.
 
 ## Perché
@@ -22,11 +29,11 @@ I dati servono solo a far funzionare il gioco: tenere i punteggi di ogni tavolo 
 
 ## Dove e per quanto
 
-I dati stanno in un database sul server privato di chi gestisce il bot. Restano finché il Narratore non chiude la partita con `/elder session end`, che cancella lo stato del canale, o finché il bot non viene rimosso o spento. I log tecnici, che possono contenere ID Discord in caso di errore, vengono ruotati automaticamente.
+I dati stanno in un database sul server privato di chi gestisce il bot, con una copia di sicurezza notturna sullo stesso server che viene sovrascritta dopo 14 giorni. Personaggi e Cronache restano finché il proprietario non li cancella (`/elder character delete`; una Cronaca archiviata resta salvata). Lo stato dei canali resta finché il Narratore non chiude la partita con `/elder session end`, che cancella lo stato del canale, o finché il bot non viene rimosso o spento. I log tecnici, che possono contenere ID Discord in caso di errore, vengono ruotati automaticamente.
 
 ## I tuoi diritti
 
-Puoi chiedere di vedere o cancellare i dati legati al tuo ID Discord aprendo una [issue su GitHub](https://github.com/Sdrogo/elder-bot/issues) (senza scrivere lì dati personali), oppure chiedere al Narratore di chiudere la partita nel tuo canale. Se sei nell'Unione Europea hai anche i diritti previsti dal GDPR, compreso il reclamo al Garante per la protezione dei dati personali.
+Puoi vedere i tuoi personaggi con `/elder character list` e cancellarli con `/elder character delete`. Per tutto il resto puoi chiedere di vedere o cancellare i dati legati al tuo ID Discord aprendo una [issue su GitHub](https://github.com/Sdrogo/elder-bot/issues) (senza scrivere lì dati personali), oppure chiedere al Narratore di chiudere la partita nel tuo canale. Se sei nell'Unione Europea hai anche i diritti previsti dal GDPR, compreso il reclamo al Garante per la protezione dei dati personali.
 
 ## Discord
 

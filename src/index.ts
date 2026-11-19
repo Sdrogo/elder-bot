@@ -1,9 +1,14 @@
 import { Client, Events, GatewayIntentBits, MessageFlags, type Interaction } from 'discord.js';
 import { commands } from './commands/index.js';
-import { runElder } from './commands/elder.js';
+import { autocompleteElder, runElder } from './commands/elder.js';
 import type { Context } from './commands/types.js';
 import { loadConfig } from './config.js';
 import { localeFor, resolveLocale, t } from './i18n/index.js';
+import {
+  handleCampaignButton,
+  handleCampaignSelect,
+  isCampaignId,
+} from './interactions/campaignButtons.js';
 import { handleRollButton, handleRollModal, handleRollSelect } from './interactions/rollButtons.js';
 import { Store } from './state/store.js';
 import { syncDiceEmojis } from './ui/diceEmojis.js';
@@ -30,10 +35,14 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
       await runElder(byName, interaction, ctx);
+    } else if (interaction.isAutocomplete()) {
+      await autocompleteElder(byName, interaction, ctx);
     } else if (interaction.isButton()) {
-      await handleRollButton(interaction, ctx);
+      if (isCampaignId(interaction.customId)) await handleCampaignButton(interaction, ctx);
+      else await handleRollButton(interaction, ctx);
     } else if (interaction.isStringSelectMenu()) {
-      await handleRollSelect(interaction, ctx);
+      if (isCampaignId(interaction.customId)) await handleCampaignSelect(interaction, ctx);
+      else await handleRollSelect(interaction, ctx);
     } else if (interaction.isModalSubmit()) {
       await handleRollModal(interaction, ctx);
     }
