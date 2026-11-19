@@ -58,7 +58,10 @@ Per aggiungere una lingua copia `src/i18n/en.ts` in un nuovo file (ad esempio `s
 
 ## Overlay per OBS
 
-La cartella [`overlay/`](overlay/README.md) contiene **Elder Overlay**, un programma separato dal bot. Mostra in OBS i tracciati dei personaggi (Health, Vitae, Willpower, Humanity, Hunger dice e Masquerade Tracker) come cornici attorno alle webcam, e si comanda da un pannello in OBS o dallo Stream Deck. Gira solo sul PC di chi trasmette e non viene incluso nell'immagine Docker del bot.
+Le cornici attorno alle webcam (Health, Vitae, Willpower, Humanity, Hunger dice e Masquerade Tracker) si possono avere in due modi:
+
+- **Dal bot** (con il [pannello web](#pannello-web-facoltativo) attivo): OBS apre le pagine direttamente dal VPS e mostra la Cronaca in onda, letta dal database. Ogni modifica, da Discord, dal pannello o dallo Stream Deck, arriva in circa un secondo. Sul PC non serve installare niente. Vedi [Overlay di OBS dal bot](#overlay-di-obs-dal-bot).
+- **Con Elder Overlay sul PC**: la cartella [`overlay/`](overlay/README.md) contiene un programma che gira accanto a OBS, da solo o collegato al bot.
 
 ## Sviluppo in locale
 
@@ -149,6 +152,18 @@ Serve un dominio gestito da Cloudflare (piano gratuito). Poi:
    ```
 4. **Avvio**: `docker compose up -d --build`, poi `docker compose run --rm elder-bot node dist/deploy-commands.js` per il comando `/elder panel`. Nei log deve comparire "Pannello in ascolto sulla porta 8080", e `docker compose logs cloudflared` deve dire "Registered tunnel connection".
 5. **Prova**: apri `https://elder.tuodominio.it`, premi "Accedi con Discord" e autorizza. Su Discord, `/elder panel` dà il link a chiunque.
+
+### Overlay di OBS dal bot
+
+Nel pannello, sezione **Overlay di OBS** (visibile a chi è Narratore di almeno una Cronaca):
+
+1. **Browser Source**: copia l'indirizzo _Scena intera_ in una Browser Source di OBS a 1920×1080, posizione 0,0, sopra i ritagli delle webcam. Oppure usa gli indirizzi delle singole cornici, uno per PG più quello del Narratore. Gli indirizzi contengono una chiave di sola visione: chi la vede può solo guardare le cornici. _Nuovi indirizzi_ la cambia, e quelli vecchi smettono di funzionare.
+2. **Ritagli**: _Posizioni dei ritagli nella scena_ dice dove mettere ogni webcam (X, Y, larghezza e altezza), come nel dock di Elder Overlay.
+3. **Dock**: in OBS, _Docks → Custom Browser Docks_ con l'indirizzo del pannello. Fai login con Discord una volta e da lì muovi tracciati, Masquerade e Cronaca in onda.
+4. **Stream Deck**: _Crea la chiave_ e usa una richiesta **POST** con l'header `X-Elder-Token` uguale alla chiave, per esempio `https://elder.tuodominio.it/api/overlay/adjust?pg=lucrezia&track=vitae&delta=-1` (gli stessi `track`, `field` e `delta` di Elder Overlay; `pg` è l'id nell'indirizzo della cornice). Per mettere in onda una Cronaca: `/api/overlay/live?cronaca=<id>`.
+5. **Simboli dei clan**: sono di Paradox e non stanno nel repository. Copia i PNG nella cartella `symbols/` sul VPS, per esempio dal PC con `scp overlay/symbols/*.png debian@<vps>:~/elder-bot/symbols/`. Il bot li legge in sola lettura e li mostra solo con la chiave di visione.
+
+Se il VPS non risponde le cornici si fermano sugli ultimi valori e si riprendono da sole.
 
 Il login chiede a Discord solo il permesso `identify` (ID e nome). La sessione è un cookie `HttpOnly` e `Secure` che dura 30 giorni; nel database c'è solo la sua impronta. Ogni modifica richiede un token anti-CSRF, e i tentativi di login sono limitati a 10 al minuto per indirizzo. Per togliere il pannello basta svuotare `PANEL_URL` e `COMPOSE_PROFILES` e rifare `docker compose up -d`.
 

@@ -1,11 +1,17 @@
-/* global window, document, EventSource, Image, URLSearchParams, setTimeout */
+/* global window, document, EventSource, Image, URL, URLSearchParams, setTimeout */
 // OBS Browser Source. /scena draws every frame on one fixed 1920×1080 page;
 // /frame?pg=<id> (or ?pg=storyteller) draws a single frame that fills the source.
+// The same page runs on the overlay program (http://127.0.0.1:7777/scena) and on the bot
+// (https://<panel>/overlay/scena?v=<view key>), so every address here is relative.
 'use strict';
 
 const { CLANS, SECTS, el, sceneLayout } = window.ELDER;
-const sceneMode = window.location.pathname === '/scena';
+const sceneMode = window.location.pathname.endsWith('/scena');
 const params = new URLSearchParams(window.location.search);
+// The bot's view key; the overlay program needs none.
+const view = params.get('v') ? `?v=${encodeURIComponent(params.get('v'))}` : '';
+// Absolute, because a url() in a CSS variable resolves against the stylesheet, not the page.
+const symbolUrl = (key) => new URL(`symbols/${key}.png${view}`, window.location.href).href;
 const pg = params.get('pg') || '';
 // Numbers by default; ?stile=caselle draws the boxes of the character sheet instead.
 const boxStyle = params.get('stile') === 'caselle';
@@ -22,7 +28,7 @@ const symbolOk = new Map();
 function symbol(key, frame) {
   const i = el('i', 'sym');
   i.hidden = true;
-  i.style.setProperty('--m', `url("/symbols/${key}.png")`);
+  i.style.setProperty('--m', `url("${symbolUrl(key)}")`);
   const show = () => (i.hidden = false);
   if (symbolOk.get(key) === true) show();
   else if (!symbolOk.has(key)) {
@@ -33,7 +39,7 @@ function symbol(key, frame) {
       frame.querySelectorAll('.sym').forEach((s) => (s.hidden = false));
     };
     img.onerror = () => symbolOk.set(key, false);
-    img.src = `/symbols/${key}.png`;
+    img.src = symbolUrl(key);
   }
   return i;
 }
@@ -281,5 +287,5 @@ function render(state) {
   prev = state;
 }
 
-// EventSource reconnects by itself if the overlay program restarts.
-new EventSource('/events').onmessage = (e) => render(JSON.parse(e.data));
+// EventSource reconnects by itself if the overlay program or the bot restarts.
+new EventSource(`events${view}`).onmessage = (e) => render(JSON.parse(e.data));

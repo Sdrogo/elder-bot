@@ -292,6 +292,11 @@ button:disabled {
   font-size: 16px;
 }
 
+.overlay-box h4 {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
 .copy-row {
   display: flex;
   gap: 8px;
@@ -300,6 +305,18 @@ button:disabled {
 .copy-row input {
   flex: 1;
   min-width: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.overlay-box details summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.overlay-box details ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }

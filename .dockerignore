@@ -5,4 +5,7 @@ data
 .git
 tests
 *.db
-overlay
+# Only the overlay's frame pages go in the image; the symbols are mounted at run time.
+overlay/*
+!overlay/static
+symbols

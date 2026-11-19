@@ -45,6 +45,30 @@ const MAX_BODY = 4096;
 /** The static pages live in panel/ at the root of the repository (and of the image). */
 export const STATIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'panel');
 
+/** The OBS frame pages are the overlay program's own, served by the bot too. */
+export const OVERLAY_DIR = join(STATIC_DIR, '..', 'overlay', 'static');
+/** Clan and sect symbols (Paradox IP, not in git): a folder mounted read-only on the VPS. */
+export const SYMBOLS_DIR = join(STATIC_DIR, '..', 'symbols');
+
+const OVERLAY_FILES: Record<string, string> = {
+  'common.js': 'text/javascript; charset=utf-8',
+  'frame.js': 'text/javascript; charset=utf-8',
+  'overlay.css': 'text/css; charset=utf-8',
+};
+const SYMBOLS = new Set<string>([...CLANS, ...SECTS.filter((s) => s !== 'none')]);
+
+/** The frames load their fonts from Google Fonts; everything else is the bot's own. */
+const OVERLAY_CSP =
+  "default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; " +
+  "font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'self'; base-uri 'none'; " +
+  "form-action 'none'; frame-ancestors 'none'";
+
+/** Open live streams to OBS: in all, and for one view key. */
+const MAX_STREAMS = 64;
+const MAX_STREAMS_PER_USER = 16;
+/** How often a stream checks the database for changes, in ms. */
+const STREAM_TICK_MS = 1000;
+
 const STATIC_FILES: Record<string, string> = {
   '/app.js': 'text/javascript; charset=utf-8',
   '/panel.css': 'text/css; charset=utf-8',
@@ -68,6 +92,8 @@ export interface PanelDeps {
   clientSecret: string;
   fetchFn?: Fetch;
   staticDir?: string;
+  overlayDir?: string;
+  symbolsDir?: string;
   now?: () => number;
   /**
    * The Discord servers the bot shares with a user, where they can create characters.
@@ -263,6 +289,98 @@ export function createPanelHandler(deps: PanelDeps) {
   };
   const limiter = new RateLimiter(now);
   const { store } = deps;
+  const overlayDir = deps.overlayDir ?? OVERLAY_DIR;
+  const symbolsDir = deps.symbolsDir ?? SYMBOLS_DIR;
+  const streams = new Map<ServerResponse, { userId: string; last: string }>();
+  let ticker: NodeJS.Timeout | undefined;
+
+  /**
+   * Every second, each OBS stream gets the Chronicle on air again if anything changed, from
+   * Discord, the panel or the Stream Deck alike: the database is the one source of truth.
+   */
+  function tick() {
+    const views = new Map<string, string>();
+    for (const [res, s] of streams) {
+      let view = views.get(s.userId);
+      if (view === undefined) {
+        view = JSON.stringify(overlayView(store, s.userId));
+        views.set(s.userId, view);
+      }
+      if (view !== s.last) {
+        s.last = view;
+        res.write(`data: ${view}\n\n`);
+      }
+    }
+  }
+
+  /** The overlay pages for OBS: /overlay/scena, /overlay/frame, their files and the stream. */
+  async function overlayPage(req: IncomingMessage, res: ServerResponse, url: URL) {
+    const headers = { 'Content-Security-Policy': OVERLAY_CSP };
+    const userId = store.viewKeys.userOf(url.searchParams.get('v'));
+    const name = url.pathname.slice('/overlay/'.length);
+    if (name.startsWith('static/')) {
+      const file = name.slice('static/'.length);
+      if (!Object.hasOwn(OVERLAY_FILES, file)) return json(res, 404, { error: 'not found' });
+      const body = await readFile(join(overlayDir, file));
+      return send(res, 200, body, OVERLAY_FILES[file]!, {
+        ...headers,
+        'Cache-Control': 'public, max-age=300',
+      });
+    }
+    if (!userId) {
+      return send(
+        res,
+        401,
+        'Chiave di visione mancante o non valida: copia di nuovo l’indirizzo dal pannello.',
+        'text/plain; charset=utf-8',
+        headers,
+      );
+    }
+    if (name === 'scena' || name === 'frame') {
+      const body = await readFile(join(overlayDir, 'frame.html'));
+      return send(res, 200, body, 'text/html; charset=utf-8', headers);
+    }
+    const symbol = /^symbols\/([a-z0-9-]+)\.png$/.exec(name);
+    if (symbol) {
+      const key = symbol[1]!;
+      if (!SYMBOLS.has(key)) return json(res, 404, { error: 'no symbol' });
+      const body = await readFile(join(symbolsDir, `${key}.png`)).catch(() => undefined);
+      if (!body) return json(res, 404, { error: 'no symbol' });
+      return send(res, 200, body, 'image/png', {
+        ...headers,
+        'Cache-Control': 'private, max-age=300',
+      });
+    }
+    if (name === 'events') {
+      const mine = [...streams.values()].filter((s) => s.userId === userId).length;
+      if (streams.size >= MAX_STREAMS || mine >= MAX_STREAMS_PER_USER) {
+        return json(res, 503, { error: 'too many listeners' });
+      }
+      res.writeHead(200, {
+        ...SECURITY_HEADERS,
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-store',
+        // Cloudflare must pass each event on at once instead of buffering the response.
+        'X-Accel-Buffering': 'no',
+        Connection: 'keep-alive',
+      });
+      const view = JSON.stringify(overlayView(store, userId));
+      res.write(`retry: 2000\ndata: ${view}\n\n`);
+      streams.set(res, { userId, last: view });
+      ticker ??= setInterval(tick, STREAM_TICK_MS);
+      const ping = setInterval(() => res.write(': ping\n\n'), 20_000);
+      req.on('close', () => {
+        clearInterval(ping);
+        streams.delete(res);
+        if (streams.size === 0) {
+          clearInterval(ticker);
+          ticker = undefined;
+        }
+      });
+      return;
+    }
+    return json(res, 404, { error: 'not found' });
+  }
   const guildCache = new Map<string, { at: number; guilds: Guild[] }>();
 
   /** Servers where the user may create a character: shared with the bot, or already used. */
@@ -448,11 +566,18 @@ export function createPanelHandler(deps: PanelDeps) {
    * with the session cookie, and is meant for the overlay program, never for a browser page:
    * a request with an Origin header is refused, so no web page can use a key it doesn't hold.
    */
-  async function overlayApi(req: IncomingMessage, res: ServerResponse, path: string) {
+  async function overlayApi(req: IncomingMessage, res: ServerResponse, url: URL) {
+    const path = url.pathname;
     if (req.headers.origin !== undefined) return json(res, 403, { error: 'forbidden' });
+    // Stream Deck plugins: Authorization: Bearer, or the X-Elder-Token header of the overlay.
     const auth = req.headers.authorization;
+    const header = req.headers['x-elder-token'];
     const userId = store.overlayKeys.userOf(
-      auth?.startsWith('Bearer ') ? auth.slice(7).trim() : undefined,
+      auth?.startsWith('Bearer ')
+        ? auth.slice(7).trim()
+        : Array.isArray(header)
+          ? header[0]
+          : header,
     );
     if (!userId) return json(res, 401, { error: 'invalid overlay key' });
     const { campaign } = store;
@@ -481,8 +606,12 @@ export function createPanelHandler(deps: PanelDeps) {
     }
     const text = await readBody(req);
     if (text === undefined) return json(res, 413, { error: 'body too large' });
-    const body = parseObject(text);
-    if (!body) return json(res, 400, { error: 'invalid body' });
+    const parsed = text.trim() ? parseObject(text) : {};
+    if (!parsed) return json(res, 400, { error: 'invalid body' });
+    // Stream Deck keys often put everything in the address: ?pg=lucrezia&track=vitae&delta=-1
+    const body: Record<string, unknown> = { ...Object.fromEntries(url.searchParams), ...parsed };
+    body.chronicle ??= body.cronaca;
+    body.delta = body.delta === undefined ? 1 : Number(body.delta);
     const runs = campaign.chroniclesRunBy(userId);
 
     if (path === '/api/overlay/live') {
@@ -566,8 +695,10 @@ export function createPanelHandler(deps: PanelDeps) {
       return redirect(res, '/', [clearState, cookie(SESSION_COOKIE, token, SESSION_DAYS * 86400)]);
     }
 
+    if (method === 'GET' && path.startsWith('/overlay/')) return overlayPage(req, res, url);
+
     if (path === '/api/overlay' || path.startsWith('/api/overlay/')) {
-      return overlayApi(req, res, path);
+      return overlayApi(req, res, url);
     }
 
     const current = session(req);
@@ -614,6 +745,16 @@ export function createPanelHandler(deps: PanelDeps) {
         })),
         guilds: await guildsFor(me.userId),
         overlayKey: store.overlayKeys.createdAt(me.userId) ?? null,
+        // The OBS addresses, for Storytellers: the view key and the ids of the frames on air.
+        overlay: runs.length
+          ? {
+              viewKey: store.viewKeys.get(me.userId),
+              characters: overlayView(store, me.userId).characters.map((c) => ({
+                id: c.id,
+                name: c.name,
+              })),
+            }
+          : null,
         options: {
           clans: CLANS.map((id) => ({ id, name: CLAN_NAMES[id] })),
           tiers: TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
@@ -625,6 +766,13 @@ export function createPanelHandler(deps: PanelDeps) {
     }
 
     // Every change below: a JSON body, the CSRF token and the panel's own origin.
+    if (path === '/api/overlay-view-key' && method === 'POST') {
+      if ((await readBody(req)) === undefined) return json(res, 413, { error: 'body too large' });
+      if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+      store.viewKeys.renew(me.userId);
+      return json(res, 200, { ok: true });
+    }
+
     if (path === '/api/overlay-key' && (method === 'POST' || method === 'DELETE')) {
       if ((await readBody(req)) === undefined) return json(res, 413, { error: 'body too large' });
       if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });

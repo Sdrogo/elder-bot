@@ -20,6 +20,8 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY assets ./assets
 COPY panel ./panel
+# The OBS frame pages are the overlay program's own files, served by the bot too.
+COPY overlay/static ./overlay/static
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data
