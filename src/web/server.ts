@@ -14,17 +14,19 @@ import {
   healthMax,
   hungerDice,
   isClan,
+  isSect,
   isTier,
   isTrack,
   newCharacter,
   vitaeMax,
   willpowerMax,
+  SECTS,
   type CharacterValues,
   type Clan,
 } from '../game/character.js';
 import type { Character, Chronicle } from '../state/campaign.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
-import type { Store } from '../state/store.js';
+import { MASQUERADE_BOXES, type Store } from '../state/store.js';
 import { authorizeUrl, identify, type Fetch, type OAuthApp } from './discord.js';
 
 // The web panel: "Log in with Discord", then each user sees their own characters and Chronicles.
@@ -297,6 +299,91 @@ export function createPanelHandler(deps: PanelDeps) {
     return sameSecret(Array.isArray(token) ? token[0] : token, s.csrf);
   }
 
+  /** The Storyteller's changes to their own Chronicles. */
+  async function chronicleChange(
+    res: ServerResponse,
+    userId: string,
+    body: Record<string, unknown>,
+    idText: string | undefined,
+    action: string | undefined,
+  ) {
+    const { campaign } = store;
+    const ok = () => json(res, 200, { ok: true });
+    const name = (v: unknown) => (typeof v === 'string' ? cleanName(v) : undefined);
+
+    if (idText === undefined) {
+      // POST /api/chronicles {guild, name, sect}: a new Chronicle, on air if none is.
+      const guild = (await guildsFor(userId)).find((g) => g.id === body.guild);
+      if (!guild) return json(res, 400, { error: 'invalid', field: 'guild' });
+      const chronicleName = name(body.name);
+      if (!chronicleName) return json(res, 400, { error: 'invalid', field: 'name' });
+      if (!isSect(body.sect)) return json(res, 400, { error: 'invalid', field: 'sect' });
+      const created = campaign.createChronicle({
+        guildId: guild.id,
+        storytellerId: userId,
+        name: chronicleName,
+        sect: body.sect,
+      });
+      if (created === 'duplicate' || created === 'limit') return json(res, 409, { error: created });
+      if (!campaign.liveChronicle(guild.id, userId)) campaign.setLive(created.id);
+      return ok();
+    }
+
+    const chronicle = campaign.getChronicle(Number(idText));
+    if (!chronicle || chronicle.archived || chronicle.storytellerId !== userId) {
+      return json(res, 404, { error: 'not found' });
+    }
+    const member = () => {
+      const id = body.character;
+      return typeof id === 'number' && campaign.members(chronicle.id).some((m) => m.id === id)
+        ? id
+        : undefined;
+    };
+
+    switch (action) {
+      case 'live':
+        campaign.setLive(chronicle.id);
+        return ok();
+      case 'masquerade': {
+        if (!isInt(body.delta, -MASQUERADE_BOXES, MASQUERADE_BOXES)) {
+          return json(res, 400, { error: 'invalid body' });
+        }
+        const value = Math.min(MASQUERADE_BOXES, Math.max(0, chronicle.masquerade + body.delta));
+        campaign.setMasquerade(chronicle.id, value);
+        return ok();
+      }
+      case 'move': {
+        const id = member();
+        if (id === undefined || (body.delta !== -1 && body.delta !== 1)) {
+          return json(res, 400, { error: 'invalid body' });
+        }
+        campaign.moveMember(chronicle.id, id, body.delta);
+        return ok();
+      }
+      case 'remove': {
+        const id = member();
+        if (id === undefined) return json(res, 400, { error: 'invalid body' });
+        campaign.leave(id);
+        return ok();
+      }
+      default: {
+        // POST /api/chronicles/:id {name?, sect?}
+        const patch: { name?: string; sect?: (typeof SECTS)[number] } = {};
+        if (body.name !== undefined) {
+          const n = name(body.name);
+          if (!n) return json(res, 400, { error: 'invalid', field: 'name' });
+          patch.name = n;
+        }
+        if (body.sect !== undefined) {
+          if (!isSect(body.sect)) return json(res, 400, { error: 'invalid', field: 'sect' });
+          patch.sect = body.sect;
+        }
+        campaign.updateChronicle(chronicle.id, patch);
+        return ok();
+      }
+    }
+  }
+
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // Only cloudflared reaches this port, and it passes on the visitor's address.
     const forwarded = req.headers['cf-connecting-ip'];
@@ -383,6 +470,8 @@ export function createPanelHandler(deps: PanelDeps) {
           slug: c.slug,
           name: c.name,
           sect: SECT_NAMES[c.sect],
+          sectId: c.sect,
+          guild: c.guildId,
           masquerade: c.masquerade,
           live: campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id,
           characters: campaign.members(c.id).map(view),
@@ -391,6 +480,7 @@ export function createPanelHandler(deps: PanelDeps) {
         options: {
           clans: CLANS.map((id) => ({ id, name: CLAN_NAMES[id] })),
           tiers: TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
+          sects: SECTS.map((id) => ({ id, name: SECT_NAMES[id] })),
           maxAttribute: LIMITS.attribute,
           maxName: LIMITS.nameLength,
         },
@@ -399,7 +489,9 @@ export function createPanelHandler(deps: PanelDeps) {
 
     // Every change below: a JSON body, the CSRF token and the panel's own origin.
     const characterPath = /^\/api\/characters(?:\/(\d{1,12})(\/track)?)?$/.exec(path);
-    if (!characterPath || !['POST', 'DELETE'].includes(method)) {
+    const chroniclePath =
+      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove))?)?$/.exec(path);
+    if (!(characterPath || chroniclePath) || !['POST', 'DELETE'].includes(method)) {
       return json(res, 404, { error: 'not found' });
     }
     const text = await readBody(req);
@@ -419,7 +511,12 @@ export function createPanelHandler(deps: PanelDeps) {
       return json(res, 200, { character: characterView(c, chronicles, me.userId) });
     };
 
-    const [, idText, track] = characterPath;
+    if (chroniclePath) {
+      if (method !== 'POST') return json(res, 404, { error: 'not found' });
+      return chronicleChange(res, me.userId, body, chroniclePath[1], chroniclePath[2]);
+    }
+
+    const [, idText, track] = characterPath!;
     if (idText === undefined) {
       // POST /api/characters: a new character, on a server the user shares with the bot.
       if (method !== 'POST') return json(res, 404, { error: 'not found' });

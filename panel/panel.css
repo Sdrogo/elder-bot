@@ -217,8 +217,13 @@ button:disabled {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+}
+
+.actions button {
+  white-space: nowrap;
 }
 
 .sheet-form {
@@ -261,4 +266,13 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+}
+
+.chronicle .masquerade {
+  max-width: 420px;
+  margin: 4px 0;
+}
+
+.chronicle > .actions {
+  margin-bottom: 12px;
 }

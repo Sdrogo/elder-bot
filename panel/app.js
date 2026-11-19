@@ -15,7 +15,7 @@ const TEXT = {
     'chronicles.title': 'Le mie Cronache',
     noChronicle: 'nessuna Cronaca',
     live: 'in onda',
-    noMembers: 'Nessun personaggio. Invita i giocatori con /elder chronicle invite.',
+    noMembers: 'Nessun personaggio. Invita i giocatori su Discord con /elder chronicle invite.',
     error: 'Qualcosa è andato storto. Ricarica la pagina.',
     edit: 'Modifica',
     delete: 'Elimina',
@@ -32,6 +32,13 @@ const TEXT = {
     'error.limit': 'Hai raggiunto il numero massimo di personaggi su quel server.',
     'error.invalid': 'Controlla i campi: qualcosa non va.',
     'error.change': 'Modifica non riuscita. Ricarica la pagina e riprova.',
+    'chronicles.new': 'Nuova Cronaca',
+    'chronicles.empty': 'Non sei Narratore di nessuna Cronaca. Creane una con "Nuova Cronaca".',
+    goLive: 'Metti in onda',
+    sect: 'Setta',
+    up: 'Sposta prima',
+    down: 'Sposta dopo',
+    remove: 'Togli',
   },
   en: {
     'login.intro': 'Your Vampire: The Masquerade characters and Chronicles.',
@@ -45,7 +52,7 @@ const TEXT = {
     'chronicles.title': 'My Chronicles',
     noChronicle: 'no Chronicle',
     live: 'on air',
-    noMembers: 'No characters yet. Invite players with /elder chronicle invite.',
+    noMembers: 'No characters yet. Invite players on Discord with /elder chronicle invite.',
     error: 'Something went wrong. Reload the page.',
     edit: 'Edit',
     delete: 'Delete',
@@ -62,6 +69,13 @@ const TEXT = {
     'error.limit': 'You reached the maximum number of characters on that server.',
     'error.invalid': 'Check the fields: something is wrong.',
     'error.change': 'The change failed. Reload the page and try again.',
+    'chronicles.new': 'New Chronicle',
+    'chronicles.empty': 'You run no Chronicle. Make one with "New Chronicle".',
+    goLive: 'Put on air',
+    sect: 'Sect',
+    up: 'Move earlier',
+    down: 'Move later',
+    remove: 'Remove',
   },
 };
 
@@ -84,6 +98,23 @@ function button(text, onClick, className = '') {
   const b = el('button', className, text);
   b.type = 'button';
   b.addEventListener('click', onClick);
+  return b;
+}
+
+/** A button that asks for a second press within 4 seconds before it acts. */
+function confirmButton(text, onConfirm) {
+  let armed = false;
+  const b = button(text, () => {
+    if (armed) return onConfirm();
+    armed = true;
+    b.textContent = tr('confirmDelete');
+    b.classList.add('danger');
+    setTimeout(() => {
+      armed = false;
+      b.textContent = text;
+      b.classList.remove('danger');
+    }, 4000);
+  });
   return b;
 }
 
@@ -220,7 +251,7 @@ function characterForm(c, onDone) {
   return form;
 }
 
-function characterCard(c) {
+function characterCard(c, chronicle) {
   const card = el('article', 'card');
   card.append(el('h3', '', c.name));
   card.append(el('div', 'meta', `${c.clan} · ${c.tier} · ${c.chronicle ?? tr('noChronicle')}`));
@@ -266,8 +297,8 @@ function characterCard(c) {
     track(c, 'Violations', '', String(hu.violations), 'violations'),
   );
 
+  const actions = el('div', 'actions');
   if (c.editable) {
-    const actions = el('div', 'actions');
     actions.append(
       button(tr('edit'), () => {
         const form = characterForm(c, () => form.replaceWith(actions));
@@ -275,26 +306,94 @@ function characterCard(c) {
       }),
     );
     if (c.owned) {
-      let armed = false;
-      const del = button(tr('delete'), () => {
-        if (!armed) {
-          armed = true;
-          del.textContent = tr('confirmDelete');
-          del.classList.add('danger');
-          setTimeout(() => {
-            armed = false;
-            del.textContent = tr('delete');
-            del.classList.remove('danger');
-          }, 4000);
-          return;
-        }
-        void change('DELETE', `/api/characters/${c.id}`);
-      });
-      actions.append(del);
+      actions.append(
+        confirmButton(tr('delete'), () => change('DELETE', `/api/characters/${c.id}`)),
+      );
     }
-    card.append(actions);
   }
+  if (chronicle) {
+    // The Storyteller's view: scene order (also the overlay's) and removal from the Chronicle.
+    const path = `/api/chronicles/${chronicle.id}`;
+    const up = button('↑', () => change('POST', `${path}/move`, { character: c.id, delta: -1 }));
+    const down = button('↓', () => change('POST', `${path}/move`, { character: c.id, delta: 1 }));
+    up.title = tr('up');
+    down.title = tr('down');
+    up.setAttribute('aria-label', `${c.name}: ${tr('up')}`);
+    down.setAttribute('aria-label', `${c.name}: ${tr('down')}`);
+    actions.append(
+      up,
+      down,
+      confirmButton(tr('remove'), () => change('POST', `${path}/remove`, { character: c.id })),
+    );
+  }
+  if (actions.childElementCount) card.append(actions);
   return card;
+}
+
+/** The form for a new Chronicle (no `ch`) or for renaming one and changing its sect. */
+function chronicleForm(ch, onDone) {
+  const form = el('form', 'sheet-form');
+  const name = el('input');
+  name.name = 'name';
+  name.required = true;
+  name.maxLength = me.options.maxName;
+  name.value = ch?.name ?? '';
+  if (!ch && me.guilds.length > 1) {
+    form.append(field(tr('server'), select('guild', me.guilds, me.guilds[0].id)));
+  }
+  form.append(
+    field(tr('name'), name),
+    field(tr('sect'), select('sect', me.options.sects, ch?.sectId ?? 'camarilla')),
+  );
+  const actions = el('div', 'actions');
+  const submit = el('button', 'primary', tr(ch ? 'save' : 'create'));
+  submit.type = 'submit';
+  actions.append(submit, button(tr('cancel'), onDone));
+  form.append(actions);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const body = { name: data.get('name'), sect: data.get('sect') };
+    if (!ch) body.guild = data.get('guild') ?? me.guilds[0].id;
+    submit.disabled = true;
+    const ok = await change('POST', ch ? `/api/chronicles/${ch.id}` : '/api/chronicles', body);
+    submit.disabled = false;
+    if (ok) onDone();
+  });
+  return form;
+}
+
+function chronicleBlock(ch) {
+  const path = `/api/chronicles/${ch.id}`;
+  const block = el('div', ch.live ? 'chronicle live' : 'chronicle');
+  const title = el('h3', '', ch.name);
+  if (ch.live) title.append(el('span', 'badge', tr('live')));
+  const tools = el('div', 'actions');
+  if (!ch.live) tools.append(button(tr('goLive'), () => change('POST', `${path}/live`), 'primary'));
+  tools.append(
+    button(tr('edit'), () => {
+      const form = chronicleForm(ch, () => form.replaceWith(tools));
+      tools.replaceWith(form);
+    }),
+  );
+  const masquerade = el('div', 'track masquerade');
+  const step = (delta) => () => change('POST', `${path}/masquerade`, { delta });
+  const value = el('span', 'value');
+  const minus = button('−', step(-1), 'step');
+  const plus = button('+', step(1), 'step');
+  minus.setAttribute('aria-label', 'Masquerade −1');
+  plus.setAttribute('aria-label', 'Masquerade +1');
+  value.append(minus, el('strong', '', `${ch.masquerade}/10`), plus);
+  masquerade.append(
+    el('span', 'label', 'Masquerade'),
+    el('span', 'boxes', boxes(ch.masquerade, 10 - ch.masquerade)),
+    value,
+  );
+  block.append(title, el('div', 'meta', ch.sect), masquerade, tools);
+  const cards = el('div', 'cards');
+  cards.append(...ch.characters.map((c) => characterCard(c, ch)));
+  block.append(ch.characters.length ? cards : el('p', 'empty', tr('noMembers')));
+  return block;
 }
 
 async function loadPanel() {
@@ -313,20 +412,8 @@ async function loadPanel() {
   list.replaceChildren(...me.characters.map(characterCard));
   document.getElementById('characters-empty').hidden = me.characters.length > 0;
 
-  const chronicles = document.getElementById('chronicles');
-  document.getElementById('chronicles-section').hidden = me.chronicles.length === 0;
-  chronicles.replaceChildren(
-    ...me.chronicles.map((ch) => {
-      const block = el('div', ch.live ? 'chronicle live' : 'chronicle');
-      const title = el('h3', '', ch.name);
-      if (ch.live) title.append(el('span', 'badge', tr('live')));
-      block.append(title, el('div', 'meta', `${ch.sect} · Masquerade ${ch.masquerade}/10`));
-      const cards = el('div', 'cards');
-      cards.append(...ch.characters.map(characterCard));
-      block.append(ch.characters.length ? cards : el('p', 'empty', tr('noMembers')));
-      return block;
-    }),
-  );
+  document.getElementById('chronicles-empty').hidden = me.chronicles.length > 0;
+  document.getElementById('chronicles').replaceChildren(...me.chronicles.map(chronicleBlock));
 }
 
 function setUpPanel() {
@@ -334,15 +421,21 @@ function setUpPanel() {
     await fetch('/logout', { method: 'POST', headers: { 'X-CSRF-Token': me.csrf } });
     location.href = '/';
   });
-  const slot = document.getElementById('new-character-slot');
-  const open = document.getElementById('new-character');
+  opener('new-character', 'new-character-slot', characterForm);
+  opener('new-chronicle', 'new-chronicle-slot', chronicleForm);
+}
+
+/** Wires a "new …" button to show its form in a slot, once the user's servers are known. */
+function opener(buttonId, slotId, makeForm) {
+  const open = document.getElementById(buttonId);
+  const slot = document.getElementById(slotId);
   open.addEventListener('click', () => {
     if (!me.guilds.length) {
       notify(tr('noServer'));
       return;
     }
     open.hidden = true;
-    const form = characterForm(undefined, () => {
+    const form = makeForm(undefined, () => {
       form.remove();
       open.hidden = false;
     });

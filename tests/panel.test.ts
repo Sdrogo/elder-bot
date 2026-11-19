@@ -303,6 +303,94 @@ describe('panel changes', () => {
   });
 });
 
+describe('Storyteller controls', () => {
+  async function setup() {
+    const cookie = await login();
+    const me = (await (await get('/api/me', cookie)).json()) as { csrf: string };
+    const send = (path: string, body: unknown) =>
+      fetch(base + path, {
+        method: 'POST',
+        headers: {
+          cookie,
+          'content-type': 'application/json',
+          'x-csrf-token': me.csrf,
+          origin: PUBLIC,
+        },
+        body: JSON.stringify(body),
+      });
+    const values = newCharacter({ tier: 'neonate', stamina: 3, composure: 4, resolve: 2 });
+    const make = (ownerId: string, name: string) => {
+      const c = store.campaign.createCharacter({
+        guildId: 'g',
+        ownerId,
+        name,
+        clan: 'brujah',
+        values,
+      });
+      if (typeof c !== 'object') throw new Error('setup');
+      return c;
+    };
+    return { send, make };
+  }
+
+  it('creates Chronicles and switches the one on air', async () => {
+    const { send } = await setup();
+    const create = (name: string) => send('/api/chronicles', { guild: 'g', name, sect: 'anarch' });
+    expect((await create('Prima')).status).toBe(200);
+    expect((await create('Seconda')).status).toBe(200);
+    expect((await create('Prima')).status).toBe(409);
+    const [first, second] = store.campaign.chroniclesRunBy('111');
+    expect(store.campaign.liveChronicle('g', '111')?.id).toBe(first!.id);
+    expect((await send(`/api/chronicles/${second!.id}/live`, {})).status).toBe(200);
+    expect(store.campaign.liveChronicle('g', '111')?.id).toBe(second!.id);
+    expect(
+      (await send(`/api/chronicles/${second!.id}`, { name: 'Terza', sect: 'sabbat' })).status,
+    ).toBe(200);
+    expect(store.campaign.getChronicle(second!.id)).toMatchObject({
+      name: 'Terza',
+      sect: 'sabbat',
+    });
+  });
+
+  it('moves the Masquerade within 0 and 10', async () => {
+    const { send } = await setup();
+    await send('/api/chronicles', { guild: 'g', name: 'Prima', sect: 'camarilla' });
+    const [ch] = store.campaign.chroniclesRunBy('111');
+    expect((await send(`/api/chronicles/${ch!.id}/masquerade`, { delta: 3 })).status).toBe(200);
+    await send(`/api/chronicles/${ch!.id}/masquerade`, { delta: -5 });
+    expect(store.campaign.getChronicle(ch!.id)?.masquerade).toBe(0);
+    await send(`/api/chronicles/${ch!.id}/masquerade`, { delta: 10 });
+    await send(`/api/chronicles/${ch!.id}/masquerade`, { delta: 1 });
+    expect(store.campaign.getChronicle(ch!.id)?.masquerade).toBe(10);
+  });
+
+  it('reorders and removes characters only in the Storyteller own Chronicle', async () => {
+    const { send, make } = await setup();
+    await send('/api/chronicles', { guild: 'g', name: 'Prima', sect: 'camarilla' });
+    const [ch] = store.campaign.chroniclesRunBy('111');
+    const a = make('222', 'A');
+    const b = make('333', 'B');
+    store.campaign.join(ch!.id, a.id);
+    store.campaign.join(ch!.id, b.id);
+    const path = `/api/chronicles/${ch!.id}`;
+    expect((await send(`${path}/move`, { character: b.id, delta: -1 })).status).toBe(200);
+    expect(store.campaign.members(ch!.id).map((m) => m.name)).toEqual(['B', 'A']);
+    expect((await send(`${path}/remove`, { character: a.id })).status).toBe(200);
+    expect(store.campaign.members(ch!.id).map((m) => m.name)).toEqual(['B']);
+    expect((await send(`${path}/remove`, { character: a.id })).status).toBe(400);
+
+    const other = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '999',
+      name: 'Altrui',
+      sect: 'camarilla',
+    });
+    if (typeof other !== 'object') throw new Error('setup');
+    expect((await send(`/api/chronicles/${other.id}/live`, {})).status).toBe(404);
+    expect((await send(`/api/chronicles/${other.id}/masquerade`, { delta: 1 })).status).toBe(404);
+  });
+});
+
 describe('web sessions', () => {
   it('expire after 30 days and keep only a hash of the token', async () => {
     const { default: Database } = await import('better-sqlite3');
