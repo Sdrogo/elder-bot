@@ -73,6 +73,17 @@ const panel = config.panel
         publicUrl: config.panel.url,
         clientId: config.clientId,
         clientSecret: config.panel.clientSecret,
+        // One REST call per server the bot is on; no privileged intent needed.
+        guildsOf: async (userId) => {
+          const guilds = [];
+          for (const guild of client.guilds.cache.values()) {
+            const member = await guild.members
+              .fetch({ user: userId, cache: false })
+              .catch(() => undefined);
+            if (member) guilds.push({ id: guild.id, name: guild.name });
+          }
+          return guilds;
+        },
       },
       config.panel.port,
     )

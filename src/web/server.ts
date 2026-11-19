@@ -4,13 +4,23 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  CLANS,
   CLAN_NAMES,
+  LIMITS,
   SECT_NAMES,
+  TIERS,
   TIER_NAMES,
+  cleanName,
   healthMax,
   hungerDice,
+  isClan,
+  isTier,
+  isTrack,
+  newCharacter,
   vitaeMax,
   willpowerMax,
+  type CharacterValues,
+  type Clan,
 } from '../game/character.js';
 import type { Character, Chronicle } from '../state/campaign.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
@@ -55,7 +65,20 @@ export interface PanelDeps {
   fetchFn?: Fetch;
   staticDir?: string;
   now?: () => number;
+  /**
+   * The Discord servers the bot shares with a user, where they can create characters.
+   * Without it, only the servers where they already have a character or a Chronicle count.
+   */
+  guildsOf?: (userId: string) => Promise<Guild[]>;
 }
+
+export interface Guild {
+  id: string;
+  name: string;
+}
+
+/** How long the list of a user's servers is kept before asking Discord again. */
+const GUILDS_TTL_MS = 5 * 60_000;
 
 /** A fixed one-minute window per key. Old windows are dropped so the map stays small. */
 class RateLimiter {
@@ -94,23 +117,77 @@ function sameSecret(a: string | undefined, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
+/**
+ * Who may change a character from the panel: its owner or the Storyteller of its Chronicle.
+ * Server admins are not known here (the login reads only the user's id), so they use Discord.
+ */
+export function canEditOnPanel(
+  userId: string,
+  c: Character,
+  getChronicle: (id: number) => Chronicle | undefined,
+): boolean {
+  if (c.ownerId === userId) return true;
+  if (c.chronicleId === undefined) return false;
+  return getChronicle(c.chronicleId)?.storytellerId === userId;
+}
+
 /** What the panel shows of a character: the saved values plus everything worked out from them. */
-export function characterView(c: Character, chronicles: Map<number, Chronicle>) {
+export function characterView(c: Character, chronicles: Map<number, Chronicle>, viewerId = '') {
   const v = c.values;
   const chronicle = c.chronicleId !== undefined ? chronicles.get(c.chronicleId) : undefined;
   return {
     id: c.id,
     name: c.name,
     clan: CLAN_NAMES[c.clan],
+    clanId: c.clan,
     tier: TIER_NAMES[v.tier],
+    tierId: v.tier,
     chronicle: chronicle?.name ?? null,
+    owned: c.ownerId === viewerId,
+    editable: c.ownerId === viewerId || (!!viewerId && chronicle?.storytellerId === viewerId),
     attributes: { stamina: v.stamina, composure: v.composure, resolve: v.resolve },
     health: { current: v.health, max: healthMax(v), baneful: v.baneful },
     vitae: { current: v.vitae, max: vitaeMax(v) },
     hunger: hungerDice(v),
     willpower: { current: v.willpower, max: willpowerMax(v) },
     humanity: { rank: v.humanity, violations: v.violations },
+    baneful: v.baneful,
   };
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+const isInt = (v: unknown, lo: number, hi: number): v is number =>
+  Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi;
+
+/** The fields of a character form that are present and valid; `error` names the first bad one. */
+function characterFields(body: Record<string, unknown>) {
+  const out: {
+    name?: string;
+    clan?: Clan;
+    values: Partial<CharacterValues>;
+    error?: string;
+  } = { values: {} };
+  if (body.name !== undefined) {
+    const name = typeof body.name === 'string' ? cleanName(body.name) : undefined;
+    if (!name) return { ...out, error: 'name' };
+    out.name = name;
+  }
+  if (body.clan !== undefined) {
+    if (!isClan(body.clan)) return { ...out, error: 'clan' };
+    out.clan = body.clan;
+  }
+  if (body.tier !== undefined) {
+    if (!isTier(body.tier)) return { ...out, error: 'tier' };
+    out.values.tier = body.tier;
+  }
+  for (const key of ['stamina', 'composure', 'resolve'] as const) {
+    if (body[key] === undefined) continue;
+    if (!isInt(body[key], 1, LIMITS.attribute)) return { ...out, error: key };
+    out.values[key] = body[key];
+  }
+  return out;
 }
 
 export function createPanelHandler(deps: PanelDeps) {
@@ -125,6 +202,32 @@ export function createPanelHandler(deps: PanelDeps) {
   };
   const limiter = new RateLimiter(now);
   const { store } = deps;
+  const guildCache = new Map<string, { at: number; guilds: Guild[] }>();
+
+  /** Servers where the user may create a character: shared with the bot, or already used. */
+  async function guildsFor(userId: string): Promise<Guild[]> {
+    const cached = guildCache.get(userId);
+    if (cached && now() - cached.at < GUILDS_TTL_MS) return cached.guilds;
+    let guilds: Guild[] = [];
+    if (deps.guildsOf) {
+      try {
+        guilds = await deps.guildsOf(userId);
+      } catch (error) {
+        console.error('Server Discord non letti:', (error as Error).message);
+      }
+    }
+    const known = new Set(guilds.map((g) => g.id));
+    const { campaign } = store;
+    for (const c of [...campaign.charactersOwnedBy(userId), ...campaign.chroniclesRunBy(userId)]) {
+      if (!known.has(c.guildId)) {
+        known.add(c.guildId);
+        guilds.push({ id: c.guildId, name: c.guildId });
+      }
+    }
+    if (guildCache.size > 1000) guildCache.clear();
+    guildCache.set(userId, { at: now(), guilds });
+    return guilds;
+  }
 
   const cookie = (name: string, value: string, maxAgeSeconds: number) =>
     `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
@@ -158,14 +261,26 @@ export function createPanelHandler(deps: PanelDeps) {
     send(res, 200, await readFile(join(staticDir, file)), 'text/html; charset=utf-8');
   }
 
-  /** Reads and discards a request body, refusing anything larger than MAX_BODY. */
-  async function drainBody(req: IncomingMessage): Promise<boolean> {
+  /** Reads a request body, refusing anything larger than MAX_BODY (undefined). */
+  async function readBody(req: IncomingMessage): Promise<string | undefined> {
+    const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of req) {
       size += (chunk as Buffer).length;
-      if (size > MAX_BODY) return false;
+      if (size > MAX_BODY) return undefined;
+      chunks.push(chunk as Buffer);
     }
-    return true;
+    return Buffer.concat(chunks).toString('utf8');
+  }
+
+  /** A JSON object body; null when it is missing, malformed or not an object. */
+  function parseObject(text: string): Record<string, unknown> | null {
+    try {
+      const value: unknown = JSON.parse(text);
+      return isRecord(value) ? value : null;
+    } catch {
+      return null;
+    }
   }
 
   function session(req: IncomingMessage): { token: string; session: WebSession } | undefined {
@@ -237,7 +352,7 @@ export function createPanelHandler(deps: PanelDeps) {
     const me = current.session;
 
     if (method === 'POST' && path === '/logout') {
-      if (!(await drainBody(req))) return json(res, 413, { error: 'body too large' });
+      if ((await readBody(req)) === undefined) return json(res, 413, { error: 'body too large' });
       if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
       store.sessions.delete(current.token);
       return send(res, 204, '', 'text/plain; charset=utf-8', {
@@ -258,10 +373,11 @@ export function createPanelHandler(deps: PanelDeps) {
         const c = campaign.getChronicle(id);
         if (c) chronicles.set(id, c);
       }
+      const view = (c: Character) => characterView(c, chronicles, me.userId);
       return json(res, 200, {
         user: { id: me.userId, name: me.name },
         csrf: me.csrf,
-        characters: characters.map((c) => characterView(c, chronicles)),
+        characters: characters.map(view),
         chronicles: runs.map((c) => ({
           id: c.id,
           slug: c.slug,
@@ -269,15 +385,103 @@ export function createPanelHandler(deps: PanelDeps) {
           sect: SECT_NAMES[c.sect],
           masquerade: c.masquerade,
           live: campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id,
-          characters: campaign.members(c.id).map((m) => characterView(m, chronicles)),
+          characters: campaign.members(c.id).map(view),
         })),
+        guilds: await guildsFor(me.userId),
+        options: {
+          clans: CLANS.map((id) => ({ id, name: CLAN_NAMES[id] })),
+          tiers: TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
+          maxAttribute: LIMITS.attribute,
+          maxName: LIMITS.nameLength,
+        },
       });
     }
 
-    return json(res, 404, { error: 'not found' });
+    // Every change below: a JSON body, the CSRF token and the panel's own origin.
+    const characterPath = /^\/api\/characters(?:\/(\d{1,12})(\/track)?)?$/.exec(path);
+    if (!characterPath || !['POST', 'DELETE'].includes(method)) {
+      return json(res, 404, { error: 'not found' });
+    }
+    const text = await readBody(req);
+    if (text === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    const body = method === 'DELETE' ? {} : parseObject(text);
+    if (!body) return json(res, 400, { error: 'invalid body' });
+    const { campaign } = store;
+    const getChronicle = (id: number) => campaign.getChronicle(id);
+    const done = (c: Character) => {
+      const chronicles = new Map<number, Chronicle>();
+      const ch = c.chronicleId === undefined ? undefined : getChronicle(c.chronicleId);
+      if (ch) chronicles.set(ch.id, ch);
+      return json(res, 200, { character: characterView(c, chronicles, me.userId) });
+    };
+
+    const [, idText, track] = characterPath;
+    if (idText === undefined) {
+      // POST /api/characters: a new character, on a server the user shares with the bot.
+      if (method !== 'POST') return json(res, 404, { error: 'not found' });
+      const fields = characterFields(body);
+      if (fields.error) return json(res, 400, { error: 'invalid', field: fields.error });
+      const guilds = await guildsFor(me.userId);
+      const guild = guilds.find((g) => g.id === body.guild);
+      if (!guild) return json(res, 400, { error: 'invalid', field: 'guild' });
+      const { name, clan } = fields;
+      const { tier, stamina, composure, resolve } = fields.values;
+      if (!name || !clan || !tier || !stamina || !composure || !resolve) {
+        return json(res, 400, { error: 'missing fields' });
+      }
+      const created = campaign.createCharacter({
+        guildId: guild.id,
+        ownerId: me.userId,
+        name,
+        clan,
+        values: newCharacter({ tier, stamina, composure, resolve }),
+      });
+      if (created === 'duplicate' || created === 'limit') return json(res, 409, { error: created });
+      return done(created);
+    }
+
+    const character = campaign.getCharacter(Number(idText));
+    if (!character || !canEditOnPanel(me.userId, character, getChronicle)) {
+      // The same answer for "not there" and "not yours": ids can't be probed.
+      return json(res, 404, { error: 'not found' });
+    }
+
+    if (method === 'DELETE') {
+      if (track || character.ownerId !== me.userId) return json(res, 403, { error: 'owner only' });
+      campaign.deleteCharacter(character.id);
+      return send(res, 204, '');
+    }
+
+    if (track) {
+      // POST /api/characters/:id/track {track, delta}: one step of a tracker, clamped to the rules.
+      if (!isTrack(body.track) || !isInt(body.delta, -10, 10)) {
+        return json(res, 400, { error: 'invalid body' });
+      }
+      const value = character.values[body.track] + body.delta;
+      const updated = campaign.setTrack(character.id, body.track, value, me.userId);
+      return updated ? done(updated) : json(res, 404, { error: 'not found' });
+    }
+
+    // POST /api/characters/:id: name, clan, tier or Attributes.
+    const fields = characterFields(body);
+    if (fields.error) return json(res, 400, { error: 'invalid', field: fields.error });
+    const updated = campaign.updateCharacter(
+      character.id,
+      {
+        ...(fields.name ? { name: fields.name } : {}),
+        ...(fields.clan ? { clan: fields.clan } : {}),
+        values: fields.values,
+      },
+      me.userId,
+    );
+    if (updated === 'duplicate' || updated === 'limit') return json(res, 409, { error: updated });
+    return updated ? done(updated) : json(res, 404, { error: 'not found' });
   };
 }
-
 /** Starts the panel on its internal port. Errors are logged and answered with a 500. */
 export function startPanel(deps: PanelDeps, port: number): Server {
   const handle = createPanelHandler(deps);

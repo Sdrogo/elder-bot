@@ -134,7 +134,7 @@ Senza `DISCORD_GUILD_ID` i comandi vengono registrati su tutti i server e posson
 
 ## Pannello web (facoltativo)
 
-Un sito dove giocatori e Narratore entrano con il loro account Discord e vedono i propri personaggi e le proprie Cronache. Arriva da Internet solo attraverso un tunnel Cloudflare: il VPS non apre porte, e la porta del pannello (8080) non è pubblicata, la raggiunge solo il container `cloudflared`.
+Un sito dove giocatori e Narratore entrano con il loro account Discord e gestiscono i propri personaggi senza comandi in chat: tracciati con i pulsanti +/−, nuovi PG, modifiche a nome, clan, livello e Attributi, eliminazione. Il Narratore vede e modifica anche i PG delle sue Cronache (ma non può eliminarli). I PG nuovi si creano sui server Discord che hai in comune con il bot. Arriva da Internet solo attraverso un tunnel Cloudflare: il VPS non apre porte, e la porta del pannello (8080) non è pubblicata, la raggiunge solo il container `cloudflared`.
 
 Serve un dominio gestito da Cloudflare (piano gratuito). Poi:
 
