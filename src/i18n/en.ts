@@ -262,6 +262,12 @@ export const en = {
   'willpower.none': '**{name}** has no Willpower left.',
   'willpower.left': '{name}: Willpower {left}/{max}.',
 
+  // Web panel.
+  'cmd.panel.description': 'Link to the web panel: your characters and Chronicles',
+  'panel.link': 'Your characters and Chronicles, in the browser. Log in with your Discord account.',
+  'panel.open': 'Open the panel',
+  'panel.notConfigured': 'The web panel is not set up on this bot.',
+
   'error.generic': 'Something went wrong.',
 };
 

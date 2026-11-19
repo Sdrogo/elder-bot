@@ -1,0 +1,157 @@
+:root {
+  color-scheme: dark;
+  --bg: #121014;
+  --card: #1d191f;
+  --line: #3a3140;
+  --text: #ece6ee;
+  --quiet: #a99fae;
+  --blood: #b3122e;
+  --blood-soft: #b3122e33;
+  --discord: #5865f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    15px/1.5 system-ui,
+    sans-serif;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+}
+
+h2 {
+  font-size: 17px;
+  margin: 24px 0 12px;
+}
+
+.top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.top #user {
+  margin-left: auto;
+  color: var(--quiet);
+}
+
+button,
+.button {
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.button.discord {
+  background: var(--discord);
+  border-color: var(--discord);
+  padding: 10px 18px;
+  font-weight: 600;
+}
+
+.login {
+  max-width: 420px;
+  margin-top: 12vh;
+  text-align: center;
+}
+
+.login h1 {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.note,
+.empty {
+  color: var(--quiet);
+  font-size: 13px;
+}
+
+.error {
+  color: #ff8a9a;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.card .meta {
+  color: var(--quiet);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.track {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 14px;
+}
+
+.track .boxes {
+  letter-spacing: 1px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.hunger {
+  color: #ff8a9a;
+  font-weight: 600;
+}
+
+.chronicle {
+  border-left: 3px solid var(--line);
+  padding-left: 12px;
+  margin-bottom: 20px;
+}
+
+.chronicle.live {
+  border-left-color: var(--blood);
+}
+
+.badge {
+  background: var(--blood-soft);
+  color: #ff8a9a;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  margin-left: 6px;
+}

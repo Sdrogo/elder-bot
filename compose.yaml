@@ -25,5 +25,31 @@ services:
         max-size: '10m'
         max-file: '3'
 
+  # Web panel: the only way in from the Internet. cloudflared opens an outbound tunnel to
+  # Cloudflare, so the VPS opens no port; the bot's panel port is published nowhere.
+  # Runs only with COMPOSE_PROFILES=panel in .env.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.7
+    profiles: ['panel']
+    command: tunnel --no-autoupdate run
+    environment:
+      # Only the tunnel token: cloudflared never sees the bot's secrets.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - elder-bot
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
 volumes:
   elder-bot-data:

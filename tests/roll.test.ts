@@ -152,6 +152,7 @@ describe('slash commands', () => {
       'session',
       'character',
       'chronicle',
+      'panel',
     ]);
   });
 });

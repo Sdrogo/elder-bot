@@ -4,6 +4,7 @@ import { contest } from './contest.js';
 import { frenzy } from './frenzy.js';
 import { masquerade } from './masquerade.js';
 import { npc } from './npc.js';
+import { panel } from './panel.js';
 import { prolonged } from './prolonged.js';
 import { roll } from './roll.js';
 import { session } from './session.js';
@@ -19,4 +20,5 @@ export const commands: Command[] = [
   session,
   character,
   chronicle,
+  panel,
 ];

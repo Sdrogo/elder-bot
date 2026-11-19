@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ProlongedTask } from '../dice/prolonged.js';
 import { Campaign } from './campaign.js';
+import { WebSessions } from './sessions.js';
 
 /** The Masquerade Tracker has 10 boxes. */
 export const MASQUERADE_BOXES = 10;
@@ -15,6 +16,8 @@ export class Store {
   private db: Database.Database;
   /** Characters and Chronicles, in the same database. */
   readonly campaign: Campaign;
+  /** Web panel logins. */
+  readonly sessions: WebSessions;
 
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -36,6 +39,7 @@ export class Store {
         channel_id TEXT PRIMARY KEY, locale TEXT NOT NULL);
     `);
     this.campaign = new Campaign(this.db);
+    this.sessions = new WebSessions(this.db);
   }
 
   /** Marked boxes on the Masquerade Tracker (Storyteller Packet p. 32), 0 to 10. */

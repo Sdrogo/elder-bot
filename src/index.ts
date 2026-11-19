@@ -12,9 +12,13 @@ import {
 import { handleRollButton, handleRollModal, handleRollSelect } from './interactions/rollButtons.js';
 import { Store } from './state/store.js';
 import { syncDiceEmojis } from './ui/diceEmojis.js';
+import { startPanel } from './web/server.js';
 
 const config = loadConfig();
-const ctx: Context = { store: new Store(config.databasePath) };
+const ctx: Context = {
+  store: new Store(config.databasePath),
+  ...(config.panel ? { panelUrl: config.panel.url } : {}),
+};
 const byName = new Map(commands.map((c) => [c.data.name, c]));
 
 // Slash commands and buttons need no privileged intents.
@@ -61,8 +65,22 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   }
 });
 
+// The web panel starts only when PANEL_URL and DISCORD_CLIENT_SECRET are set.
+const panel = config.panel
+  ? startPanel(
+      {
+        store: ctx.store,
+        publicUrl: config.panel.url,
+        clientId: config.clientId,
+        clientSecret: config.panel.clientSecret,
+      },
+      config.panel.port,
+    )
+  : undefined;
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
+    panel?.close();
     void client.destroy().finally(() => {
       ctx.store.close();
       process.exit(0);
