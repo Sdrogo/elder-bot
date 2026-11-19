@@ -28,6 +28,16 @@ import {
 } from '../game/character.js';
 import type { Character, Chronicle } from '../state/campaign.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
+import {
+  BACKGROUND_TYPES,
+  LAYOUTS,
+  MAX_BACKGROUND,
+  RESOLUTIONS,
+  camLinks,
+  imageType,
+  isLayout,
+  isResolution,
+} from '../state/stage.js';
 import { MASQUERADE_BOXES, type Store } from '../state/store.js';
 import { authorizeUrl, identify, type Fetch, type OAuthApp } from './discord.js';
 
@@ -61,6 +71,8 @@ const SYMBOLS = new Set<string>([...CLANS, ...SECTS.filter((s) => s !== 'none')]
 const OVERLAY_CSP =
   "default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; " +
   "font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'self'; base-uri 'none'; " +
+  // Each player's webcam comes from VDO.Ninja in a frame of its own.
+  'frame-src https://vdo.ninja; ' +
   "form-action 'none'; frame-ancestors 'none'";
 
 /** Open live streams to OBS: in all, and for one view key. */
@@ -162,9 +174,15 @@ export function canEditOnPanel(
 }
 
 /** What the panel shows of a character: the saved values plus everything worked out from them. */
-export function characterView(c: Character, chronicles: Map<number, Chronicle>, viewerId = '') {
+export function characterView(
+  c: Character,
+  chronicles: Map<number, Chronicle>,
+  viewerId = '',
+  cam?: string,
+) {
   const v = c.values;
   const chronicle = c.chronicleId !== undefined ? chronicles.get(c.chronicleId) : undefined;
+  const editable = c.ownerId === viewerId || (!!viewerId && chronicle?.storytellerId === viewerId);
   return {
     id: c.id,
     name: c.name,
@@ -174,7 +192,9 @@ export function characterView(c: Character, chronicles: Map<number, Chronicle>, 
     tierId: v.tier,
     chronicle: chronicle?.name ?? null,
     owned: c.ownerId === viewerId,
-    editable: c.ownerId === viewerId || (!!viewerId && chronicle?.storytellerId === viewerId),
+    editable,
+    // The player's VDO.Ninja links, only for those who may change the character.
+    cam: cam && editable ? camLinks(cam, c.name) : null,
     attributes: { stamina: v.stamina, composure: v.composure, resolve: v.resolve },
     health: { current: v.health, max: healthMax(v), baneful: v.baneful },
     vitae: { current: v.vitae, max: vitaeMax(v) },
@@ -196,7 +216,19 @@ export function overlayView(store: Store, userId: string) {
   const isLive = (c: Chronicle) => campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id;
   const live = runs.find(isLive);
   const characters = live ? overlayCharacters(campaign.members(live.id)) : [];
+  const stage = store.stage.settings(userId);
+  const [width, height] = RESOLUTIONS[stage.resolution];
   return {
+    // The /scena page: its size, where the frames go, the background and the roll box.
+    stage: {
+      width,
+      height,
+      layout: stage.layout,
+      rollBox: stage.rollBox,
+      background: stage.background ?? null,
+      cam: stage.cam ?? null,
+    },
+    roll: (live && store.stage.lastRoll(live.id)) ?? null,
     chronicle: live
       ? { slug: live.slug, name: live.name, sect: live.sect, masquerade: live.masquerade }
       : null,
@@ -212,6 +244,7 @@ export function overlayView(store: Store, userId: string) {
         willpower: { max: willpowerMax(v), current: v.willpower },
         humanity: { rank: v.humanity, violations: v.violations },
         hunger: hungerDice(v),
+        cam: store.stage.camOf(c.id) ?? null,
       };
     }),
   };
@@ -345,6 +378,11 @@ export function createPanelHandler(deps: PanelDeps) {
       if (!body) return json(res, 404, { error: 'no symbol' });
       return sendFile(req, res, body, 'image/png', headers);
     }
+    if (name === 'background') {
+      const found = store.stage.background(userId);
+      if (!found) return json(res, 404, { error: 'no background' });
+      return sendFile(req, res, found.image, found.type, headers);
+    }
     if (name === 'events') {
       const mine = [...streams.values()].filter((s) => s.userId === userId).length;
       if (streams.size >= MAX_STREAMS || mine >= MAX_STREAMS_PER_USER) {
@@ -458,14 +496,82 @@ export function createPanelHandler(deps: PanelDeps) {
 
   /** Reads a request body, refusing anything larger than MAX_BODY (undefined). */
   async function readBody(req: IncomingMessage): Promise<string | undefined> {
+    return (await readBytes(req, MAX_BODY))?.toString('utf8');
+  }
+
+  /** A request body as bytes, undefined when it is larger than `max`. */
+  async function readBytes(req: IncomingMessage, max: number): Promise<Buffer | undefined> {
+    const declared = Number(req.headers['content-length']);
+    if (declared > max) return undefined;
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of req) {
       size += (chunk as Buffer).length;
-      if (size > MAX_BODY) return undefined;
+      if (size > max) return undefined;
       chunks.push(chunk as Buffer);
     }
-    return Buffer.concat(chunks).toString('utf8');
+    return Buffer.concat(chunks);
+  }
+
+  /** The Storyteller's scene: size, layout, roll box, their webcam and the background. */
+  async function stageChange(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    action: string | undefined,
+  ) {
+    const method = req.method ?? 'GET';
+    const isBackground = action === 'background';
+    const data = await readBytes(req, isBackground ? MAX_BACKGROUND : MAX_BODY);
+    if (data === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    // Only Storytellers have a scene.
+    if (!store.campaign.chroniclesRunBy(me.userId).length) {
+      return json(res, 403, { error: 'storytellers only' });
+    }
+    const { stage } = store;
+    const ok = () => json(res, 200, { ok: true });
+
+    if (isBackground) {
+      if (method === 'DELETE') {
+        stage.removeBackground(me.userId);
+        return ok();
+      }
+      if (method !== 'PUT') return json(res, 404, { error: 'not found' });
+      const type = imageType(data);
+      if (!type) return json(res, 415, { error: 'PNG, JPEG or WebP only' });
+      stage.setBackground(me.userId, data, type);
+      return ok();
+    }
+    if (action === 'cam') {
+      if (method === 'DELETE') stage.removeStorytellerCam(me.userId);
+      else if (method === 'POST') stage.renewStorytellerCam(me.userId);
+      else return json(res, 404, { error: 'not found' });
+      return ok();
+    }
+    if (method !== 'POST' || action !== undefined) return json(res, 404, { error: 'not found' });
+    const body = parseObject(data.toString('utf8'));
+    if (!body) return json(res, 400, { error: 'invalid body' });
+    const patch: Parameters<typeof stage.update>[1] = {};
+    if (body.resolution !== undefined) {
+      if (!isResolution(body.resolution))
+        return json(res, 400, { error: 'invalid', field: 'resolution' });
+      patch.resolution = body.resolution;
+    }
+    if (body.layout !== undefined) {
+      if (!isLayout(body.layout)) return json(res, 400, { error: 'invalid', field: 'layout' });
+      patch.layout = body.layout;
+    }
+    if (body.rollBox !== undefined) {
+      if (typeof body.rollBox !== 'boolean')
+        return json(res, 400, { error: 'invalid', field: 'rollBox' });
+      patch.rollBox = body.rollBox;
+    }
+    stage.update(me.userId, patch);
+    return ok();
   }
 
   /** A JSON object body; null when it is missing, malformed or not an object. */
@@ -743,7 +849,9 @@ export function createPanelHandler(deps: PanelDeps) {
         const c = campaign.getChronicle(id);
         if (c) chronicles.set(id, c);
       }
-      const view = (c: Character) => characterView(c, chronicles, me.userId);
+      const view = (c: Character) =>
+        characterView(c, chronicles, me.userId, store.stage.camOf(c.id));
+      const stage = store.stage.settings(me.userId);
       return json(res, 200, {
         user: { id: me.userId, name: me.name },
         csrf: me.csrf,
@@ -769,6 +877,16 @@ export function createPanelHandler(deps: PanelDeps) {
                 id: c.id,
                 name: c.name,
               })),
+              stage: {
+                resolution: stage.resolution,
+                layout: stage.layout,
+                rollBox: stage.rollBox,
+                background: stage.background ?? null,
+                cam: stage.cam ? camLinks(stage.cam, 'Storyteller') : null,
+              },
+              layouts: LAYOUTS,
+              resolutions: Object.keys(RESOLUTIONS),
+              backgroundTypes: BACKGROUND_TYPES,
             }
           : null,
         options: {
@@ -800,7 +918,10 @@ export function createPanelHandler(deps: PanelDeps) {
       return json(res, 200, { key: store.overlayKeys.create(me.userId) });
     }
 
-    const characterPath = /^\/api\/characters(?:\/(\d{1,12})(\/track)?)?$/.exec(path);
+    const stagePath = /^\/api\/stage(?:\/(cam|background))?$/.exec(path);
+    if (stagePath) return stageChange(req, res, me, stagePath[1]);
+
+    const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam))?)?$/.exec(path);
     const chroniclePath =
       /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove))?)?$/.exec(path);
     if (!(characterPath || chroniclePath) || !['POST', 'DELETE'].includes(method)) {
@@ -812,7 +933,9 @@ export function createPanelHandler(deps: PanelDeps) {
     if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
       return json(res, 429, { error: 'too many requests' });
     }
-    const body = method === 'DELETE' ? {} : parseObject(text);
+    // A new webcam link needs no body.
+    const noBody = method === 'DELETE' || (characterPath?.[2] === 'cam' && !text.trim());
+    const body = noBody ? {} : parseObject(text);
     if (!body) return json(res, 400, { error: 'invalid body' });
     const { campaign } = store;
     const getChronicle = (id: number) => campaign.getChronicle(id);
@@ -820,7 +943,9 @@ export function createPanelHandler(deps: PanelDeps) {
       const chronicles = new Map<number, Chronicle>();
       const ch = c.chronicleId === undefined ? undefined : getChronicle(c.chronicleId);
       if (ch) chronicles.set(ch.id, ch);
-      return json(res, 200, { character: characterView(c, chronicles, me.userId) });
+      return json(res, 200, {
+        character: characterView(c, chronicles, me.userId, store.stage.camOf(c.id)),
+      });
     };
 
     if (chroniclePath) {
@@ -828,7 +953,8 @@ export function createPanelHandler(deps: PanelDeps) {
       return chronicleChange(res, me.userId, body, chroniclePath[1], chroniclePath[2]);
     }
 
-    const [, idText, track] = characterPath!;
+    const [, idText, sub] = characterPath!;
+    const track = sub === 'track';
     if (idText === undefined) {
       // POST /api/characters: a new character, on a server the user shares with the bot.
       if (method !== 'POST') return json(res, 404, { error: 'not found' });
@@ -857,6 +983,13 @@ export function createPanelHandler(deps: PanelDeps) {
     if (!character || !canEditOnPanel(me.userId, character, getChronicle)) {
       // The same answer for "not there" and "not yours": ids can't be probed.
       return json(res, 404, { error: 'not found' });
+    }
+
+    if (sub === 'cam') {
+      // POST /api/characters/:id/cam: a new VDO.Ninja link, the old one stops working.
+      if (method === 'POST') store.stage.renewCam(character.id);
+      else store.stage.removeCam(character.id);
+      return done(character);
     }
 
     if (method === 'DELETE') {

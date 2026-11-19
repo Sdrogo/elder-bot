@@ -1,11 +1,12 @@
 /* global window, document, EventSource, Image, URL, URLSearchParams, setTimeout */
-// OBS Browser Source. /scena draws every frame on one fixed 1920×1080 page;
-// /frame?pg=<id> (or ?pg=storyteller) draws a single frame that fills the source.
+// OBS Browser Source. /scena draws every frame on one fixed page (1920×1080 or 2560×1440),
+// with the background, each player's webcam and the last roll; /frame?pg=<id> (or
+// ?pg=storyteller, or ?pg=tiro for the roll box alone) draws one frame that fills the source.
 // The same page runs on the overlay program (http://127.0.0.1:7777/scena) and on the bot
 // (https://<panel>/overlay/scena?v=<view key>), so every address here is relative.
 'use strict';
 
-const { CLANS, SECTS, el, sceneLayout } = window.ELDER;
+const { CLANS, SECTS, el, sceneLayout, rollBoxRect, camUrl } = window.ELDER;
 const sceneMode = window.location.pathname.endsWith('/scena');
 const params = new URLSearchParams(window.location.search);
 // The bot's view key; the overlay program needs none.
@@ -19,7 +20,13 @@ const boxStyle = params.get('stile') === 'caselle';
 const scale = Number(params.get('scala'));
 if (scale >= 0.3 && scale <= 3)
   document.documentElement.style.setProperty('--scale', String(scale));
+// ?webcam=0 leaves the webcams out, for scenes that still capture them another way.
+const showCams = params.get('webcam') !== '0';
 const root = document.getElementById('root');
+const cams = document.getElementById('cams');
+const bg = document.getElementById('bg');
+/** One iframe per webcam, never moved in the page: moving an iframe reloads the video. */
+const camFrames = new Map();
 const SVG = 'http://www.w3.org/2000/svg';
 
 let prev = null;
@@ -191,6 +198,7 @@ function toast(frame, text) {
 
 function renderCharacter(c, before) {
   const frame = el('div', 'frame');
+  if (c.cam) frame.dataset.cam = c.cam;
   frame.style.setProperty('--clan', (CLANS[c.clan] || CLANS.caitiff).hue);
   const now = boxClasses(c);
   const old = before ? boxClasses(before) : null;
@@ -219,8 +227,9 @@ function renderCharacter(c, before) {
   return frame;
 }
 
-function renderStoryteller(chronicle, before) {
+function renderStoryteller(chronicle, before, cam) {
   const frame = el('div', 'frame st');
+  if (cam) frame.dataset.cam = cam;
   frame.style.setProperty('--clan', 'var(--gold)');
   const plate = el('div', 'plate', el('span', 'nm', 'Storyteller'));
   if (chronicle.sect !== 'none') {
@@ -243,32 +252,149 @@ function renderStoryteller(chronicle, before) {
   return frame;
 }
 
+const OUTCOME_CLASS = { win: 'win', critical: 'crit', fail: 'fail', bestial: 'beast' };
+
+/** The last roll: what was rolled, each side's dice and successes, the result. */
+function renderRoll(roll, before) {
+  const box = el('div', 'roll');
+  if (!roll) {
+    box.classList.add('empty');
+    return box;
+  }
+  if (!before || before.at !== roll.at) box.classList.add('new');
+  box.classList.add(OUTCOME_CLASS[roll.tone] || 'neutral');
+  const many = roll.sides.reduce((n, s) => n + s.normal.length + s.hunger.length, 0) > 14;
+  const sides = el('div', `sides${many ? ' many' : ''}`);
+  for (const side of roll.sides) {
+    const dice = el('div', 'dice');
+    for (const face of side.normal) {
+      const die = d10(face >= 6, face);
+      if (face === 10) die.classList.add('ten');
+      dice.append(die);
+    }
+    for (const face of side.hunger) {
+      const die = d10(face >= 6, face);
+      die.classList.add('hdie');
+      if (face === 1) die.classList.add('one');
+      if (face === 10) die.classList.add('ten');
+      dice.append(die);
+    }
+    sides.append(
+      el(
+        'div',
+        'side',
+        el('span', 'who', side.who),
+        dice,
+        el('span', 'succ', String(side.successes)),
+      ),
+    );
+  }
+  const head = el('div', 'rhead', el('span', 'what', roll.label));
+  if (roll.difficulty) head.append(el('span', 'diff', `Difficulty ${roll.difficulty}`));
+  box.append(head, sides);
+  if (roll.outcome) box.append(el('div', 'outcome', roll.outcome));
+  return box;
+}
+
+function place(node, r) {
+  node.style.left = `${r.x}px`;
+  node.style.top = `${r.y}px`;
+  node.style.width = `${r.w}px`;
+  node.style.height = `${r.h}px`;
+  return node;
+}
+
+let backgroundTag = null;
+
+/** The background image of the scene, reloaded only when the Storyteller changes it. */
+function renderBackground(stage) {
+  const tag = stage.background;
+  if (tag === backgroundTag) return;
+  backgroundTag = tag;
+  if (!tag) {
+    bg.replaceChildren();
+    return;
+  }
+  const img = el('img');
+  img.alt = '';
+  const query = view ? `${view}&t=${tag}` : `?t=${tag}`;
+  img.src = new URL(`background${query}`, window.location.href).href;
+  bg.replaceChildren(img);
+}
+
 function renderScene(state) {
+  const stage = state.stage || { width: 1920, height: 1080, layout: 'grid', rollBox: false };
+  document.documentElement.style.setProperty('--canvas', `${stage.width}px`);
+  document.documentElement.style.setProperty('--canvas-h', `${stage.height}px`);
+  renderBackground(stage);
   // Characters in the order they were added, the Storyteller last; slots never move
   // unless a character is added or removed.
   const frames = state.characters.map((c) =>
     renderCharacter(c, prev && prev.characters.find((x) => x.id === c.id)),
   );
-  frames.push(renderStoryteller(state.chronicle, prev && prev.chronicle));
-  const slots = sceneLayout(frames.length);
-  root.replaceChildren(
-    ...frames.map((frame, i) => {
-      const r = slots[i];
-      const slot = el('div', 'slot', frame);
-      slot.style.left = `${r.x}px`;
-      slot.style.top = `${r.y}px`;
-      slot.style.width = `${r.w}px`;
-      slot.style.height = `${r.h}px`;
-      return slot;
-    }),
-  );
+  frames.push(renderStoryteller(state.chronicle, prev && prev.chronicle, stage.cam));
+  const slots = sceneLayout(frames.length, stage);
+  const k = stage.width / 1920;
+  const nodes = frames.map((frame, i) => {
+    const slot = place(el('div', 'slot', frame), slots[i]);
+    if (slots[i].w / k < 540) slot.classList.add('compact');
+    return slot;
+  });
+  if (stage.rollBox) {
+    const box = renderRoll(state.roll, prev && prev.roll);
+    nodes.push(place(el('div', 'slot roll-slot', box), rollBoxRect(stage.width)));
+  }
+  root.replaceChildren(...nodes);
+}
+
+/** Puts each webcam under its frame; webcams no longer on air are closed. */
+function placeCams() {
+  const seen = new Set();
+  if (showCams) {
+    for (const frame of root.querySelectorAll('.frame[data-cam]')) {
+      const id = frame.dataset.cam;
+      seen.add(id);
+      let iframe = camFrames.get(id);
+      if (!iframe) {
+        iframe = el('iframe', 'cam');
+        iframe.src = camUrl(id);
+        iframe.allow = 'autoplay';
+        iframe.setAttribute('scrolling', 'no');
+        camFrames.set(id, iframe);
+        cams.append(iframe);
+      }
+      const r = frame.getBoundingClientRect();
+      place(iframe, {
+        x: r.left + window.scrollX,
+        y: r.top + window.scrollY,
+        w: r.width,
+        h: r.height,
+      });
+    }
+  }
+  for (const [id, iframe] of camFrames) {
+    if (!seen.has(id)) {
+      iframe.remove();
+      camFrames.delete(id);
+    }
+  }
 }
 
 function render(state) {
+  if (!state.chronicle) {
+    // No Chronicle on air: nothing to show until the Storyteller puts one on air.
+    root.replaceChildren();
+    placeCams();
+    prev = null;
+    return;
+  }
   if (sceneMode) {
     renderScene(state);
   } else if (pg === 'storyteller') {
-    root.replaceChildren(renderStoryteller(state.chronicle, prev && prev.chronicle));
+    const cam = state.stage && state.stage.cam;
+    root.replaceChildren(renderStoryteller(state.chronicle, prev && prev.chronicle, cam));
+  } else if (pg === 'tiro') {
+    root.replaceChildren(el('div', 'roll-alone', renderRoll(state.roll, prev && prev.roll)));
   } else {
     const c = state.characters.find((x) => x.id === pg);
     if (!c) {
@@ -284,8 +410,11 @@ function render(state) {
   for (const cl of root.querySelectorAll('.plate .cl')) {
     if (cl.scrollWidth > cl.clientWidth + 1) cl.hidden = true;
   }
+  placeCams();
   prev = state;
 }
+
+window.addEventListener('resize', placeCams);
 
 // EventSource reconnects by itself if the overlay program or the bot restarts.
 new EventSource(`events${view}`).onmessage = (e) => render(JSON.parse(e.data));

@@ -337,6 +337,36 @@ export class Campaign {
     return row ? toCharacter(row) : undefined;
   }
 
+  /**
+   * The Chronicle a roll belongs to, for the overlay: the one played in this channel,
+   * otherwise a Chronicle on air where the roller has a character, otherwise the roller's
+   * own Chronicle on air (a Storyteller rolling for an NPC). With the roller's character.
+   */
+  rollChronicle(
+    guildId: string | null,
+    channelId: string,
+    userId: string,
+  ): { chronicle: Chronicle; character?: Character } | undefined {
+    const here = this.chronicleByChannel(channelId);
+    if (here) return { chronicle: here, character: this.activeCharacter(channelId, userId) };
+    if (!guildId) return undefined;
+    const row = this.db
+      .prepare(
+        `${CHARACTER_SELECT}
+         JOIN chronicles ch ON ch.id = m.chronicle_id
+         JOIN live_chronicle l ON l.chronicle_id = ch.id
+         WHERE c.guild_id = ? AND c.owner_id = ? ORDER BY m.position LIMIT 1`,
+      )
+      .get(guildId, userId) as CharacterRow | undefined;
+    if (row) {
+      const character = toCharacter(row);
+      const chronicle = this.getChronicle(character.chronicleId!);
+      if (chronicle) return { chronicle, character };
+    }
+    const own = this.liveChronicle(guildId, userId);
+    return own ? { chronicle: own } : undefined;
+  }
+
   /** Recent changes to a character, newest first. */
   changes(id: number, limit = 10) {
     return this.db

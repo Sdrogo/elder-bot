@@ -5,6 +5,7 @@ import type { ProlongedTask } from '../dice/prolonged.js';
 import { Campaign } from './campaign.js';
 import { OverlayKeys, ViewKeys } from './overlayKeys.js';
 import { WebSessions } from './sessions.js';
+import { Stage } from './stage.js';
 
 /** The Masquerade Tracker has 10 boxes. */
 export const MASQUERADE_BOXES = 10;
@@ -23,6 +24,8 @@ export class Store {
   readonly overlayKeys: OverlayKeys;
   /** View keys for the overlay pages in OBS. */
   readonly viewKeys: ViewKeys;
+  /** Webcams, scene settings and last rolls for the OBS scene. */
+  readonly stage: Stage;
 
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -47,6 +50,7 @@ export class Store {
     this.sessions = new WebSessions(this.db);
     this.overlayKeys = new OverlayKeys(this.db);
     this.viewKeys = new ViewKeys(this.db);
+    this.stage = new Stage(this.db);
   }
 
   /** Marked boxes on the Masquerade Tracker (Storyteller Packet p. 32), 0 to 10. */

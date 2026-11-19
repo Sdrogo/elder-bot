@@ -6,7 +6,8 @@ import { described, localeFor, t, tn, type Locale } from '../i18n/index.js';
 import { COLORS, TERMS, formatDice } from '../ui/format.js';
 import { hungerDice } from '../game/character.js';
 import { rollerHunger } from './campaignShared.js';
-import { hungerOption } from './shared.js';
+import { showRoll } from '../game/shownRoll.js';
+import { hungerOption, where } from './shared.js';
 import type { Command } from './types.js';
 
 const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contest.description')
@@ -125,6 +126,22 @@ export const contest: Command = {
     if (notes.length)
       embed.addFields({ name: t(locale, 'contest.consequences'), value: notes.join('\n') });
     await interaction.reply({ embeds: [embed] });
+    showRoll(store, where(interaction), (who) => {
+      const side = (s: Side, name: string) => ({
+        who: name,
+        normal: s.result.dice,
+        hunger: s.result.hunger,
+        successes: s.result.successes,
+      });
+      const them = theirCharacter?.name ?? theirs.name;
+      const winner = outcome.winner === 'a' ? who : outcome.winner === 'b' ? them : '';
+      return {
+        label: reason ?? 'Contested Test',
+        sides: [side(mine, who), side(theirs, them)],
+        outcome: winner ? `Vince ${winner}` : 'Pareggio',
+        tone: winner ? 'win' : 'neutral',
+      };
+    });
   },
 };
 

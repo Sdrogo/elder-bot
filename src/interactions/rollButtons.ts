@@ -26,6 +26,8 @@ import { willpowerMax } from '../game/character.js';
 import { localeFor, t, type Locale } from '../i18n/index.js';
 import { decodeRollId, encodeRollId, type RollRef } from '../ui/customId.js';
 import { COLORS, TERMS, button, retryRow, rollMessage } from '../ui/format.js';
+import { labelOf, showRoll, shownTest } from '../game/shownRoll.js';
+import { where } from '../commands/shared.js';
 import { OnceGuard } from './once.js';
 
 /** Buttons only the Storyteller answers; all others belong to the roller. */
@@ -239,6 +241,13 @@ export async function handleRollSelect(
   }
   const message = rollMessage(locale, response, title, [{ name: TERMS.willpower, value: spent }]);
   await interaction.update({ content: message.content ?? '', ...message });
+  showRoll(ctx.store, where(interaction), (who) =>
+    shownTest(
+      who,
+      `${labelOf(title, interaction.user.displayName)} · ${TERMS.willpower}`,
+      response,
+    ),
+  );
 }
 
 export async function handleRollModal(
@@ -260,6 +269,9 @@ export async function handleRollModal(
   const response = performRoll(request, { roller: ctx.roller });
   const title = interaction.message?.embeds[0]?.title ?? t(locale, 'roll.title');
   await interaction.reply(rollMessage(locale, response, t(locale, 'roll.retryTitle', { title })));
+  showRoll(ctx.store, where(interaction), (who) =>
+    shownTest(who, `${labelOf(title, interaction.user.displayName)} · ${TERMS.tryAgain}`, response),
+  );
   // Only one second attempt: drop the first roll's buttons.
   await interaction.message?.edit({ components: [] });
 }

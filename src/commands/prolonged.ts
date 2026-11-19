@@ -7,6 +7,7 @@ import {
   type ProlongedTask,
 } from '../dice/prolonged.js';
 import { performRoll } from '../game/roll.js';
+import { resultOf, showRoll } from '../game/shownRoll.js';
 import { choice, described, localeFor, t, type Locale } from '../i18n/index.js';
 import {
   COLORS,
@@ -17,7 +18,7 @@ import {
   outcomeLine,
 } from '../ui/format.js';
 import { rollerHunger } from './campaignShared.js';
-import { hungerOption } from './shared.js';
+import { hungerOption, where } from './shared.js';
 import type { Command } from './types.js';
 
 const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prolonged.description')
@@ -157,6 +158,14 @@ export const prolonged: Command = {
       embed.setColor(COLORS.painful).setFooter({ text: t(locale, 'prolonged.failed') });
     }
     await interaction.reply({ embeds: [embed] });
+    showRoll(store, where(interaction), (who) => {
+      const shown = resultOf(result);
+      return {
+        label: `${task.name} · ${task.successes}/${task.target}`,
+        sides: [{ who, normal: result.dice, hunger: result.hunger, successes: result.successes }],
+        ...(shown.tone === 'neutral' ? { outcome: '', tone: 'neutral' as const } : shown),
+      };
+    });
   },
 };
 

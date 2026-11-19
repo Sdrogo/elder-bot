@@ -39,16 +39,43 @@ const TEXT = {
     up: 'Sposta prima',
     down: 'Sposta dopo',
     remove: 'Togli',
+    'cam.title': 'Webcam per OBS',
+    'cam.note':
+      'Il giocatore apre questo link sul suo PC, sceglie la webcam e lascia la scheda aperta: la webcam compare nella sua cornice. Nessun microfono, la voce resta su Discord.',
+    'cam.create': 'Attiva la webcam',
+    'cam.renew': 'Nuovo link',
+    'cam.remove': 'Togli la webcam',
+    'cam.link': 'Link del giocatore',
+    'cam.mine': 'La tua webcam (Narratore)',
+    'cam.on': 'attiva',
+    'cam.myLink': 'Il tuo link',
+    'stage.title': 'Scena',
+    'stage.resolution': 'Risoluzione',
+    'stage.layout': 'Disposizione',
+    'stage.rollBox': 'Riquadro con l’ultimo tiro in basso',
+    'stage.background': 'Sfondo',
+    'stage.upload': 'Carica sfondo',
+    'stage.removeBackground': 'Togli sfondo',
+    'stage.backgroundNote':
+      'PNG, JPEG o WebP fino a 8 MB, meglio se della stessa misura della scena.',
+    'stage.hasBackground': 'Sfondo caricato.',
+    'stage.noBackground': 'Nessuno sfondo: la scena resta trasparente.',
+    'stage.tooBig': 'Immagine troppo grande: massimo 8 MB.',
+    'stage.badImage': 'Formato non valido: usa PNG, JPEG o WebP.',
+    'layout.grid': 'Griglia: tutte le cornici uguali',
+    'layout.stage': 'Palco: Narratore grande in alto, giocatori sotto',
+    'layout.sides': 'Ai lati: giocatori a sinistra e a destra, Narratore al centro',
+    'overlay.roll': 'Solo il riquadro dei tiri',
     'overlay.title': 'Overlay di OBS',
     'overlay.pages':
-      'Browser Source di OBS: le cornici della Cronaca in onda, aggiornate a ogni modifica. Scena intera a 1920×1080.',
+      'Browser Source di OBS: le cornici della Cronaca in onda, aggiornate a ogni modifica. Imposta la Browser Source della scena intera alla risoluzione scelta qui sotto.',
     'overlay.scene': 'Scena intera',
     'overlay.storyteller': 'Cornice del Narratore',
     'overlay.newPages': 'Nuovi indirizzi',
     'overlay.deck': 'Chiave per lo Stream Deck',
     'overlay.slots': 'Posizioni dei ritagli nella scena',
     'overlay.slotsNote':
-      'In OBS metti ogni ritaglio della webcam nel suo rettangolo: Ctrl+E, Posizione = X, Y e riquadro "Adatta all’interno" = L × A. Cambiano solo se cambia il numero di PG.',
+      'Solo per le webcam non collegate con VDO.Ninja: in OBS metti ogni ritaglio nel suo rettangolo (Ctrl+E, Posizione = X, Y e riquadro "Adatta all’interno" = L × A) e aggiungi &webcam=0 all’indirizzo della scena.',
     'overlay.none':
       'Serve per cambiare i tracciati dallo Stream Deck (o per collegare Elder Overlay sul PC).',
     'overlay.since': 'Chiave attiva dal',
@@ -99,16 +126,42 @@ const TEXT = {
     up: 'Move earlier',
     down: 'Move later',
     remove: 'Remove',
+    'cam.title': 'Webcam for OBS',
+    'cam.note':
+      'The player opens this link on their computer, picks the webcam and keeps the tab open: the webcam shows in their frame. No microphone, voices stay on Discord.',
+    'cam.create': 'Turn on the webcam',
+    'cam.renew': 'New link',
+    'cam.remove': 'Remove the webcam',
+    'cam.link': "Player's link",
+    'cam.mine': 'Your webcam (Storyteller)',
+    'cam.on': 'on',
+    'cam.myLink': 'Your link',
+    'stage.title': 'Scene',
+    'stage.resolution': 'Resolution',
+    'stage.layout': 'Layout',
+    'stage.rollBox': 'Box with the last roll at the bottom',
+    'stage.background': 'Background',
+    'stage.upload': 'Upload background',
+    'stage.removeBackground': 'Remove background',
+    'stage.backgroundNote': 'PNG, JPEG or WebP up to 8 MB, best at the size of the scene.',
+    'stage.hasBackground': 'Background uploaded.',
+    'stage.noBackground': 'No background: the scene stays transparent.',
+    'stage.tooBig': 'Image too large: 8 MB at most.',
+    'stage.badImage': 'Not a valid image: use PNG, JPEG or WebP.',
+    'layout.grid': 'Grid: all frames alike',
+    'layout.stage': 'Stage: Storyteller large on top, players below',
+    'layout.sides': 'Sides: players left and right, Storyteller in the middle',
+    'overlay.roll': 'Roll box only',
     'overlay.title': 'OBS overlay',
     'overlay.pages':
-      'OBS Browser Sources: the frames of the Chronicle on air, updated on every change. Whole scene at 1920×1080.',
+      'OBS Browser Sources: the frames of the Chronicle on air, updated on every change. Set the whole-scene Browser Source to the resolution chosen below.',
     'overlay.scene': 'Whole scene',
     'overlay.storyteller': 'Storyteller frame',
     'overlay.newPages': 'New addresses',
     'overlay.deck': 'Stream Deck key',
     'overlay.slots': 'Where the crops go in the scene',
     'overlay.slotsNote':
-      'In OBS put each webcam crop in its rectangle: Ctrl+E, Position = X, Y and bounding box "Scale to inner bounds" = W × H. They change only when the number of characters does.',
+      'Only for webcams not linked with VDO.Ninja: in OBS put each crop in its rectangle (Ctrl+E, Position = X, Y and bounding box "Scale to inner bounds" = W × H) and add &webcam=0 to the scene address.',
     'overlay.none': 'Moves trackers from the Stream Deck (or links Elder Overlay on your PC).',
     'overlay.since': 'Key active since',
     'overlay.create': 'Make the key',
@@ -342,6 +395,8 @@ function characterCard(c, chronicle) {
     track(c, 'Violations', '', String(hu.violations), 'violations'),
   );
 
+  if (c.editable) card.append(camBox(c));
+
   const actions = el('div', 'actions');
   if (c.editable) {
     actions.append(
@@ -373,6 +428,25 @@ function characterCard(c, chronicle) {
   }
   if (actions.childElementCount) card.append(actions);
   return card;
+}
+
+/** The character's VDO.Ninja link: the player sends their webcam, OBS shows it in the frame. */
+function camBox(c) {
+  const box = el('details', 'cam-box');
+  box.append(el('summary', '', c.cam ? `${tr('cam.title')} · ${tr('cam.on')}` : tr('cam.title')));
+  const path = `/api/characters/${c.id}/cam`;
+  const actions = el('div', 'actions');
+  if (c.cam) {
+    box.append(el('p', 'note', tr('cam.note')), copyField(tr('cam.link'), c.cam.push));
+    actions.append(
+      confirmButton(tr('cam.renew'), () => change('POST', path)),
+      confirmButton(tr('cam.remove'), () => change('DELETE', path)),
+    );
+  } else {
+    actions.append(button(tr('cam.create'), () => change('POST', path)));
+  }
+  box.append(actions);
+  return box;
 }
 
 /** The form for a new Chronicle (no `ch`) or for renaming one and changing its sect. */
@@ -456,6 +530,93 @@ function copyField(label, value) {
   return field(label, row);
 }
 
+/** The scene's settings: size, layout, roll box, background and the Storyteller's webcam. */
+function stageBox(pages) {
+  const st = pages.stage;
+  const box = el('div', 'stage-box');
+  box.append(el('h4', '', tr('stage.title')));
+  const save = (patch) => change('POST', '/api/stage', patch);
+  const resolution = select(
+    'resolution',
+    [
+      { id: '1080', name: 'Full HD · 1920 × 1080' },
+      { id: '1440', name: '2K · 2560 × 1440' },
+    ],
+    st.resolution,
+  );
+  resolution.addEventListener('change', () => save({ resolution: resolution.value }));
+  const layout = select(
+    'layout',
+    pages.layouts.map((id) => ({ id, name: tr(`layout.${id}`) })),
+    st.layout,
+  );
+  layout.addEventListener('change', () => save({ layout: layout.value }));
+  const rollBox = el('input');
+  rollBox.type = 'checkbox';
+  rollBox.checked = st.rollBox;
+  rollBox.addEventListener('change', () => save({ rollBox: rollBox.checked }));
+  const check = el('label', 'check');
+  check.append(rollBox, el('span', '', tr('stage.rollBox')));
+  box.append(field(tr('stage.resolution'), resolution), field(tr('stage.layout'), layout), check);
+
+  // Background: the file goes as it is, the server checks it is an image.
+  const file = el('input');
+  file.type = 'file';
+  file.accept = pages.backgroundTypes.join(',');
+  file.hidden = true;
+  file.addEventListener('change', async () => {
+    const image = file.files?.[0];
+    if (!image) return;
+    if (image.size > 8 * 1024 * 1024) return notify(tr('stage.tooBig'));
+    const response = await fetch('/api/stage/background', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': image.type || 'application/octet-stream',
+        'X-CSRF-Token': me.csrf,
+      },
+      body: image,
+    });
+    if (!response.ok)
+      return notify(tr(response.status === 415 ? 'stage.badImage' : 'error.change'));
+    await loadPanel();
+  });
+  const bgActions = el('div', 'actions');
+  bgActions.append(
+    button(tr('stage.upload'), () => file.click()),
+    file,
+  );
+  if (st.background) {
+    bgActions.append(
+      confirmButton(tr('stage.removeBackground'), () => change('DELETE', '/api/stage/background')),
+    );
+  }
+  box.append(
+    el('h4', '', tr('stage.background')),
+    el(
+      'p',
+      'note',
+      `${tr(st.background ? 'stage.hasBackground' : 'stage.noBackground')} ${tr('stage.backgroundNote')}`,
+    ),
+    bgActions,
+  );
+
+  // The Storyteller's own webcam, in their frame.
+  const camActions = el('div', 'actions');
+  box.append(el('h4', '', tr('cam.mine')));
+  if (st.cam) {
+    box.append(copyField(tr('cam.myLink'), st.cam.push));
+    camActions.append(
+      confirmButton(tr('cam.renew'), () => change('POST', '/api/stage/cam')),
+      confirmButton(tr('cam.remove'), () => change('DELETE', '/api/stage/cam')),
+    );
+  } else {
+    camActions.append(button(tr('cam.create'), () => change('POST', '/api/stage/cam')));
+  }
+  box.append(camActions);
+  return box;
+}
+
 /** The Storyteller's key for the OBS overlay; a new key is shown once, then only its date. */
 function overlayBox(newKey) {
   const box = el('div', 'overlay-box');
@@ -470,12 +631,16 @@ function overlayBox(newKey) {
       el('p', 'note', tr('overlay.pages')),
       copyField(tr('overlay.scene'), `${base}/scena?${v}`),
       copyField(tr('overlay.storyteller'), `${base}/frame?pg=storyteller&${v}`),
+      copyField(tr('overlay.roll'), `${base}/frame?pg=tiro&${v}`),
       ...pages.characters.map((c) => copyField(c.name, `${base}/frame?pg=${c.id}&${v}`)),
     );
+    box.append(stageBox(pages));
     const layout = window.ELDER?.sceneLayout;
     if (layout) {
       const names = [...pages.characters.map((c) => c.name), 'Storyteller'];
-      const slots = layout(names.length);
+      const st = pages.stage;
+      const width = st.resolution === '1440' ? 2560 : 1920;
+      const slots = layout(names.length, { layout: st.layout, width, rollBox: st.rollBox });
       const details = el('details', 'slots');
       const list = el('ul');
       list.append(

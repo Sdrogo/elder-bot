@@ -320,3 +320,33 @@ button:disabled {
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
+
+/* A character's webcam link (VDO.Ninja) */
+.cam-box {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.5rem;
+}
+.cam-box summary {
+  cursor: pointer;
+  color: var(--quiet);
+}
+.cam-box .actions {
+  margin-top: 0.5rem;
+}
+
+/* The Storyteller's scene settings */
+.stage-box {
+  display: grid;
+  gap: 8px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.check input {
+  width: 1.1rem;
+  height: 1.1rem;
+}

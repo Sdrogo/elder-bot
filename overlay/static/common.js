@@ -29,41 +29,95 @@ window.ELDER = {
     none: '',
   },
   /**
-   * Fixed slots of the /scena page on a 1920×1080 canvas, one per frame (characters, then
-   * the Storyteller). Each rectangle is where a webcam crop goes in OBS, so it keeps the
-   * 16:9 shape of a Discord webcam tile. Picks the column count that gives the biggest
-   * tiles, centres the grid, and centres a last row that is not full. The name and Hunger
-   * The passe-partout band adds about 45 px above each tile (name) and 70 px below it
-   * (trackers), so rows leave room for both.
+   * Slots of the /scena page, one per frame: the characters, then the Storyteller last.
+   * Each rectangle is the webcam inside a frame, 16:9 like a webcam; the frame's bands add
+   * about 45 px above it (name) and 70 px below it (trackers) on a 1920×1080 canvas.
+   * Layouts: 'grid' (all alike, biggest tiles), 'stage' (the Storyteller large on top, the
+   * players in a row below), 'sides' (players in columns left and right, the Storyteller at
+   * the top centre, the middle left free for the background). Everything is worked out on a
+   * 1920×1080 canvas and scaled to `width` (2560 for 2K). With `rollBox`, the bottom centre
+   * is kept for the roll box.
    */
-  sceneLayout(n) {
+  sceneLayout(n, { layout = 'grid', width = 1920, rollBox = false } = {}) {
     const W = 1920;
     const H = 1080;
-    const top = 60;
-    const side = 30;
-    const bottom = 85;
-    const gapX = 40;
-    const gapY = 135;
+    const k = width / W;
     const ratio = 16 / 9;
-    const count = Math.max(1, n);
-    let best = { cols: 1, rows: 1, w: 0, h: 0 };
-    for (let cols = 1; cols <= count; cols++) {
-      const rows = Math.ceil(count / cols);
-      const maxW = (W - 2 * side - (cols - 1) * gapX) / cols;
-      const maxH = (H - top - bottom - (rows - 1) * gapY) / rows;
-      const w = Math.floor(Math.min(maxW, maxH * ratio));
-      if (w > best.w) best = { cols, rows, w, h: Math.floor(w / ratio) };
+    const bottom = rollBox ? 150 : 0;
+    // Best-fitting grid of `count` tiles in a box that includes the frames' bands.
+    const grid = (count, box) => {
+      const bandTop = 50;
+      const bandBottom = 75;
+      const gapX = 40;
+      const gapY = 135;
+      let best = { cols: 1, rows: 1, w: 0, h: 0 };
+      for (let cols = 1; cols <= Math.max(1, count); cols++) {
+        const rows = Math.ceil(count / cols);
+        const maxW = (box.w - (cols - 1) * gapX) / cols;
+        const maxH = (box.h - bandTop - bandBottom - (rows - 1) * gapY) / rows;
+        const w = Math.floor(Math.min(maxW, maxH * ratio, box.maxW || Infinity));
+        if (w > best.w) best = { cols, rows, w, h: Math.floor(w / ratio) };
+      }
+      const { cols, rows, w, h } = best;
+      const gridH = rows * h + (rows - 1) * gapY;
+      const y0 = box.y + bandTop + Math.floor((box.h - bandTop - bandBottom - gridH) / 2);
+      return Array.from({ length: count }, (_, i) => {
+        const row = Math.floor(i / cols);
+        const inRow = Math.min(cols, count - row * cols);
+        const rowW = inRow * w + (inRow - 1) * gapX;
+        const x0 = box.x + Math.floor((box.w - rowW) / 2);
+        return { x: x0 + (i % cols) * (w + gapX), y: y0 + row * (h + gapY), w, h };
+      });
+    };
+    const area = { x: 30, y: 10, w: W - 60, h: H - 10 - Math.max(bottom, 10) };
+    const players = Math.max(0, n - 1);
+    let slots;
+    if (layout === 'stage' && players > 0) {
+      const top = Math.floor(area.h * 0.56);
+      slots = [
+        ...grid(players, { x: area.x, y: area.y + top, w: area.w, h: area.h - top, maxW: 420 }),
+        ...grid(1, { x: area.x, y: area.y, w: area.w, h: top }),
+      ];
+    } else if (layout === 'sides' && players > 0) {
+      const colW = Math.floor(area.w * 0.26);
+      const left = Math.ceil(players / 2);
+      const full = { y: 10, h: H - 20 };
+      slots = [
+        ...grid(left, { x: area.x, ...full, w: colW }),
+        ...grid(players - left, { x: area.x + area.w - colW, ...full, w: colW }),
+        ...grid(1, {
+          x: area.x + colW + 40,
+          y: area.y,
+          w: area.w - 2 * colW - 80,
+          h: area.h * 0.6,
+        }),
+      ];
+    } else {
+      slots = grid(Math.max(1, n), area);
     }
-    const { cols, rows, w, h } = best;
-    const gridH = rows * h + (rows - 1) * gapY;
-    const y0 = top + Math.floor((H - top - bottom - gridH) / 2);
-    return Array.from({ length: n }, (_, i) => {
-      const row = Math.floor(i / cols);
-      const inRow = Math.min(cols, n - row * cols);
-      const rowW = inRow * w + (inRow - 1) * gapX;
-      const x0 = Math.floor((W - rowW) / 2);
-      return { x: x0 + (i % cols) * (w + gapX), y: y0 + row * (h + gapY), w, h };
+    const round = (r) => ({
+      x: Math.round(r.x * k),
+      y: Math.round(r.y * k),
+      w: Math.round(r.w * k),
+      h: Math.round(r.h * k),
     });
+    return slots.slice(0, n).map(round);
+  },
+  /** The roll box at the bottom centre of the scene, scaled like the slots. */
+  rollBoxRect(width = 1920) {
+    const k = width / 1920;
+    const w = 860;
+    const h = 120;
+    return {
+      x: Math.round(((1920 - w) / 2) * k),
+      y: Math.round((1080 - h - 18) * k),
+      w: Math.round(w * k),
+      h: Math.round(h * k),
+    };
+  },
+  /** OBS's view of a VDO.Ninja webcam: no buttons, no sound (voices stay on Discord). */
+  camUrl(id) {
+    return `https://vdo.ninja/?view=${encodeURIComponent(id)}&cleanoutput&cover&noaudio&transparent`;
   },
   /** el('div', 'a b', child, 'text') builds an element; strings become text nodes, never HTML. */
   el(tag, cls, ...children) {
