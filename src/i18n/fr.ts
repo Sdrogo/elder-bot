@@ -273,5 +273,12 @@ export const fr: Messages = {
   'willpower.none': "**{name}** n'a plus de Willpower.",
   'willpower.left': '{name} : Willpower {left}/{max}.',
 
+  // Web panel.
+  'cmd.panel.description': 'Lien vers le panneau web : tes personnages et tes Chroniques',
+  'panel.link':
+    'Tes personnages et tes Chroniques, dans le navigateur. Connecte-toi avec ton compte Discord.',
+  'panel.open': 'Ouvrir le panneau',
+  'panel.notConfigured': "Le panneau web n'est pas activé sur ce bot.",
+
   'error.generic': "Quelque chose s'est mal passé.",
 };

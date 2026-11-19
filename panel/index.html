@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>ElderBot</title>
+    <link rel="stylesheet" href="/panel.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body data-page="panel">
+    <header class="top">
+      <h1>ElderBot</h1>
+      <span id="user"></span>
+      <button id="logout" type="button" data-t="logout">Esci</button>
+    </header>
+    <main>
+      <section>
+        <h2 data-t="characters.title">I miei personaggi</h2>
+        <p class="empty" id="characters-empty" data-t="characters.empty" hidden>
+          Non hai ancora personaggi. Su Discord: /elder character create.
+        </p>
+        <div class="cards" id="characters"></div>
+      </section>
+      <section id="chronicles-section" hidden>
+        <h2 data-t="chronicles.title">Le mie Cronache</h2>
+        <div id="chronicles"></div>
+      </section>
+    </main>
+  </body>
+</html>

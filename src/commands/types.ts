@@ -9,6 +9,8 @@ import type { Store } from '../state/store.js';
 export interface Context {
   store: Store;
   roller?: DieRoller;
+  /** Public address of the web panel, when it is configured. */
+  panelUrl?: string;
 }
 
 export interface Command {

@@ -1,6 +1,6 @@
 # Informativa sulla privacy di ElderBot
 
-Ultimo aggiornamento: 18 novembre 2026
+Ultimo aggiornamento: 19 novembre 2026
 
 ElderBot è un bot Discord che tira i dadi per Vampire: The Masquerade 6ª edizione. Questa pagina spiega quali dati tratta, perché e per quanto tempo.
 
@@ -20,6 +20,8 @@ Se un giocatore crea un personaggio, o un Narratore una Cronaca, il bot salva an
 - il personaggio: nome, clan, livello di gioco, Stamina, Composure, Resolve e i tracciati (Health, Vitae, Willpower, Humanity);
 - la Cronaca: nome, setta, Masquerade Tracker, canale in cui si gioca e quali personaggi ne fanno parte;
 - un registro delle modifiche ai tracciati (chi, cosa, quando), cancellato dopo 30 giorni.
+
+Se usi il pannello web, al login Discord comunica al bot solo il tuo ID e il tuo nome visualizzato (permesso `identify`). Il bot salva una sessione con questi due dati e l'impronta del cookie di accesso; la sessione scade dopo 30 giorni o quando premi "Esci". Il pannello non usa cookie di tracciamento né servizi di analisi. Il traffico passa da Cloudflare, che ne è responsabile secondo la propria [informativa](https://www.cloudflare.com/privacypolicy/).
 
 I risultati dei tiri, i dadi Fame, i motivi e i nomi visualizzati compaiono nei messaggi del bot su Discord ma non vengono salvati dal bot.
 

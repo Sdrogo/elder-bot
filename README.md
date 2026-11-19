@@ -132,6 +132,26 @@ Se l'aggiornamento cambia i comandi (nomi o opzioni), registrali di nuovo con `d
 
 Senza `DISCORD_GUILD_ID` i comandi vengono registrati su tutti i server e possono metterci fino a un'ora a comparire.
 
+## Pannello web (facoltativo)
+
+Un sito dove giocatori e Narratore entrano con il loro account Discord e vedono i propri personaggi e le proprie Cronache. Arriva da Internet solo attraverso un tunnel Cloudflare: il VPS non apre porte, e la porta del pannello (8080) non è pubblicata, la raggiunge solo il container `cloudflared`.
+
+Serve un dominio gestito da Cloudflare (piano gratuito). Poi:
+
+1. **Tunnel**: in Cloudflare apri _Zero Trust → Networks → Tunnels → Create a tunnel_, tipo _Cloudflared_, e copia il token che compare nel comando di installazione (la lunga stringa dopo `--token`). Non installare niente sul VPS: ci pensa Docker. Nella scheda _Public Hostname_ aggiungi `elder.tuodominio.it` con servizio `HTTP` e URL `elder-bot:8080`.
+2. **Discord**: nel [Developer Portal](https://discord.com/developers/applications), app del bot → _OAuth2_: copia il _Client Secret_ (_Reset Secret_ se non lo vedi) e in _Redirects_ aggiungi `https://elder.tuodominio.it/callback`.
+3. **`.env` sul VPS** (`nano .env`), con i valori dei passi precedenti:
+   ```bash
+   PANEL_URL=https://elder.tuodominio.it
+   DISCORD_CLIENT_SECRET=...
+   TUNNEL_TOKEN=...
+   COMPOSE_PROFILES=panel
+   ```
+4. **Avvio**: `docker compose up -d --build`, poi `docker compose run --rm elder-bot node dist/deploy-commands.js` per il comando `/elder panel`. Nei log deve comparire "Pannello in ascolto sulla porta 8080", e `docker compose logs cloudflared` deve dire "Registered tunnel connection".
+5. **Prova**: apri `https://elder.tuodominio.it`, premi "Accedi con Discord" e autorizza. Su Discord, `/elder panel` dà il link a chiunque.
+
+Il login chiede a Discord solo il permesso `identify` (ID e nome). La sessione è un cookie `HttpOnly` e `Secure` che dura 30 giorni; nel database c'è solo la sua impronta. Ogni modifica richiede un token anti-CSRF, e i tentativi di login sono limitati a 10 al minuto per indirizzo. Per togliere il pannello basta svuotare `PANEL_URL` e `COMPOSE_PROFILES` e rifare `docker compose up -d`.
+
 ## Termini e privacy
 
 [Termini di servizio](TERMS.md) · [Informativa sulla privacy](PRIVACY.md)

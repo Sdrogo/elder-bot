@@ -220,6 +220,25 @@ export class Campaign {
     return rows.map(toCharacter);
   }
 
+  /** Every character a user owns, on any server, by name: for the web panel. */
+  charactersOwnedBy(ownerId: string): Character[] {
+    const rows = this.db
+      .prepare(`${CHARACTER_SELECT} WHERE c.owner_id = ? ORDER BY c.name COLLATE NOCASE`)
+      .all(ownerId) as CharacterRow[];
+    return rows.map(toCharacter);
+  }
+
+  /** Every Chronicle a Storyteller runs that is not archived, on any server: for the web panel. */
+  chroniclesRunBy(storytellerId: string): Chronicle[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM chronicles WHERE storyteller_id = ? AND archived = 0
+         ORDER BY name COLLATE NOCASE`,
+      )
+      .all(storytellerId) as ChronicleRow[];
+    return rows.map(toChronicle);
+  }
+
   /** Characters in the Chronicles a Storyteller runs on a server, by name. */
   charactersRunBy(guildId: string, storytellerId: string): Character[] {
     const rows = this.db
