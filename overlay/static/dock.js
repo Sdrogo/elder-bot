@@ -8,7 +8,12 @@ const token = document.querySelector('meta[name="elder-token"]').content;
 const $ = (id) => document.getElementById(id);
 const origin = window.location.origin;
 
-let state = { characters: [], chronicle: { masquerade: 0, sect: 'camarilla' } };
+let state = {
+  characters: [],
+  chronicle: { masquerade: 0, sect: 'camarilla' },
+  link: { linked: false },
+};
+let confirmUnlink = false;
 let selected = null; // character id, or '+' for the new-character form
 let confirmRemove = false;
 
@@ -76,6 +81,11 @@ function renderTabs() {
     };
     return b;
   });
+  if (state.link.linked) {
+    // Linked to the bot: characters are made in the web panel.
+    $('tabs').replaceChildren(...tabs);
+    return;
+  }
   const add = el('button', '', '+ Nuovo');
   add.type = 'button';
   add.setAttribute('aria-pressed', String(selected === '+'));
@@ -126,10 +136,45 @@ function renderCharacter(c) {
   $('url-deck').value = `${origin}/api/adjust?pg=${c.id}&track=health&delta=-1`;
 }
 
-function render() {
-  if (selected !== '+' && !state.characters.some((c) => c.id === selected)) {
-    selected = state.characters[0] ? state.characters[0].id : '+';
+function renderLink() {
+  const link = state.link;
+  $('bot-off').hidden = link.linked;
+  $('bot-on').hidden = !link.linked;
+  $('local-edit').hidden = link.linked;
+  $('sect').disabled = link.linked;
+  if (!link.linked) {
+    $('bot-summary').textContent = 'Collega al bot';
+    $('bot-chronicles').hidden = true;
+    return;
   }
+  const where = link.chronicle ? `in onda: ${link.chronicle}` : 'nessuna Cronaca in onda';
+  $('bot-summary').textContent = link.ok === false ? 'Bot: non raggiungibile' : `Bot · ${where}`;
+  $('bot-info').textContent =
+    link.ok === false
+      ? `${link.error}. Le cornici mostrano gli ultimi valori ricevuti.`
+      : `Collegato a ${link.url}. Tasto Stream Deck per una Cronaca: POST ${origin}/api/live?cronaca=<id>`;
+  $('bot-unlink').textContent = confirmUnlink ? 'Conferma: scollega' : 'Scollega';
+  const chronicles = link.chronicles || [];
+  $('bot-chronicles').hidden = chronicles.length < 2;
+  $('bot-chronicles').replaceChildren(
+    ...chronicles.map((ch) => {
+      const b = el('button', '', ch.name);
+      b.type = 'button';
+      b.title = `id: ${ch.slug}`;
+      b.setAttribute('aria-pressed', String(ch.live));
+      b.onclick = () => post('/api/live', { cronaca: ch.slug });
+      return b;
+    }),
+  );
+}
+
+function render() {
+  if (!state.link) state.link = { linked: false };
+  if (state.link.linked && selected === '+') selected = null;
+  if (selected !== '+' && !state.characters.some((c) => c.id === selected)) {
+    selected = state.characters[0] ? state.characters[0].id : state.link.linked ? null : '+';
+  }
+  renderLink();
   renderTabs();
   const c = state.characters.find((x) => x.id === selected);
   $('char').hidden = !c;
@@ -192,6 +237,23 @@ $('remove-char').onclick = async () => {
   }
   confirmRemove = false;
   await post('/api/characters/remove', { pg: selected });
+};
+$('bot-link').onclick = async () => {
+  const ok = await post('/api/bot/link', { url: $('bot-url').value, key: $('bot-key').value });
+  if (ok) {
+    $('bot-key').value = '';
+    $('bot-setup').open = false;
+    status('Collegato al bot.');
+  }
+};
+$('bot-unlink').onclick = async () => {
+  if (!confirmUnlink) {
+    confirmUnlink = true;
+    render();
+    return;
+  }
+  confirmUnlink = false;
+  await post('/api/bot/unlink', {});
 };
 $('masq-dec').onclick = () => post('/api/adjust', { track: 'masquerade', delta: -1 });
 $('masq-inc').onclick = () => post('/api/adjust', { track: 'masquerade', delta: 1 });

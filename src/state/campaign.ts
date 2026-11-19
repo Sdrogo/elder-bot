@@ -513,6 +513,21 @@ export class Campaign {
     return 'ok';
   }
 
+  /**
+   * Moves a character one place earlier (-1) or later (+1) in its Chronicle's scene order.
+   * Returns false when it is not a member or is already at that end.
+   */
+  moveMember(chronicleId: number, characterId: number, delta: -1 | 1): boolean {
+    const order = this.members(chronicleId).map((c) => c.id);
+    const i = order.indexOf(characterId);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= order.length) return false;
+    [order[i], order[j]] = [order[j]!, order[i]!];
+    const set = this.db.prepare('UPDATE chronicle_members SET position = ? WHERE character_id = ?');
+    this.db.transaction(() => order.forEach((id, k) => set.run(k + 1, id)))();
+    return true;
+  }
+
   leave(characterId: number): void {
     this.db.prepare('DELETE FROM chronicle_members WHERE character_id = ?').run(characterId);
   }

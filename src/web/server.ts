@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
@@ -12,19 +12,23 @@ import {
   TIER_NAMES,
   cleanName,
   healthMax,
+  slugify,
   hungerDice,
   isClan,
+  isSect,
   isTier,
   isTrack,
+  type Track,
   newCharacter,
   vitaeMax,
   willpowerMax,
+  SECTS,
   type CharacterValues,
   type Clan,
 } from '../game/character.js';
 import type { Character, Chronicle } from '../state/campaign.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
-import type { Store } from '../state/store.js';
+import { MASQUERADE_BOXES, type Store } from '../state/store.js';
 import { authorizeUrl, identify, type Fetch, type OAuthApp } from './discord.js';
 
 // The web panel: "Log in with Discord", then each user sees their own characters and Chronicles.
@@ -153,6 +157,63 @@ export function characterView(c: Character, chronicles: Map<number, Chronicle>, 
     humanity: { rank: v.humanity, violations: v.violations },
     baneful: v.baneful,
   };
+}
+
+/**
+ * What the OBS overlay gets: the Storyteller's Chronicle on air, with its characters in the
+ * overlay's own shape. Character ids are slugs of their names, unique within the Chronicle,
+ * because OBS Browser Sources and Stream Deck keys use them (`?pg=lucrezia`).
+ */
+export function overlayView(store: Store, userId: string) {
+  const { campaign } = store;
+  const runs = campaign.chroniclesRunBy(userId);
+  const isLive = (c: Chronicle) => campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id;
+  const live = runs.find(isLive);
+  const characters = live ? overlayCharacters(campaign.members(live.id)) : [];
+  return {
+    chronicle: live
+      ? { slug: live.slug, name: live.name, sect: live.sect, masquerade: live.masquerade }
+      : null,
+    chronicles: runs.map((c) => ({ slug: c.slug, name: c.name, live: isLive(c) })),
+    characters: characters.map(({ id, c }) => {
+      const v = c.values;
+      return {
+        id,
+        name: c.name,
+        clan: c.clan,
+        health: { max: healthMax(v), current: v.health, baneful: v.baneful },
+        vitae: { max: vitaeMax(v), current: v.vitae },
+        willpower: { max: willpowerMax(v), current: v.willpower },
+        humanity: { rank: v.humanity, violations: v.violations },
+        hunger: hungerDice(v),
+      };
+    }),
+  };
+}
+
+/** Characters with their overlay ids: the name's slug, with -2, -3 ... when two share it. */
+function overlayCharacters(members: Character[]) {
+  const used = new Set<string>(['storyteller']);
+  return members.map((c) => {
+    const base = slugify(c.name) || `pg-${c.id}`;
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    return { id, c };
+  });
+}
+
+/** The overlay's tracker names (track + field) on the bot's trackers. */
+function overlayTrack(track: unknown, field: unknown): Track | 'masquerade' | undefined {
+  const f = field ?? 'current';
+  if (track === 'masquerade' && f === 'current') return 'masquerade';
+  if (track === 'health')
+    return f === 'current' ? 'health' : f === 'baneful' ? 'baneful' : undefined;
+  if (track === 'vitae' || track === 'willpower') return f === 'current' ? track : undefined;
+  if (track === 'humanity') {
+    return f === 'current' ? 'humanity' : f === 'violations' ? 'violations' : undefined;
+  }
+  return undefined;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -297,6 +358,164 @@ export function createPanelHandler(deps: PanelDeps) {
     return sameSecret(Array.isArray(token) ? token[0] : token, s.csrf);
   }
 
+  /** The Storyteller's changes to their own Chronicles. */
+  async function chronicleChange(
+    res: ServerResponse,
+    userId: string,
+    body: Record<string, unknown>,
+    idText: string | undefined,
+    action: string | undefined,
+  ) {
+    const { campaign } = store;
+    const ok = () => json(res, 200, { ok: true });
+    const name = (v: unknown) => (typeof v === 'string' ? cleanName(v) : undefined);
+
+    if (idText === undefined) {
+      // POST /api/chronicles {guild, name, sect}: a new Chronicle, on air if none is.
+      const guild = (await guildsFor(userId)).find((g) => g.id === body.guild);
+      if (!guild) return json(res, 400, { error: 'invalid', field: 'guild' });
+      const chronicleName = name(body.name);
+      if (!chronicleName) return json(res, 400, { error: 'invalid', field: 'name' });
+      if (!isSect(body.sect)) return json(res, 400, { error: 'invalid', field: 'sect' });
+      const created = campaign.createChronicle({
+        guildId: guild.id,
+        storytellerId: userId,
+        name: chronicleName,
+        sect: body.sect,
+      });
+      if (created === 'duplicate' || created === 'limit') return json(res, 409, { error: created });
+      if (!campaign.liveChronicle(guild.id, userId)) campaign.setLive(created.id);
+      return ok();
+    }
+
+    const chronicle = campaign.getChronicle(Number(idText));
+    if (!chronicle || chronicle.archived || chronicle.storytellerId !== userId) {
+      return json(res, 404, { error: 'not found' });
+    }
+    const member = () => {
+      const id = body.character;
+      return typeof id === 'number' && campaign.members(chronicle.id).some((m) => m.id === id)
+        ? id
+        : undefined;
+    };
+
+    switch (action) {
+      case 'live':
+        campaign.setLive(chronicle.id);
+        return ok();
+      case 'masquerade': {
+        if (!isInt(body.delta, -MASQUERADE_BOXES, MASQUERADE_BOXES)) {
+          return json(res, 400, { error: 'invalid body' });
+        }
+        const value = Math.min(MASQUERADE_BOXES, Math.max(0, chronicle.masquerade + body.delta));
+        campaign.setMasquerade(chronicle.id, value);
+        return ok();
+      }
+      case 'move': {
+        const id = member();
+        if (id === undefined || (body.delta !== -1 && body.delta !== 1)) {
+          return json(res, 400, { error: 'invalid body' });
+        }
+        campaign.moveMember(chronicle.id, id, body.delta);
+        return ok();
+      }
+      case 'remove': {
+        const id = member();
+        if (id === undefined) return json(res, 400, { error: 'invalid body' });
+        campaign.leave(id);
+        return ok();
+      }
+      default: {
+        // POST /api/chronicles/:id {name?, sect?}
+        const patch: { name?: string; sect?: (typeof SECTS)[number] } = {};
+        if (body.name !== undefined) {
+          const n = name(body.name);
+          if (!n) return json(res, 400, { error: 'invalid', field: 'name' });
+          patch.name = n;
+        }
+        if (body.sect !== undefined) {
+          if (!isSect(body.sect)) return json(res, 400, { error: 'invalid', field: 'sect' });
+          patch.sect = body.sect;
+        }
+        campaign.updateChronicle(chronicle.id, patch);
+        return ok();
+      }
+    }
+  }
+
+  /**
+   * The OBS overlay's API. It authenticates with an overlay key (Authorization: Bearer), not
+   * with the session cookie, and is meant for the overlay program, never for a browser page:
+   * a request with an Origin header is refused, so no web page can use a key it doesn't hold.
+   */
+  async function overlayApi(req: IncomingMessage, res: ServerResponse, path: string) {
+    if (req.headers.origin !== undefined) return json(res, 403, { error: 'forbidden' });
+    const auth = req.headers.authorization;
+    const userId = store.overlayKeys.userOf(
+      auth?.startsWith('Bearer ') ? auth.slice(7).trim() : undefined,
+    );
+    if (!userId) return json(res, 401, { error: 'invalid overlay key' });
+    const { campaign } = store;
+    const method = req.method ?? 'GET';
+
+    if (method === 'GET' && path === '/api/overlay') {
+      const body = JSON.stringify(overlayView(store, userId));
+      // The overlay asks every few seconds: answer 304 when nothing changed.
+      const etag = `"${createHash('sha256').update(body).digest('base64url').slice(0, 22)}"`;
+      if (req.headers['if-none-match'] === etag) {
+        res.writeHead(304, { ...SECURITY_HEADERS, ETag: etag, 'Cache-Control': 'no-cache' });
+        res.end();
+        return;
+      }
+      return send(res, 200, body, 'application/json; charset=utf-8', {
+        ETag: etag,
+        'Cache-Control': 'no-cache',
+      });
+    }
+
+    if (method !== 'POST' || !['/api/overlay/adjust', '/api/overlay/live'].includes(path)) {
+      return json(res, 404, { error: 'not found' });
+    }
+    if (!limiter.allow(`change:${userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    const text = await readBody(req);
+    if (text === undefined) return json(res, 413, { error: 'body too large' });
+    const body = parseObject(text);
+    if (!body) return json(res, 400, { error: 'invalid body' });
+    const runs = campaign.chroniclesRunBy(userId);
+
+    if (path === '/api/overlay/live') {
+      // Stream Deck: one key per Chronicle puts it on air.
+      const target = runs.find((c) => c.slug === body.chronicle);
+      if (!target) return json(res, 404, { error: 'no Chronicle with that id' });
+      campaign.setLive(target.id);
+      return json(res, 200, { ok: true });
+    }
+
+    // POST /api/overlay/adjust {pg, track, field?, delta}: the overlay's Stream Deck keys.
+    const live = runs.find((c) => campaign.liveChronicle(c.guildId, userId)?.id === c.id);
+    if (!live) return json(res, 409, { error: 'no Chronicle on air' });
+    const track = overlayTrack(body.track, body.field);
+    if (!track || !isInt(body.delta, -30, 30)) {
+      return json(res, 400, { error: 'unknown track or field, or bad delta' });
+    }
+    if (track === 'masquerade') {
+      const value = Math.min(MASQUERADE_BOXES, Math.max(0, live.masquerade + body.delta));
+      campaign.setMasquerade(live.id, value);
+      return json(res, 200, { ok: true, value });
+    }
+    const found = overlayCharacters(campaign.members(live.id)).find((m) => m.id === body.pg);
+    if (!found) return json(res, 404, { error: 'no character with that id on air' });
+    const updated = campaign.setTrack(
+      found.c.id,
+      track,
+      found.c.values[track] + body.delta,
+      userId,
+    );
+    return json(res, 200, { ok: true, value: updated?.values[track] });
+  }
+
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // Only cloudflared reaches this port, and it passes on the visitor's address.
     const forwarded = req.headers['cf-connecting-ip'];
@@ -347,6 +566,10 @@ export function createPanelHandler(deps: PanelDeps) {
       return redirect(res, '/', [clearState, cookie(SESSION_COOKIE, token, SESSION_DAYS * 86400)]);
     }
 
+    if (path === '/api/overlay' || path.startsWith('/api/overlay/')) {
+      return overlayApi(req, res, path);
+    }
+
     const current = session(req);
     if (!current) return json(res, 401, { error: 'login required' });
     const me = current.session;
@@ -383,14 +606,18 @@ export function createPanelHandler(deps: PanelDeps) {
           slug: c.slug,
           name: c.name,
           sect: SECT_NAMES[c.sect],
+          sectId: c.sect,
+          guild: c.guildId,
           masquerade: c.masquerade,
           live: campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id,
           characters: campaign.members(c.id).map(view),
         })),
         guilds: await guildsFor(me.userId),
+        overlayKey: store.overlayKeys.createdAt(me.userId) ?? null,
         options: {
           clans: CLANS.map((id) => ({ id, name: CLAN_NAMES[id] })),
           tiers: TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
+          sects: SECTS.map((id) => ({ id, name: SECT_NAMES[id] })),
           maxAttribute: LIMITS.attribute,
           maxName: LIMITS.nameLength,
         },
@@ -398,8 +625,21 @@ export function createPanelHandler(deps: PanelDeps) {
     }
 
     // Every change below: a JSON body, the CSRF token and the panel's own origin.
+    if (path === '/api/overlay-key' && (method === 'POST' || method === 'DELETE')) {
+      if ((await readBody(req)) === undefined) return json(res, 413, { error: 'body too large' });
+      if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+      if (method === 'DELETE') {
+        store.overlayKeys.revoke(me.userId);
+        return send(res, 204, '');
+      }
+      // Shown once: the database keeps only its hash.
+      return json(res, 200, { key: store.overlayKeys.create(me.userId) });
+    }
+
     const characterPath = /^\/api\/characters(?:\/(\d{1,12})(\/track)?)?$/.exec(path);
-    if (!characterPath || !['POST', 'DELETE'].includes(method)) {
+    const chroniclePath =
+      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove))?)?$/.exec(path);
+    if (!(characterPath || chroniclePath) || !['POST', 'DELETE'].includes(method)) {
       return json(res, 404, { error: 'not found' });
     }
     const text = await readBody(req);
@@ -419,7 +659,12 @@ export function createPanelHandler(deps: PanelDeps) {
       return json(res, 200, { character: characterView(c, chronicles, me.userId) });
     };
 
-    const [, idText, track] = characterPath;
+    if (chroniclePath) {
+      if (method !== 'POST') return json(res, 404, { error: 'not found' });
+      return chronicleChange(res, me.userId, body, chroniclePath[1], chroniclePath[2]);
+    }
+
+    const [, idText, track] = characterPath!;
     if (idText === undefined) {
       // POST /api/characters: a new character, on a server the user shares with the bot.
       if (method !== 'POST') return json(res, 404, { error: 'not found' });

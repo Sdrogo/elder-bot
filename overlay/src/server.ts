@@ -4,7 +4,7 @@
 // dock and the Stream Deck over HTTP POST. No dependencies beyond Node itself.
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { join, resolve } from 'node:path';
 import {
@@ -12,6 +12,7 @@ import {
   addCharacter,
   CLANS,
   emptyState,
+  fromBot,
   getValue,
   removeCharacter,
   restore,
@@ -58,6 +59,62 @@ export interface OverlayOptions {
   token?: string;
   /** Delay before writing state.json, in ms. */
   saveDelay?: number;
+  /** How often to ask the bot for the Chronicle on air, in ms. */
+  pollMs?: number;
+  /** For tests: the fetch used to reach the bot. */
+  fetchFn?: typeof fetch;
+}
+
+/** Where the bot's web panel is and the Storyteller's overlay key, from the panel. */
+interface BotLink {
+  url: string;
+  key: string;
+}
+
+/** What the dock shows about the link; never the key. */
+interface LinkInfo {
+  linked: boolean;
+  url?: string;
+  ok?: boolean;
+  error?: string;
+  chronicle?: string | null;
+  chronicles?: { slug: string; name: string; live: boolean }[];
+}
+
+class BotError extends Error {
+  readonly status: number;
+  constructor(message: string, status = 502) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function loadLink(file: string): BotLink | undefined {
+  if (!existsSync(file)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as Partial<BotLink>;
+    return typeof raw.url === 'string' && typeof raw.key === 'string'
+      ? { url: raw.url, key: raw.key }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The panel address: https, or http only on this PC (for tests). No path, no trailing slash. */
+function cleanUrl(value: unknown): string {
+  if (typeof value !== 'string') throw new StateError('address is required');
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new StateError('address is not valid, e.g. https://panel.example.com');
+  }
+  const local = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) {
+    throw new StateError('the address must start with https://');
+  }
+  return url.origin;
 }
 
 export interface Overlay {
@@ -148,18 +205,102 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
   const streams = new Set<ServerResponse>();
   let saveTimer: NodeJS.Timeout | undefined;
   let port = options.port;
+  const fetchFn = options.fetchFn ?? fetch;
+  const linkFile = join(dataDir, 'bot.json');
+  let link = loadLink(linkFile);
+  let info: LinkInfo = link ? { linked: true, url: link.url } : { linked: false };
+  let etag: string | undefined;
+  let pollTimer: NodeJS.Timeout | undefined;
 
   const save = () => {
     const tmp = `${stateFile}.tmp`;
     writeFileSync(tmp, JSON.stringify(state, null, 2));
     renameSync(tmp, stateFile);
   };
+  /** What the frames and the dock receive: the trackers plus the state of the bot link. */
+  const snapshot = () => JSON.stringify({ ...state, link: info });
+  const broadcast = () => {
+    const msg = `data: ${snapshot()}\n\n`;
+    for (const s of streams) s.write(msg);
+  };
   const changed = () => {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(save, options.saveDelay ?? 300);
-    const msg = `data: ${JSON.stringify(state)}\n\n`;
-    for (const s of streams) s.write(msg);
+    broadcast();
   };
+
+  /** One call to the bot's overlay API. */
+  async function bot(path: string, init: RequestInit = {}): Promise<Response> {
+    if (!link) throw new BotError('not linked to the bot', 409);
+    let res: Response;
+    try {
+      res = await fetchFn(link.url + path, {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${link.key}`,
+          'Content-Type': 'application/json',
+          ...init.headers,
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      throw new BotError('the bot cannot be reached');
+    }
+    if (res.status === 401) throw new BotError('the bot refused the key: make a new one', 401);
+    return res;
+  }
+
+  /**
+   * Asks the bot for the Chronicle on air and shows it. When the bot can't be reached the
+   * frames keep the last values they had, so a stream never goes blank.
+   */
+  async function poll(): Promise<void> {
+    if (!link) return;
+    const before = JSON.stringify(info);
+    try {
+      const res = await bot('/api/overlay', { headers: etag ? { 'If-None-Match': etag } : {} });
+      if (res.status === 200) {
+        const view = (await res.json()) as {
+          chronicle?: { name?: string } | null;
+          chronicles?: LinkInfo['chronicles'];
+        };
+        const next = fromBot(view);
+        state.characters = next.characters;
+        state.chronicle = next.chronicle;
+        etag = res.headers.get('etag') ?? undefined;
+        info = {
+          linked: true,
+          url: link.url,
+          ok: true,
+          chronicle: view.chronicle?.name ?? null,
+          chronicles: Array.isArray(view.chronicles) ? view.chronicles.slice(0, 20) : [],
+        };
+        return changed();
+      }
+      if (res.status !== 304) throw new BotError(`the bot answered ${res.status}`);
+      info = { ...info, ok: true, error: undefined };
+    } catch (err) {
+      info = { ...info, ok: false, error: (err as Error).message };
+    }
+    if (JSON.stringify(info) !== before) broadcast();
+  }
+
+  const startPolling = () => {
+    clearInterval(pollTimer);
+    if (link) pollTimer = setInterval(() => void poll(), options.pollMs ?? 3000);
+  };
+  startPolling();
+  void poll();
+
+  /** Sends a change to the bot and shows the result at once, without waiting for the next poll. */
+  async function botChange(path: string, body: unknown): Promise<{ value?: number }> {
+    const res = await bot(path, { method: 'POST', body: JSON.stringify(body) });
+    const data = (await res.json().catch(() => ({}))) as { value?: number; error?: string };
+    if (!res.ok) throw new BotError(data.error ?? `the bot answered ${res.status}`, res.status);
+    etag = undefined;
+    await poll();
+    return data;
+  }
 
   const allowedHosts = () => new Set([`${HOST}:${port}`, `localhost:${port}`]);
   const allowedOrigins = () => new Set([`http://${HOST}:${port}`, `http://localhost:${port}`]);
@@ -175,6 +316,67 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
     params: Record<string, unknown>,
     res: ServerResponse,
   ): Promise<void> {
+    if (path === '/api/bot/link') {
+      const next = { url: cleanUrl(params.url), key: String(params.key ?? '').trim() };
+      if (!/^elk_[A-Za-z0-9_-]{20,90}$/.test(next.key)) {
+        throw new StateError('the key is not valid: copy it again from the web panel');
+      }
+      const previous = link;
+      link = next;
+      etag = undefined;
+      await poll();
+      if (!info.ok) {
+        const error = info.error ?? 'the bot cannot be reached';
+        link = previous;
+        info = link ? { linked: true, url: link.url } : { linked: false };
+        broadcast();
+        return send(res, 400, { error });
+      }
+      writeFileSync(linkFile, JSON.stringify(link), { mode: 0o600 });
+      startPolling();
+      return send(res, 200, { ok: true });
+    }
+    if (path === '/api/bot/unlink') {
+      // The frames keep the last Chronicle; from now on the dock changes them locally.
+      link = undefined;
+      clearInterval(pollTimer);
+      rmSync(linkFile, { force: true });
+      info = { linked: false };
+      changed();
+      return send(res, 200, { ok: true });
+    }
+
+    if (link) {
+      // Linked: the bot holds the trackers, and the Stream Deck keys move them there.
+      switch (path) {
+        case '/api/adjust':
+        case '/api/set': {
+          const delta =
+            path === '/api/adjust'
+              ? (params.delta ?? 1)
+              : Number(params.value) - getValue(state, params.pg, params.track, params.field);
+          const { pg, track, field } = params;
+          const data = await botChange('/api/overlay/adjust', {
+            pg,
+            track,
+            field,
+            delta: Number(delta),
+          });
+          return send(res, 200, { ok: true, value: data.value });
+        }
+        case '/api/live':
+          await botChange('/api/overlay/live', { chronicle: params.cronaca ?? params.chronicle });
+          return send(res, 200, { ok: true });
+        case '/api/characters/add':
+        case '/api/characters/update':
+        case '/api/characters/remove':
+        case '/api/chronicle/sect':
+          return send(res, 409, { error: 'linked to the bot: change it in the web panel' });
+        default:
+          return send(res, 404, { error: 'not found' });
+      }
+    }
+
     let didChange: boolean;
     let value: number | undefined;
     switch (path) {
@@ -202,6 +404,8 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
         setSect(state, params.sect);
         didChange = true;
         break;
+      case '/api/live':
+        return send(res, 409, { error: 'not linked to the bot' });
       default:
         return send(res, 404, { error: 'not found' });
     }
@@ -225,7 +429,7 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
           return send(res, 200, page('dock.html', { TOKEN: token }), 'text/html; charset=utf-8');
         if (path === '/frame' || path === '/scena')
           return send(res, 200, page('frame.html'), 'text/html; charset=utf-8');
-        if (path === '/api/state') return send(res, 200, state);
+        if (path === '/api/state') return send(res, 200, JSON.parse(snapshot()));
         if (path.startsWith('/static/')) {
           const name = path.slice('/static/'.length);
           const type = Object.hasOwn(STATIC_FILES, name) ? STATIC_FILES[name] : undefined;
@@ -252,7 +456,7 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
             'X-Content-Type-Options': 'nosniff',
             Connection: 'keep-alive',
           });
-          res.write(`retry: 1000\ndata: ${JSON.stringify(state)}\n\n`);
+          res.write(`retry: 1000\ndata: ${snapshot()}\n\n`);
           streams.add(res);
           const ping = setInterval(() => res.write(': ping\n\n'), 20000);
           req.on('close', () => {
@@ -287,6 +491,7 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
       res.end();
     } catch (err) {
       if (err instanceof StateError) return send(res, 400, { error: err.message });
+      if (err instanceof BotError) return send(res, err.status, { error: err.message });
       console.error(err);
       if (!res.headersSent) send(res, 500, { error: 'internal error' });
     }
@@ -306,6 +511,7 @@ export function startOverlay(options: OverlayOptions): Promise<Overlay> {
         close: () =>
           new Promise<void>((done) => {
             clearTimeout(saveTimer);
+            clearInterval(pollTimer);
             save();
             for (const s of streams) s.end();
             server.close(() => done());

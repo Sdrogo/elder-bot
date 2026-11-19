@@ -29,9 +29,17 @@
         </p>
         <div class="cards" id="characters"></div>
       </section>
-      <section id="chronicles-section" hidden>
-        <h2 data-t="chronicles.title">Le mie Cronache</h2>
+      <section id="chronicles-section">
+        <div class="section-head">
+          <h2 data-t="chronicles.title">Le mie Cronache</h2>
+          <button id="new-chronicle" type="button" data-t="chronicles.new">Nuova Cronaca</button>
+        </div>
+        <div id="new-chronicle-slot"></div>
+        <p class="empty" id="chronicles-empty" data-t="chronicles.empty" hidden>
+          Non sei Narratore di nessuna Cronaca.
+        </p>
         <div id="chronicles"></div>
+        <div id="overlay"></div>
       </section>
     </main>
   </body>
