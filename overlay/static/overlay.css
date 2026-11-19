@@ -29,9 +29,10 @@ body {
   color: var(--fg);
 }
 .virt {
-  /* Fixed size, whatever the Browser Source size: 1 cqw = 19.2 px, as on a 1920×1080 canvas.
+  /* Fixed size, whatever the Browser Source size: 1 cqw = 19.2 px, as on a 1920×1080 canvas
+     (25.6 px on the 2560×1440 scene, so the frames grow with it).
      ?scala= multiplies it. Only the frame lines follow the Browser Source size. */
-  width: calc(1920px * var(--scale, 1));
+  width: calc(var(--canvas, 1920px) * var(--scale, 1));
   height: 0;
   container-type: inline-size;
 }
@@ -463,10 +464,237 @@ body {
   }
 }
 
-/* /scena: every frame on one 1920×1080 page, each in a fixed slot */
+/* /scena: every frame on the scene page, each in a fixed slot. Narrow slots (many players,
+   or the players' row of the "stage" layout) get a smaller tracker rail so it fits. */
+.slot.compact .rail {
+  zoom: 0.8;
+}
 .slot {
   position: absolute;
 }
 .slot .frame {
   inset: 0;
+}
+
+/* Behind the frames: the scene's background image, then the webcams (VDO.Ninja). Negative
+   z-index keeps them under the frames without making .virt a positioned box. */
+#bg,
+#cams {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+#bg {
+  z-index: -2;
+}
+#bg img {
+  display: block;
+  width: var(--canvas, 100vw);
+  height: var(--canvas-h, 100vh);
+  object-fit: cover;
+}
+#cams {
+  z-index: -1;
+}
+.cam {
+  position: absolute;
+  border: 0;
+  border-radius: 0.2cqw;
+  background: transparent;
+  overflow: hidden;
+}
+
+/* The last roll: bottom centre of the scene, or alone with ?pg=tiro. */
+.roll-slot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.roll-alone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.roll {
+  --tone: var(--muted);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'head head'
+    'sides outcome';
+  align-items: center;
+  column-gap: 1.2cqw;
+  row-gap: 0.3cqw;
+  max-width: 100%;
+  min-width: 26cqw;
+  padding: 0.6cqw 1.3cqw 0.7cqw;
+  border-radius: 0.55cqw;
+  background: var(--band);
+  box-shadow:
+    inset 0 0 0 0.07cqw var(--edge),
+    inset 0.35cqw 0 0 var(--tone);
+  font-family: var(--cond);
+}
+.roll.empty {
+  display: none;
+}
+.roll.win {
+  --tone: var(--human);
+}
+.roll.crit {
+  --tone: var(--gold);
+}
+.roll.fail {
+  --tone: var(--muted);
+}
+.roll.beast {
+  --tone: var(--blood);
+}
+.roll.new {
+  animation: rollin 0.6s ease-out;
+}
+.rhead {
+  grid-area: head;
+  display: flex;
+  align-items: baseline;
+  gap: 0.8cqw;
+  min-width: 0;
+}
+.rhead .what {
+  font-family: var(--display);
+  font-size: 1.2cqw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.rhead .diff {
+  font-size: 0.75cqw;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sides {
+  grid-area: sides;
+  display: grid;
+  gap: 0.25cqw;
+  min-width: 0;
+}
+.side {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7cqw;
+}
+.side .who {
+  font-size: 0.85cqw;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  max-width: 9cqw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.side .succ {
+  font-weight: 600;
+  font-size: 1.9cqw;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2cqw;
+  min-width: 0;
+}
+.dice .hd {
+  width: 1.75cqw;
+  height: 2cqw;
+}
+/* Roll dice: green for successes (brighter on a 10), plain for failures, red Hunger dice. */
+.dice .hd .i,
+.dice .hd .l {
+  fill: none;
+  stroke: rgba(236, 230, 220, 0.25);
+}
+.dice .hd.on .i,
+.dice .hd.on .l {
+  fill: none;
+  stroke: rgba(155, 229, 143, 0.5);
+}
+.dice .hd.hdie .i,
+.dice .hd.hdie .l {
+  stroke: rgba(255, 107, 112, 0.45);
+}
+.many .dice .hd {
+  width: 1.2cqw;
+  height: 1.4cqw;
+}
+.dice .hd .o {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: rgba(236, 230, 220, 0.45);
+}
+.dice .hd.on .o {
+  fill: rgba(63, 174, 74, 0.35);
+  stroke: var(--human);
+}
+.dice .hd.ten .o {
+  fill: rgba(120, 220, 110, 0.55);
+  stroke: #9be58f;
+}
+.dice .hd.hdie .o {
+  stroke: var(--blood);
+  fill: rgba(192, 38, 45, 0.18);
+}
+.dice .hd.hdie.on .o {
+  fill: rgba(192, 38, 45, 0.5);
+}
+.dice .hd.one .o {
+  fill: var(--blood);
+}
+.dice .hd text,
+.dice .hd.big text,
+.dice .hd.big:not(.on) text {
+  fill: var(--fg);
+  font: 700 17px var(--cond);
+}
+.dice .hd.big {
+  width: 1.75cqw;
+  height: 2cqw;
+}
+.many .dice .hd.big {
+  width: 1.2cqw;
+  height: 1.4cqw;
+}
+.outcome {
+  grid-area: outcome;
+  justify-self: end;
+  font-family: var(--display);
+  font-size: 1.5cqw;
+  color: var(--tone);
+  white-space: nowrap;
+}
+.roll.fail .outcome {
+  color: var(--fg);
+}
+@keyframes rollin {
+  0% {
+    opacity: 0;
+    transform: translateY(1cqw);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .roll.new {
+    animation: none;
+  }
 }

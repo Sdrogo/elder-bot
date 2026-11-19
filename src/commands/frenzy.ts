@@ -2,8 +2,9 @@ import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { performRoll } from '../game/roll.js';
 import { described, localeFor, t } from '../i18n/index.js';
 import { rollMessage } from '../ui/format.js';
+import { showRoll, shownTest } from '../game/shownRoll.js';
 import { rollerHunger } from './campaignShared.js';
-import { hungerOption } from './shared.js';
+import { hungerOption, where } from './shared.js';
 import type { Command } from './types.js';
 
 export const FRENZY_TYPES = ['hunger', 'rage', 'fear', 'clan'] as const;
@@ -113,5 +114,8 @@ export const frenzy: Command = {
     // Resisting frenzy is its own call: no bargain, no second attempt, no reroll buttons.
     message.components = [];
     await interaction.reply(message);
+    showRoll(ctx.store, where(interaction), (who) =>
+      shownTest(who, t(locale, 'frenzy.title', { frenzy: name }), response),
+    );
   },
 };

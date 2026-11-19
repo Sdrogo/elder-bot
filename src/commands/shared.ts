@@ -5,6 +5,7 @@ import type {
 } from 'discord.js';
 import { MAX_HUNGER } from '../dice/test.js';
 import { performRoll, type RollRequest } from '../game/roll.js';
+import { showRoll, shownTest } from '../game/shownRoll.js';
 import { described, localeFor, type MessageKey } from '../i18n/index.js';
 import { rollMessage } from '../ui/format.js';
 import { rollerHunger } from './campaignShared.js';
@@ -61,4 +62,19 @@ export async function replyWithRoll(
   const fullTitle = `${interaction.user.displayName}: ${reason ?? title}`;
   const notes = fromCharacter.note ? [fromCharacter.note] : [];
   await interaction.reply(rollMessage(locale, response, fullTitle, notes));
+  showRoll(ctx.store, where(interaction), (who) => shownTest(who, reason ?? title, response));
+}
+
+/** Where a roll was made, for the overlay's roll box. */
+export function where(interaction: {
+  guildId: string | null;
+  channelId: string | null;
+  user: { id: string; displayName: string };
+}) {
+  return {
+    guildId: interaction.guildId,
+    channelId: interaction.channelId ?? '',
+    userId: interaction.user.id,
+    displayName: interaction.user.displayName,
+  };
 }
