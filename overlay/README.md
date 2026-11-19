@@ -2,7 +2,7 @@
 
 Overlay per OBS con i tracciati dei personaggi di **Vampire: The Masquerade 6e (Alpha 2.0)**: Health, Vitae, Willpower, Humanity, Hunger dice e il Masquerade Tracker dello Storyteller. Ogni giocatore ha una cornice attorno alla propria webcam di Discord.
 
-È un piccolo programma che gira **solo sul tuo PC**, accanto a OBS. Non è collegato al bot e non apre niente sul VPS.
+È un piccolo programma che gira **solo sul tuo PC**, accanto a OBS. Può funzionare da solo, oppure collegarsi al pannello web del bot e mostrare la Cronaca in onda (vedi [Collegamento al bot](#collegamento-al-bot)). In entrambi i casi sul tuo PC non apre niente verso Internet.
 
 - **Cornici**: ogni personaggio è una Browser Source di OBS, con sfondo trasparente.
 - **Pannello**: un Custom Browser Dock di OBS, con i pulsanti + e − e la gestione dei personaggi.
@@ -55,6 +55,22 @@ I simboli sono marchi di Paradox Interactive, quindi non stanno nel repository. 
 | `tzimisce.png`, `ventrue.png`, `caitiff.png`, `thinblood.png`                               | clan                |
 | `camarilla.png`, `camarilla-v5.png`, `anarch.png`, `sabbat.png`                             | setta (Storyteller) |
 
+## Collegamento al bot
+
+Se usi il pannello web del bot, l'overlay può prendere da lì personaggi e tracciati della Cronaca **in onda**: quando metti in onda un'altra Cronaca (dal pannello, da Discord o dallo Stream Deck) le cornici cambiano da sole.
+
+1. Nel pannello web, sezione **Overlay di OBS**, premi _Crea la chiave_ e copia indirizzo e chiave. La chiave si vede una volta sola.
+2. Nel dock di OBS apri **Collega al bot**, incolla indirizzo (per esempio `https://panel.elderbot.party`) e chiave, e premi _Collega_.
+
+Da quel momento:
+
+- l'overlay chiede al bot lo stato ogni 3 secondi (la risposta è minima se non è cambiato niente);
+- i pulsanti + e − del dock e i tasti dello Stream Deck cambiano i tracciati **sul bot**, quindi li vedono anche il pannello e Discord. I massimi derivano da Attributi e livello e si cambiano dal pannello web, come nome, clan e setta;
+- se ci sono più Cronache, il dock mostra un pulsante per ognuna per metterla in onda;
+- se il bot non risponde, le cornici restano con gli ultimi valori ricevuti: la diretta non si svuota.
+
+La chiave sta in `overlay/data/bot.json`, leggibile solo dal tuo utente. Collegando, i personaggi locali vengono sostituiti da quelli della Cronaca in onda; _Scollega_ torna al funzionamento locale e lascia gli ultimi valori ricevuti. Per bloccare una chiave persa basta _Revoca_ o _Nuova chiave_ nel pannello web.
+
 ## Stream Deck
 
 Ogni tasto è una richiesta **POST** a un indirizzo come questo, con l'header `X-Elder-Token` uguale al contenuto di `overlay/data/token.txt`:
@@ -69,6 +85,8 @@ http://127.0.0.1:7777/api/adjust?pg=lucrezia&track=health&delta=-1
 | `track`   | `health`, `vitae`, `willpower`, `humanity`, `masquerade`                                                      |
 | `field`   | `current` (predefinito); `baneful` e `max` per Health; `max` per Vitae e Willpower; `violations` per Humanity |
 | `delta`   | quanto aggiungere, per esempio `-1` o `1` (predefinito `1`)                                                   |
+
+Collegato al bot, un tasto per Cronaca la mette in onda: `POST http://127.0.0.1:7777/api/live?cronaca=<id>`, con lo stesso header. L'id della Cronaca compare passando il mouse sul suo pulsante nel dock (per esempio `testament`).
 
 La risposta è `{"ok":true,"value":4}`, con il nuovo valore: alcuni plugin possono mostrarlo sul tasto. Per impostare un valore preciso usa `/api/set` con `value` al posto di `delta`. Se il plugin non permette header personalizzati, puoi usare `Authorization: Bearer <token>` oppure aggiungere `&token=<token>` all'indirizzo.
 

@@ -13,11 +13,37 @@
       <span id="conn" class="conn">collegamento…</span>
     </header>
 
+    <section class="bot">
+      <details id="bot-setup">
+        <summary id="bot-summary">Collega al bot</summary>
+        <div id="bot-off">
+          <p class="hint">
+            Nel pannello web del bot, sezione "Overlay di OBS", crea la chiave e incolla qui
+            indirizzo e chiave. Le cornici seguiranno la Cronaca in onda; i personaggi si gestiscono
+            dal pannello web.
+          </p>
+          <label class="field"
+            >Indirizzo del pannello
+            <input id="bot-url" placeholder="https://panel.elderbot.party" autocomplete="off"
+          /></label>
+          <label class="field"
+            >Chiave <input id="bot-key" type="password" placeholder="elk_…" autocomplete="off"
+          /></label>
+          <button type="button" id="bot-link">Collega</button>
+        </div>
+        <div id="bot-on" hidden>
+          <p class="hint" id="bot-info"></p>
+          <button type="button" id="bot-unlink" class="danger">Scollega</button>
+        </div>
+      </details>
+      <div id="bot-chronicles" class="tabs" aria-label="Cronache" hidden></div>
+    </section>
+
     <nav id="tabs" class="tabs" aria-label="Personaggi"></nav>
 
     <section id="char" hidden>
       <div id="rows" class="rows"></div>
-      <details>
+      <details id="local-edit">
         <summary>Massimi, nome e clan</summary>
         <div id="maxrows" class="rows"></div>
         <label class="field">Nome <input id="edit-name" maxlength="32" autocomplete="off" /></label>

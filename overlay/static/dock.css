@@ -178,3 +178,11 @@ code {
 .status.err {
   color: var(--danger);
 }
+
+.bot {
+  margin-bottom: 8px;
+}
+
+.bot .tabs {
+  margin-top: 6px;
+}

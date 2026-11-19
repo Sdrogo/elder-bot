@@ -140,3 +140,145 @@ describe('overlay server', () => {
     expect(JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')).characters[0].id).toBe('nina');
   });
 });
+
+describe('link to the bot', () => {
+  const KEY = 'elk_' + 'k'.repeat(43);
+  let linked: Overlay;
+  let linkDir: string;
+  let botCalls: { path: string; body?: unknown }[];
+  let botState: {
+    chronicle: { slug: string; name: string; sect: string; masquerade: number };
+    chronicles: { slug: string; name: string; live: boolean }[];
+    characters: Record<string, unknown>[];
+  };
+  let up: boolean;
+
+  /** A fake bot panel: GET /api/overlay and the two POSTs, with the overlay key. */
+  const fakeBot: typeof fetch = async (input, init) => {
+    if (!up) throw new TypeError('fetch failed');
+    const url = new URL(String(input));
+    const headers = new Headers(init?.headers);
+    if (headers.get('authorization') !== `Bearer ${KEY}`)
+      return new Response('{}', { status: 401 });
+    const body = init?.body
+      ? (JSON.parse(String(init.body)) as Record<string, unknown>)
+      : undefined;
+    botCalls.push({ path: url.pathname, body });
+    if (url.pathname === '/api/overlay')
+      return Response.json(botState, { headers: { etag: '"x"' } });
+    if (url.pathname === '/api/overlay/adjust') {
+      const c = botState.characters.find((x) => x.id === body?.pg) as {
+        vitae: { current: number };
+      };
+      c.vitae.current += Number(body?.delta);
+      return Response.json({ ok: true, value: c.vitae.current });
+    }
+    if (url.pathname === '/api/overlay/live') {
+      for (const c of botState.chronicles) c.live = c.slug === body?.chronicle;
+      return Response.json({ ok: true });
+    }
+    return new Response('{}', { status: 404 });
+  };
+
+  const character = (id: string, name: string) => ({
+    id,
+    name,
+    clan: 'toreador',
+    health: { max: 8, current: 8, baneful: 0 },
+    vitae: { max: 10, current: 10 },
+    willpower: { max: 6, current: 6 },
+    humanity: { rank: 6, violations: 0 },
+    hunger: 0,
+  });
+
+  beforeEach(async () => {
+    up = true;
+    botCalls = [];
+    botState = {
+      chronicle: { slug: 'testament', name: 'Testament', sect: 'anarch', masquerade: 3 },
+      chronicles: [
+        { slug: 'testament', name: 'Testament', live: true },
+        { slug: 'berlino', name: 'Berlino', live: false },
+      ],
+      characters: [character('lucrezia', 'Lucrezia'), character('lucrezia-2', 'Lucrezia')],
+    };
+    linkDir = mkdtempSync(join(tmpdir(), 'elder-overlay-link-'));
+    linked = await startOverlay({
+      port: 0,
+      dataDir: linkDir,
+      token: TOKEN,
+      saveDelay: 0,
+      pollMs: 60_000,
+      fetchFn: fakeBot,
+    });
+  });
+  afterEach(async () => {
+    await linked.close();
+    rmSync(linkDir, { recursive: true, force: true });
+  });
+
+  const send = (path: string, body: unknown) =>
+    fetch(linked.url + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Elder-Token': TOKEN },
+      body: JSON.stringify(body),
+    });
+  const state = async () =>
+    (await (await fetch(linked.url + '/api/state')).json()) as {
+      characters: { id: string; vitae: { current: number }; hunger: number }[];
+      chronicle: { masquerade: number; sect: string };
+      link: { linked: boolean; ok?: boolean; chronicle?: string; error?: string };
+    };
+
+  it('shows the Chronicle on air and keeps the key in a private file', async () => {
+    const res = await send('/api/bot/link', { url: 'http://127.0.0.1:9/', key: KEY });
+    expect(res.status).toBe(200);
+    const s = await state();
+    expect(s.characters.map((c) => c.id)).toEqual(['lucrezia', 'lucrezia-2']);
+    expect(s.chronicle).toEqual({ masquerade: 3, sect: 'anarch' });
+    expect(s.link).toMatchObject({ linked: true, ok: true, chronicle: 'Testament' });
+    expect(JSON.stringify(s)).not.toContain(KEY);
+    expect(JSON.parse(readFileSync(join(linkDir, 'bot.json'), 'utf8'))).toEqual({
+      url: 'http://127.0.0.1:9',
+      key: KEY,
+    });
+  });
+
+  it('refuses a key the bot does not know, and plain http to another host', async () => {
+    const wrong = await send('/api/bot/link', {
+      url: 'http://127.0.0.1:9',
+      key: 'elk_' + 'x'.repeat(43),
+    });
+    expect(wrong.status).toBe(400);
+    expect((await state()).link.linked).toBe(false);
+    const http = await send('/api/bot/link', { url: 'http://panel.example.com', key: KEY });
+    expect(http.status).toBe(400);
+  });
+
+  it('sends Stream Deck keys to the bot and switches the Chronicle on air', async () => {
+    await send('/api/bot/link', { url: 'http://127.0.0.1:9', key: KEY });
+    const res = await send('/api/adjust?pg=lucrezia-2&track=vitae&delta=-4', {});
+    expect(await res.json()).toEqual({ ok: true, value: 6 });
+    expect(botCalls).toContainEqual({
+      path: '/api/overlay/adjust',
+      body: { pg: 'lucrezia-2', track: 'vitae', delta: -4 },
+    });
+    expect((await state()).characters[1]).toMatchObject({ vitae: { current: 6 }, hunger: 2 });
+    expect((await send('/api/live?cronaca=berlino', {})).status).toBe(200);
+    expect(botCalls).toContainEqual({ path: '/api/overlay/live', body: { chronicle: 'berlino' } });
+    expect((await send('/api/characters/add', { name: 'Nina', clan: 'tremere' })).status).toBe(409);
+  });
+
+  it('keeps the last values when the bot is down, and works locally once unlinked', async () => {
+    await send('/api/bot/link', { url: 'http://127.0.0.1:9', key: KEY });
+    up = false;
+    const res = await send('/api/adjust?pg=lucrezia&track=vitae&delta=-1', {});
+    expect(res.status).toBe(502);
+    const s = await state();
+    expect(s.characters).toHaveLength(2);
+    expect(s.link).toMatchObject({ linked: true });
+    expect((await send('/api/bot/unlink', {})).status).toBe(200);
+    expect((await send('/api/adjust?pg=lucrezia&track=vitae&delta=-1', {})).status).toBe(200);
+    expect((await state()).link.linked).toBe(false);
+  });
+});

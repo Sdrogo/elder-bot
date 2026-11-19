@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ProlongedTask } from '../dice/prolonged.js';
 import { Campaign } from './campaign.js';
+import { OverlayKeys } from './overlayKeys.js';
 import { WebSessions } from './sessions.js';
 
 /** The Masquerade Tracker has 10 boxes. */
@@ -18,6 +19,8 @@ export class Store {
   readonly campaign: Campaign;
   /** Web panel logins. */
   readonly sessions: WebSessions;
+  /** Keys for the Storyteller's OBS overlay. */
+  readonly overlayKeys: OverlayKeys;
 
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -40,6 +43,7 @@ export class Store {
     `);
     this.campaign = new Campaign(this.db);
     this.sessions = new WebSessions(this.db);
+    this.overlayKeys = new OverlayKeys(this.db);
   }
 
   /** Marked boxes on the Masquerade Tracker (Storyteller Packet p. 32), 0 to 10. */

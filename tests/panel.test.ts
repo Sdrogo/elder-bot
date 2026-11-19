@@ -391,6 +391,125 @@ describe('Storyteller controls', () => {
   });
 });
 
+describe('overlay API', () => {
+  const values = newCharacter({ tier: 'neonate', stamina: 3, composure: 4, resolve: 2 });
+
+  /** A Storyteller (111) with a Chronicle on air and two players, and an overlay key. */
+  async function setup() {
+    const cookie = await login();
+    const me = (await (await get('/api/me', cookie)).json()) as { csrf: string };
+    const made = await fetch(`${base}/api/overlay-key`, {
+      method: 'POST',
+      headers: { cookie, 'x-csrf-token': me.csrf, origin: PUBLIC },
+    });
+    const { key } = (await made.json()) as { key: string };
+    const ch = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Testament',
+      sect: 'anarch',
+    });
+    const other = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Berlino',
+      sect: 'camarilla',
+    });
+    if (typeof ch !== 'object' || typeof other !== 'object') throw new Error('setup');
+    store.campaign.setLive(ch.id);
+    for (const [owner, name] of [
+      ['222', 'Lucrezia'],
+      ['333', 'Lucrezia'],
+    ] as const) {
+      const c = store.campaign.createCharacter({
+        guildId: 'g',
+        ownerId: owner,
+        name,
+        clan: 'toreador',
+        values,
+      });
+      if (typeof c !== 'object') throw new Error('setup');
+      store.campaign.join(ch.id, c.id);
+    }
+    const call = (path: string, init: RequestInit = {}) =>
+      fetch(base + path, {
+        ...init,
+        headers: {
+          authorization: `Bearer ${key}`,
+          'content-type': 'application/json',
+          ...init.headers,
+        },
+      });
+    return { key, ch, other, call, cookie, csrf: me.csrf };
+  }
+
+  it('gives the Chronicle on air in the overlay shape, with a 304 when unchanged', async () => {
+    const { call } = await setup();
+    const res = await call('/api/overlay');
+    expect(res.status).toBe(200);
+    const view = (await res.json()) as {
+      chronicle: { slug: string; sect: string };
+      chronicles: { slug: string; live: boolean }[];
+      characters: { id: string; health: { max: number }; hunger: number }[];
+    };
+    expect(view.chronicle).toMatchObject({ slug: 'testament', sect: 'anarch' });
+    expect(view.chronicles.map((c) => c.slug).sort()).toEqual(['berlino', 'testament']);
+    expect(view.characters.map((c) => c.id)).toEqual(['lucrezia', 'lucrezia-2']);
+    expect(view.characters[0]).toMatchObject({ health: { max: 8 }, hunger: 0 });
+    const again = await call('/api/overlay', {
+      headers: { 'if-none-match': res.headers.get('etag')! },
+    });
+    expect(again.status).toBe(304);
+  });
+
+  it('moves trackers and switches the Chronicle on air for the Stream Deck', async () => {
+    const { call, ch, other } = await setup();
+    const post = (path: string, body: unknown) =>
+      call(path, { method: 'POST', body: JSON.stringify(body) });
+    const vitae = await post('/api/overlay/adjust', {
+      pg: 'lucrezia-2',
+      track: 'vitae',
+      delta: -4,
+    });
+    expect(await vitae.json()).toEqual({ ok: true, value: 6 });
+    expect(store.campaign.members(ch.id)[1]!.values.vitae).toBe(6);
+    const masq = await post('/api/overlay/adjust', { track: 'masquerade', delta: 2 });
+    expect(await masq.json()).toEqual({ ok: true, value: 2 });
+    expect((await post('/api/overlay/adjust', { pg: 'x', track: 'vitae', delta: 1 })).status).toBe(
+      404,
+    );
+    expect(
+      (
+        await post('/api/overlay/adjust', {
+          pg: 'lucrezia',
+          track: 'vitae',
+          field: 'max',
+          delta: 1,
+        })
+      ).status,
+    ).toBe(400);
+    expect((await post('/api/overlay/live', { chronicle: 'berlino' })).status).toBe(200);
+    expect(store.campaign.liveChronicle('g', '111')?.id).toBe(other.id);
+  });
+
+  it('refuses a wrong or revoked key and any request from a web page', async () => {
+    const { call, key, cookie, csrf } = await setup();
+    const wrong = await fetch(`${base}/api/overlay`, {
+      headers: { authorization: 'Bearer elk_nope' },
+    });
+    expect(wrong.status).toBe(401);
+    expect(
+      (await call('/api/overlay', { headers: { origin: 'https://evil.example' } })).status,
+    ).toBe(403);
+    expect(store.overlayKeys.userOf(key)).toBe('111');
+    await fetch(`${base}/api/overlay-key`, {
+      method: 'DELETE',
+      headers: { cookie, 'x-csrf-token': csrf, origin: PUBLIC },
+    });
+    expect((await call('/api/overlay')).status).toBe(401);
+  });
+});
+
 describe('web sessions', () => {
   it('expire after 30 days and keep only a hash of the token', async () => {
     const { default: Database } = await import('better-sqlite3');
@@ -406,6 +525,22 @@ describe('web sessions', () => {
     expect(stored.token_hash).not.toContain(token);
     now += 31 * 24 * 60 * 60 * 1000;
     expect(sessions.get(token)).toBeUndefined();
+    db.close();
+  });
+});
+
+describe('overlay keys', () => {
+  it('keep only a hash and replace the old key', async () => {
+    const { default: Database } = await import('better-sqlite3');
+    const { OverlayKeys } = await import('../src/state/overlayKeys.js');
+    const db = new Database(':memory:');
+    const keys = new OverlayKeys(db);
+    const first = keys.create('111');
+    const second = keys.create('111');
+    expect(keys.userOf(first)).toBeUndefined();
+    expect(keys.userOf(second)).toBe('111');
+    const row = db.prepare('SELECT key_hash FROM overlay_keys').get() as { key_hash: string };
+    expect(row.key_hash).not.toContain(second.slice(4));
     db.close();
   });
 });

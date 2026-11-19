@@ -51,7 +51,8 @@ export type Field = 'current' | 'max' | 'baneful' | 'violations';
 export const LIMITS = {
   healthMax: 15,
   vitaeMax: 30,
-  willpowerMax: 10,
+  /** Composure + Resolve, up to 10 + 10. */
+  willpowerMax: 20,
   humanity: 10,
   hunger: 5,
   masquerade: 10,
@@ -319,6 +320,62 @@ export function restore(raw: unknown): OverlayState {
       setValue(state, c.id, 'willpower', 'max', x.willpower?.max ?? c.willpower.max);
       setValue(state, c.id, 'willpower', 'current', x.willpower?.current ?? c.willpower.max);
       setValue(state, c.id, 'humanity', 'violations', x.humanity?.violations ?? 0);
+    } catch {
+      // skip a malformed character
+    }
+  }
+  return state;
+}
+
+/**
+ * The state the bot sends for the Chronicle on air (GET /api/overlay on the bot), checked like
+ * a file from disk. Character ids come from the bot, so two characters may share a name.
+ */
+export function fromBot(raw: unknown): OverlayState {
+  const state = emptyState();
+  if (!raw || typeof raw !== 'object') return state;
+  const r = raw as {
+    chronicle?: { masquerade?: unknown; sect?: unknown } | null;
+    characters?: unknown;
+  };
+  try {
+    setValue(state, null, 'masquerade', 'current', r.chronicle?.masquerade ?? 0);
+    setSect(state, r.chronicle?.sect ?? 'none');
+  } catch {
+    // keep defaults
+  }
+  if (!Array.isArray(r.characters)) return state;
+  for (const item of r.characters.slice(0, LIMITS.characters)) {
+    const x = item as Partial<Character>;
+    const id = x.id;
+    if (typeof id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(id) || id === 'storyteller') continue;
+    if (state.characters.some((c) => c.id === id)) continue;
+    try {
+      const c: Character = {
+        id,
+        name: cleanName(x.name),
+        clan: clan(x.clan),
+        health: { max: 1, current: 0, baneful: 0 },
+        vitae: { max: 1, current: 0 },
+        willpower: { max: 1, current: 0 },
+        humanity: { rank: 0, violations: 0 },
+        hunger: 0,
+      };
+      state.characters.push(c);
+      try {
+        setValue(state, id, 'health', 'max', x.health?.max);
+        setValue(state, id, 'health', 'baneful', x.health?.baneful ?? 0);
+        setValue(state, id, 'health', 'current', x.health?.current);
+        setValue(state, id, 'vitae', 'max', x.vitae?.max);
+        setValue(state, id, 'vitae', 'current', x.vitae?.current);
+        setValue(state, id, 'willpower', 'max', x.willpower?.max);
+        setValue(state, id, 'willpower', 'current', x.willpower?.current);
+        setValue(state, id, 'humanity', 'current', x.humanity?.rank);
+        setValue(state, id, 'humanity', 'violations', x.humanity?.violations ?? 0);
+      } catch (error) {
+        state.characters.pop();
+        throw error;
+      }
     } catch {
       // skip a malformed character
     }

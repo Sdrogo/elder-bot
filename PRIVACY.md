@@ -21,7 +21,7 @@ Se un giocatore crea un personaggio, o un Narratore una Cronaca, il bot salva an
 - la Cronaca: nome, setta, Masquerade Tracker, canale in cui si gioca e quali personaggi ne fanno parte;
 - un registro delle modifiche ai tracciati (chi, cosa, quando), cancellato dopo 30 giorni.
 
-Se usi il pannello web, al login Discord comunica al bot solo il tuo ID e il tuo nome visualizzato (permesso `identify`). Il bot salva una sessione con questi due dati e l'impronta del cookie di accesso; la sessione scade dopo 30 giorni o quando premi "Esci". Il pannello non usa cookie di tracciamento né servizi di analisi. Il traffico passa da Cloudflare, che ne è responsabile secondo la propria [informativa](https://www.cloudflare.com/privacypolicy/).
+Se usi il pannello web, al login Discord comunica al bot solo il tuo ID e il tuo nome visualizzato (permesso `identify`). Il bot salva una sessione con questi due dati e l'impronta del cookie di accesso; la sessione scade dopo 30 giorni o quando premi "Esci". Se il Narratore crea una chiave per l'overlay di OBS, il bot ne salva solo l'impronta e la data; la chiave permette solo di leggere la sua Cronaca in onda, muoverne i tracciati e scegliere quale Cronaca è in onda. Il pannello non usa cookie di tracciamento né servizi di analisi. Il traffico passa da Cloudflare, che ne è responsabile secondo la propria [informativa](https://www.cloudflare.com/privacypolicy/).
 
 I risultati dei tiri, i dadi Fame, i motivi e i nomi visualizzati compaiono nei messaggi del bot su Discord ma non vengono salvati dal bot.
 

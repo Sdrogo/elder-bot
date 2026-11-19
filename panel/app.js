@@ -39,6 +39,19 @@ const TEXT = {
     up: 'Sposta prima',
     down: 'Sposta dopo',
     remove: 'Togli',
+    'overlay.title': 'Overlay di OBS',
+    'overlay.none':
+      'Crea una chiave e incollala nel pannello di Elder Overlay: le cornici seguiranno la Cronaca in onda.',
+    'overlay.since': 'Chiave attiva dal',
+    'overlay.create': 'Crea la chiave',
+    'overlay.renew': 'Nuova chiave',
+    'overlay.revoke': 'Revoca',
+    'overlay.once':
+      'Copiala adesso: non la vedrai più. In Elder Overlay incolla indirizzo e chiave.',
+    'overlay.address': 'Indirizzo',
+    'overlay.key': 'Chiave',
+    copy: 'Copia',
+    copied: 'Copiata',
   },
   en: {
     'login.intro': 'Your Vampire: The Masquerade characters and Chronicles.',
@@ -76,6 +89,19 @@ const TEXT = {
     up: 'Move earlier',
     down: 'Move later',
     remove: 'Remove',
+    'overlay.title': 'OBS overlay',
+    'overlay.none':
+      'Make a key and paste it in the Elder Overlay dock: the frames will follow the Chronicle on air.',
+    'overlay.since': 'Key active since',
+    'overlay.create': 'Make the key',
+    'overlay.renew': 'New key',
+    'overlay.revoke': 'Revoke',
+    'overlay.once':
+      "Copy it now: you won't see it again. In Elder Overlay paste the address and the key.",
+    'overlay.address': 'Address',
+    'overlay.key': 'Key',
+    copy: 'Copy',
+    copied: 'Copied',
   },
 };
 
@@ -396,6 +422,58 @@ function chronicleBlock(ch) {
   return block;
 }
 
+/** A read-only field with a copy button, for the overlay address and key. */
+function copyField(label, value) {
+  const input = el('input');
+  input.readOnly = true;
+  input.value = value;
+  const copy = button(tr('copy'), async () => {
+    input.select();
+    await navigator.clipboard?.writeText(value).catch(() => undefined);
+    copy.textContent = tr('copied');
+  });
+  const row = el('div', 'copy-row');
+  row.append(input, copy);
+  return field(label, row);
+}
+
+/** The Storyteller's key for the OBS overlay; a new key is shown once, then only its date. */
+function overlayBox(newKey) {
+  const box = el('div', 'overlay-box');
+  box.append(el('h3', '', tr('overlay.title')));
+  const actions = el('div', 'actions');
+  const make = async () => {
+    const response = await fetch('/api/overlay-key', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRF-Token': me.csrf },
+    });
+    if (!response.ok) return notify(tr('error.change'));
+    const { key } = await response.json();
+    await loadPanel();
+    document.getElementById('overlay').replaceChildren(overlayBox(key));
+  };
+  if (newKey) {
+    box.append(
+      el('p', 'note', tr('overlay.once')),
+      copyField(tr('overlay.address'), location.origin),
+      copyField(tr('overlay.key'), newKey),
+    );
+  } else if (me.overlayKey) {
+    const since = new Date(me.overlayKey).toLocaleString(lang);
+    box.append(el('p', 'note', `${tr('overlay.since')} ${since}.`));
+    actions.append(
+      confirmButton(tr('overlay.renew'), make),
+      confirmButton(tr('overlay.revoke'), () => change('DELETE', '/api/overlay-key')),
+    );
+  } else {
+    box.append(el('p', 'note', tr('overlay.none')));
+    actions.append(button(tr('overlay.create'), make, 'primary'));
+  }
+  if (actions.childElementCount) box.append(actions);
+  return box;
+}
+
 async function loadPanel() {
   const response = await fetch('/api/me', { credentials: 'same-origin' });
   if (response.status === 401) {
@@ -414,6 +492,7 @@ async function loadPanel() {
 
   document.getElementById('chronicles-empty').hidden = me.chronicles.length > 0;
   document.getElementById('chronicles').replaceChildren(...me.chronicles.map(chronicleBlock));
+  document.getElementById('overlay').replaceChildren(overlayBox());
 }
 
 function setUpPanel() {

@@ -276,3 +276,30 @@ button:disabled {
 .chronicle > .actions {
   margin-bottom: 12px;
 }
+
+.overlay-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  max-width: 560px;
+  display: grid;
+  gap: 8px;
+}
+
+.overlay-box h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.copy-row {
+  display: flex;
+  gap: 8px;
+}
+
+.copy-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
