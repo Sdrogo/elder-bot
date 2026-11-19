@@ -170,6 +170,15 @@ describe('web panel', () => {
     expect((await get('/../package.json')).status).toBe(401);
     expect((await get('/%2e%2e/package.json')).status).toBe(401);
   });
+
+  it('makes browsers check the panel script again on every load', async () => {
+    const first = await get('/app.js?v=33');
+    expect(first.status).toBe(200);
+    expect(first.headers.get('cache-control')).toBe('no-cache');
+    const etag = first.headers.get('etag')!;
+    const again = await fetch(base + '/app.js', { headers: { 'if-none-match': etag } });
+    expect(again.status).toBe(304);
+  });
 });
 
 describe('panel changes', () => {
