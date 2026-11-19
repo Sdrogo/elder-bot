@@ -322,10 +322,7 @@ export function createPanelHandler(deps: PanelDeps) {
       const file = name.slice('static/'.length);
       if (!Object.hasOwn(OVERLAY_FILES, file)) return json(res, 404, { error: 'not found' });
       const body = await readFile(join(overlayDir, file));
-      return send(res, 200, body, OVERLAY_FILES[file]!, {
-        ...headers,
-        'Cache-Control': 'public, max-age=300',
-      });
+      return sendFile(req, res, body, OVERLAY_FILES[file]!, headers);
     }
     if (!userId) {
       return send(
@@ -346,10 +343,7 @@ export function createPanelHandler(deps: PanelDeps) {
       if (!SYMBOLS.has(key)) return json(res, 404, { error: 'no symbol' });
       const body = await readFile(join(symbolsDir, `${key}.png`)).catch(() => undefined);
       if (!body) return json(res, 404, { error: 'no symbol' });
-      return send(res, 200, body, 'image/png', {
-        ...headers,
-        'Cache-Control': 'private, max-age=300',
-      });
+      return sendFile(req, res, body, 'image/png', headers);
     }
     if (name === 'events') {
       const mine = [...streams.values()].filter((s) => s.userId === userId).length;
@@ -435,6 +429,28 @@ export function createPanelHandler(deps: PanelDeps) {
       Location: location,
       ...(cookies.length ? { 'Set-Cookie': cookies } : {}),
     });
+
+  /**
+   * Sends a script, stylesheet or image that browsers must check again on every load.
+   * Cloudflare stretches a short max-age to hours in the browser, which kept an old
+   * panel script running after an update; no-cache with an ETag costs one 304 instead.
+   */
+  function sendFile(
+    req: IncomingMessage,
+    res: ServerResponse,
+    body: Buffer,
+    type: string,
+    headers: Record<string, string> = {},
+  ) {
+    const etag = `"${createHash('sha256').update(body).digest('base64url').slice(0, 22)}"`;
+    const cache = { ...headers, ETag: etag, 'Cache-Control': 'no-cache' };
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, { ...SECURITY_HEADERS, ...cache });
+      res.end();
+      return;
+    }
+    send(res, 200, body, type, cache);
+  }
 
   async function page(res: ServerResponse, file: string) {
     send(res, 200, await readFile(join(staticDir, file)), 'text/html; charset=utf-8');
@@ -659,7 +675,7 @@ export function createPanelHandler(deps: PanelDeps) {
 
     if (method === 'GET' && Object.hasOwn(STATIC_FILES, path)) {
       const body = await readFile(join(staticDir, path.slice(1)));
-      return send(res, 200, body, STATIC_FILES[path]!, { 'Cache-Control': 'public, max-age=300' });
+      return sendFile(req, res, body, STATIC_FILES[path]!);
     }
 
     if (method === 'GET' && path === '/') {
