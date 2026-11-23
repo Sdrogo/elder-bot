@@ -180,6 +180,14 @@ describe('choices', () => {
     );
   });
 
+  it('put Disciplines and powers within the 25 suggestions Discord shows', () => {
+    const first = secondChoices(sheet(), fine)
+      .slice(0, 25)
+      .map((c) => c.value);
+    expect(first.slice(0, 3)).toEqual(['disc:celerity', 'disc:potence', 'disc:presence']);
+    for (const id of sheet().powers) expect(first).toContain(`power:${id}`);
+  });
+
   it('list the specialties of the Skill in with, and nothing else', () => {
     expect(specialtyChoices(sheet(), { kind: 'skill', id: 'fighting' })).toEqual([
       { name: 'Hand-to-Hand +1', value: '0' },
