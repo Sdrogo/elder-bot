@@ -329,3 +329,103 @@ ul.issues li.hint {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+.discipline {
+  margin-bottom: 12px;
+}
+
+.disc-title {
+  display: grid;
+}
+
+.powers {
+  margin-top: 10px;
+}
+
+.resource-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.resource-row select,
+.resource-row input {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.resource-row input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.resource-row .hint {
+  flex-basis: 100%;
+}
+
+.create {
+  margin-top: 20px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sheet-grid .attr-grid {
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.sheet-section h3 {
+  margin-bottom: 8px;
+}
+
+.sheet-section h4 {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.power {
+  padding: 4px 0 4px 12px;
+  font-size: 14px;
+}
+
+.power p {
+  margin: 2px 0 0;
+}
+
+.status {
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 1px 10px;
+  border: 1px solid var(--line);
+}
+
+.status.pending {
+  border-color: #d9a441;
+  color: #f0c46a;
+}
+
+.status.approved {
+  border-color: #7fd18b;
+  color: #7fd18b;
+}
+
+.status.rejected {
+  border-color: var(--blood);
+  color: #ff8a9a;
+}

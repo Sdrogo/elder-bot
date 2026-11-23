@@ -26,7 +26,15 @@ import {
   type CharacterValues,
   type Clan,
 } from '../game/character.js';
-import type { Character, Chronicle } from '../state/campaign.js';
+import {
+  CHRONICLE_TIERS,
+  isChronicleTier,
+  tierFits,
+  type Character,
+  type Chronicle,
+  type ChronicleTier,
+} from '../state/campaign.js';
+import { evaluate, trackerValues } from '../game/creation.js';
 import { parseDraft } from '../game/draft.js';
 import type { Draft } from '../state/drafts.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
@@ -105,6 +113,7 @@ const STATIC_FILES: Record<string, string> = {
   '/panel.css': 'text/css; charset=utf-8',
   '/wizard.js': 'text/javascript; charset=utf-8',
   '/wizard.css': 'text/css; charset=utf-8',
+  '/scheda.js': 'text/javascript; charset=utf-8',
 };
 
 const SECURITY_HEADERS = {
@@ -195,12 +204,20 @@ export function canEditOnPanel(
   return getChronicle(c.chronicleId)?.storytellerId === userId;
 }
 
+/** A sheet choice the Storyteller must approve, with their answer. */
+interface SheetApproval {
+  code: string;
+  target?: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 /** What the panel shows of a character: the saved values plus everything worked out from them. */
 export function characterView(
   c: Character,
   chronicles: Map<number, Chronicle>,
   viewerId = '',
   cam?: string,
+  pending = 0,
 ) {
   const v = c.values;
   const chronicle = c.chronicleId !== undefined ? chronicles.get(c.chronicleId) : undefined;
@@ -215,6 +232,10 @@ export function characterView(
     chronicle: chronicle?.name ?? null,
     owned: c.ownerId === viewerId,
     editable,
+    // Tracker-only characters can get a full sheet from the creation wizard.
+    sheet: !!c.hasSheet,
+    // Sheet choices still waiting for the Storyteller (Brood Child, a Path).
+    pending,
     // The player's VDO.Ninja links, only for those who may change the character.
     cam: cam && editable ? camLinks(cam, c.name) : null,
     attributes: { stamina: v.stamina, composure: v.composure, resolve: v.resolve },
@@ -546,8 +567,13 @@ export function createPanelHandler(deps: PanelDeps) {
     me: WebSession,
     method: string,
     idText: string | undefined,
+    sub: string | undefined,
   ) {
     const id = idText === undefined ? undefined : Number(idText);
+    if (sub === 'create') {
+      if (method !== 'POST') return json(res, 404, { error: 'not found' });
+      return createFromDraft(req, res, me, id!);
+    }
     if (method === 'GET') {
       if (id === undefined) {
         return json(res, 200, { drafts: store.drafts.ownedBy(me.userId).map(draftView) });
@@ -582,6 +608,142 @@ export function createPanelHandler(deps: PanelDeps) {
     return updated
       ? json(res, 200, { draft: draftView(updated) })
       : json(res, 404, { error: 'not found' });
+  }
+
+  /**
+   * POST /api/drafts/:id/create {guild}: a complete draft becomes a character with its full
+   * sheet, or completes the tracker-only character it was opened from. The server runs the
+   * rules again: what the browser says is never trusted.
+   */
+  async function createFromDraft(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    id: number,
+  ) {
+    const text = await readBody(req);
+    if (text === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    const body = text.trim() ? parseObject(text) : {};
+    if (!body) return json(res, 400, { error: 'invalid body' });
+    const draft = store.drafts.get(id, me.userId);
+    if (!draft) return json(res, 404, { error: 'not found' });
+    const d = draft.data;
+    const result = evaluate(d);
+    if (!result.complete || !d.clan) return json(res, 400, { error: 'incomplete' });
+    const name = cleanName(d.name ?? '');
+    if (!name) return json(res, 400, { error: 'invalid', field: 'name' });
+    // The bot still calls the Giovanni line by its V5 name.
+    const clan: Clan = d.clan === 'giovanni' ? 'hecata' : d.clan;
+    const sheet = {
+      data: d,
+      approvals: result.approvals.map((a) => ({ ...a, status: 'pending' as const })),
+    };
+    const { campaign } = store;
+    let character: Character | undefined;
+    if (d.characterId !== undefined) {
+      const old = campaign.getCharacter(d.characterId);
+      if (!old || old.ownerId !== me.userId) return json(res, 404, { error: 'not found' });
+      if (old.hasSheet) return json(res, 409, { error: 'has sheet' });
+      const { tier, stamina, composure, resolve } = trackerValues(d);
+      const updated = campaign.updateCharacter(
+        old.id,
+        { name, clan, values: { tier, stamina, composure, resolve } },
+        me.userId,
+      );
+      if (updated === 'duplicate' || updated === 'limit' || updated === 'tier') {
+        return json(res, 409, { error: updated });
+      }
+      if (!updated) return json(res, 404, { error: 'not found' });
+      campaign.attachSheet(old.id, sheet);
+      character = campaign.getCharacter(old.id);
+    } else {
+      const guild = (await guildsFor(me.userId)).find((g) => g.id === body.guild);
+      if (!guild) return json(res, 400, { error: 'invalid', field: 'guild' });
+      const created = campaign.createCharacter({
+        guildId: guild.id,
+        ownerId: me.userId,
+        name,
+        clan,
+        values: newCharacter(trackerValues(d)),
+        sheet,
+      });
+      if (created === 'duplicate' || created === 'limit') return json(res, 409, { error: created });
+      character = created;
+    }
+    store.drafts.delete(id, me.userId);
+    const chronicles = new Map<number, Chronicle>();
+    const ch =
+      character?.chronicleId === undefined
+        ? undefined
+        : campaign.getChronicle(character.chronicleId);
+    if (ch) chronicles.set(ch.id, ch);
+    return json(res, 200, {
+      character: character && characterView(character, chronicles, me.userId),
+      approvals: result.approvals,
+    });
+  }
+
+  /** How many of a character's sheet choices still wait for the Storyteller. */
+  function pendingOf(c: Character): number {
+    if (!c.hasSheet) return 0;
+    const approvals = store.campaign.getSheet(c.id)?.approvals ?? [];
+    return approvals.filter((a) => (a as SheetApproval).status === 'pending').length;
+  }
+
+  /**
+   * GET /api/characters/:id/sheet: the full sheet, for the owner and the Storyteller of its
+   * Chronicle. POST …/approval {index, approved}: the Storyteller's answer to one choice.
+   */
+  async function sheetApi(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    method: string,
+    id: number,
+    sub: string,
+  ) {
+    const { campaign } = store;
+    const c = campaign.getCharacter(id);
+    const getChronicle = (n: number) => campaign.getChronicle(n);
+    if (!c || !canEditOnPanel(me.userId, c, getChronicle)) {
+      return json(res, 404, { error: 'not found' });
+    }
+    const sheet = campaign.getSheet(c.id);
+    if (!sheet) return json(res, 404, { error: 'not found' });
+    const chronicle = c.chronicleId === undefined ? undefined : getChronicle(c.chronicleId);
+    const canApprove = chronicle?.storytellerId === me.userId;
+    const chronicles = new Map<number, Chronicle>(chronicle ? [[chronicle.id, chronicle]] : []);
+    if (sub === 'sheet' && method === 'GET') {
+      return json(res, 200, {
+        character: characterView(c, chronicles, me.userId, undefined, pendingOf(c)),
+        sheet,
+        canApprove,
+      });
+    }
+    if (sub !== 'approval' || method !== 'POST') return json(res, 404, { error: 'not found' });
+    const text = await readBody(req);
+    if (text === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!canApprove) return json(res, 403, { error: 'storyteller only' });
+    const body = parseObject(text);
+    const approvals = sheet.approvals as SheetApproval[];
+    if (
+      !body ||
+      !isInt(body.index, 0, approvals.length - 1) ||
+      typeof body.approved !== 'boolean'
+    ) {
+      return json(res, 400, { error: 'invalid body' });
+    }
+    approvals[body.index] = {
+      ...approvals[body.index]!,
+      status: body.approved ? 'approved' : 'rejected',
+    };
+    campaign.setApprovals(c.id, approvals);
+    return json(res, 200, { approvals });
   }
 
   async function page(res: ServerResponse, file: string) {
@@ -711,11 +873,17 @@ export function createPanelHandler(deps: PanelDeps) {
       const chronicleName = name(body.name);
       if (!chronicleName) return json(res, 400, { error: 'invalid', field: 'name' });
       if (!isSect(body.sect)) return json(res, 400, { error: 'invalid', field: 'sect' });
+      // The tier of play: '' or none takes any character.
+      const tier = body.tier === undefined || body.tier === '' ? undefined : body.tier;
+      if (tier !== undefined && !isChronicleTier(tier)) {
+        return json(res, 400, { error: 'invalid', field: 'tier' });
+      }
       const created = campaign.createChronicle({
         guildId: guild.id,
         storytellerId: userId,
         name: chronicleName,
         sect: body.sect,
+        tier,
       });
       if (created === 'duplicate' || created === 'limit') return json(res, 409, { error: created });
       if (!campaign.liveChronicle(guild.id, userId)) campaign.setLive(created.id);
@@ -771,7 +939,22 @@ export function createPanelHandler(deps: PanelDeps) {
           if (!isSect(body.sect)) return json(res, 400, { error: 'invalid', field: 'sect' });
           patch.sect = body.sect;
         }
+        let tier: ChronicleTier | undefined | null = null;
+        if (body.tier !== undefined) {
+          if (body.tier !== '' && !isChronicleTier(body.tier)) {
+            return json(res, 400, { error: 'invalid', field: 'tier' });
+          }
+          tier = body.tier === '' ? undefined : body.tier;
+        }
+        // Checked before anything changes: a refused tier leaves the Chronicle as it was.
+        if (
+          tier !== null &&
+          campaign.members(chronicle.id).some((c) => !tierFits(c.values.tier, tier))
+        ) {
+          return json(res, 409, { error: 'tier' });
+        }
         campaign.updateChronicle(chronicle.id, patch);
+        if (tier !== null) campaign.setChronicleTier(chronicle.id, tier);
         return ok();
       }
     }
@@ -891,6 +1074,9 @@ export function createPanelHandler(deps: PanelDeps) {
     if (method === 'GET' && path === '/crea') {
       return session(req) ? page(res, 'crea.html') : redirect(res, '/', []);
     }
+    if (method === 'GET' && path === '/scheda') {
+      return session(req) ? page(res, 'scheda.html') : redirect(res, '/', []);
+    }
 
     if (method === 'GET' && path === '/login') {
       if (!limiter.allow(`login:${ip}`, LOGIN_LIMIT)) return send(res, 429, 'Too many requests');
@@ -954,7 +1140,7 @@ export function createPanelHandler(deps: PanelDeps) {
         if (c) chronicles.set(id, c);
       }
       const view = (c: Character) =>
-        characterView(c, chronicles, me.userId, store.stage.camOf(c.id));
+        characterView(c, chronicles, me.userId, store.stage.camOf(c.id), pendingOf(c));
       const stage = store.stage.settings(me.userId);
       return json(res, 200, {
         user: { id: me.userId, name: me.name },
@@ -966,6 +1152,8 @@ export function createPanelHandler(deps: PanelDeps) {
           name: c.name,
           sect: SECT_NAMES[c.sect],
           sectId: c.sect,
+          tier: c.tier ? TIER_NAMES[c.tier] : null,
+          tierId: c.tier ?? '',
           guild: c.guildId,
           masquerade: c.masquerade,
           live: campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id,
@@ -997,6 +1185,7 @@ export function createPanelHandler(deps: PanelDeps) {
           clans: CLANS.map((id) => ({ id, name: CLAN_NAMES[id] })),
           tiers: TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
           sects: SECTS.map((id) => ({ id, name: SECT_NAMES[id] })),
+          chronicleTiers: CHRONICLE_TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
           maxAttribute: LIMITS.attribute,
           maxName: LIMITS.nameLength,
         },
@@ -1022,11 +1211,14 @@ export function createPanelHandler(deps: PanelDeps) {
       return json(res, 200, { key: store.overlayKeys.create(me.userId) });
     }
 
-    const draftPath = /^\/api\/drafts(?:\/(\d{1,12}))?$/.exec(path);
-    if (draftPath) return draftsApi(req, res, me, method, draftPath[1]);
+    const draftPath = /^\/api\/drafts(?:\/(\d{1,12})(?:\/(create))?)?$/.exec(path);
+    if (draftPath) return draftsApi(req, res, me, method, draftPath[1], draftPath[2]);
 
     const stagePath = /^\/api\/stage(?:\/(cam|background))?$/.exec(path);
     if (stagePath) return stageChange(req, res, me, stagePath[1]);
+
+    const sheetPath = /^\/api\/characters\/(\d{1,12})\/(sheet|approval)$/.exec(path);
+    if (sheetPath) return sheetApi(req, res, me, method, Number(sheetPath[1]), sheetPath[2]!);
 
     const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam))?)?$/.exec(path);
     const chroniclePath =
@@ -1127,7 +1319,9 @@ export function createPanelHandler(deps: PanelDeps) {
       },
       me.userId,
     );
-    if (updated === 'duplicate' || updated === 'limit') return json(res, 409, { error: updated });
+    if (updated === 'duplicate' || updated === 'limit' || updated === 'tier') {
+      return json(res, 409, { error: updated });
+    }
     return updated ? done(updated) : json(res, 404, { error: 'not found' });
   };
 }

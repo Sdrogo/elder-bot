@@ -127,5 +127,8 @@ export function parseDraft(v: unknown): SheetDraft | undefined {
   if (typeof v.path === 'string' && PATHS.some((p) => p.id === v.path)) d.path = v.path;
   const name = text(v.name, DRAFT_LIMITS.name);
   if (name?.trim()) d.name = name;
+  if (Number.isInteger(v.characterId) && (v.characterId as number) > 0) {
+    d.characterId = v.characterId as number;
+  }
   return d;
 }

@@ -97,6 +97,8 @@ export interface SheetDraft {
   extraResources: ResourcePick[];
   flaws: FlawPick[];
   name?: string;
+  /** A tracker-only character this sheet completes, instead of making a new one. */
+  characterId?: number;
 }
 
 export function emptyDraft(tier: CreationTier): SheetDraft {

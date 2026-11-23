@@ -6,7 +6,8 @@ import {
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import { canEditCharacter } from '../auth/campaign.js';
-import { CLAN_NAMES, LIMITS } from '../game/character.js';
+import { CLAN_NAMES, LIMITS, TIER_NAMES } from '../game/character.js';
+import { tierFits } from '../state/campaign.js';
 import type { Context } from '../commands/types.js';
 import { localeFor, t, type Locale, type MessageKey } from '../i18n/index.js';
 import { infoEmbed } from '../ui/format.js';
@@ -103,7 +104,7 @@ export async function handleCampaignButton(
       return ephemeral(interaction, locale, 'chronicle.notFound');
     const free = campaign
       .charactersOf(chronicle.guildId, interaction.user.id)
-      .filter((c) => c.chronicleId === undefined);
+      .filter((c) => c.chronicleId === undefined && tierFits(c.values.tier, chronicle.tier));
     if (!free.length) return ephemeral(interaction, locale, 'chronicle.noFreeCharacter');
     const menu = new StringSelectMenuBuilder()
       .setCustomId(
@@ -139,8 +140,13 @@ export async function handleCampaignSelect(
   if (!c || c.ownerId !== interaction.user.id || c.guildId !== chronicle.guildId) {
     return ephemeral(interaction, locale, 'character.notFound');
   }
-  if (campaign.join(chronicle.id, c.id) === 'busy') {
-    return ephemeral(interaction, locale, 'chronicle.busy', { name: c.name });
+  const joined = campaign.join(chronicle.id, c.id);
+  if (joined === 'busy') return ephemeral(interaction, locale, 'chronicle.busy', { name: c.name });
+  if (joined === 'tier') {
+    return ephemeral(interaction, locale, 'chronicle.wrongTier', {
+      name: c.name,
+      tier: TIER_NAMES[chronicle.tier!],
+    });
   }
   await interaction.update({
     content: t(locale, 'chronicle.joined.private', { name: c.name, chronicle: chronicle.name }),

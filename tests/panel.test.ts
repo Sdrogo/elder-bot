@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newCharacter } from '../src/game/character.js';
 import { emptyDraft, type SheetDraft } from '../src/game/creation.js';
 import { MAX_DRAFTS } from '../src/state/drafts.js';
+import { brujah } from './fixtures/sheets.js';
 import { Store } from '../src/state/store.js';
 import { createPanelHandler } from '../src/web/server.js';
 
@@ -705,5 +706,216 @@ describe('character creation wizard', () => {
     expect((await send('POST', '/api/drafts', { data: { tier: 'neonate' } })).status).toBe(409);
     const big = { tier: 'neonate', name: 'x'.repeat(20_000) };
     expect((await send('POST', '/api/drafts', { data: big })).status).toBe(413);
+  });
+
+  it('creates a character with its full sheet from a complete draft, only once', async () => {
+    const send = await asUser();
+    const half = await send('POST', '/api/drafts', { data: { tier: 'neonate', name: 'Mezza' } });
+    const halfId = ((await half.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${halfId}/create`, { guild: 'g' })).status).toBe(400);
+
+    const saved = await send('POST', '/api/drafts', { data: brujah() });
+    const id = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${id}/create`, { guild: 'other' })).status).toBe(400);
+    expect((await send('POST', `/api/drafts/${id}/create`, { guild: 'g' }, 'wrong')).status).toBe(
+      403,
+    );
+    const res = await send('POST', `/api/drafts/${id}/create`, { guild: 'g' });
+    expect(res.status).toBe(200);
+    const { character } = (await res.json()) as {
+      character: { id: number; name: string; clanId: string; sheet: boolean };
+    };
+    expect(character).toMatchObject({ name: 'Nico', clanId: 'brujah', sheet: true });
+    const stored = store.campaign.getCharacter(character.id)!;
+    // Stamina 3, Composure 3 and Resolve 2 from the sheet drive the trackers.
+    expect(stored.values).toMatchObject({ tier: 'neonate', stamina: 3, health: 8, willpower: 5 });
+    expect(store.campaign.getSheet(character.id)?.data).toMatchObject({ sire: 'caring' });
+    // The draft is gone, so the same sheet can't make a second character.
+    expect((await send('POST', `/api/drafts/${id}/create`, { guild: 'g' })).status).toBe(404);
+
+    // Deleting the character deletes its sheet too.
+    expect((await send('DELETE', `/api/characters/${character.id}`)).status).toBe(204);
+    expect(store.campaign.getSheet(character.id)).toBeUndefined();
+  });
+
+  it('completes a tracker-only character instead of making a new one', async () => {
+    const old = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Vecchio',
+      clan: 'brujah',
+      values: {
+        ...newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+        vitae: 3,
+      },
+    });
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altrui',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+    });
+    if (typeof old !== 'object' || typeof theirs !== 'object') throw new Error('setup');
+    const send = await asUser();
+
+    const stolen = await send('POST', '/api/drafts', {
+      data: { ...brujah(), characterId: theirs.id },
+    });
+    const stolenId = ((await stolen.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${stolenId}/create`, {})).status).toBe(404);
+
+    const saved = await send('POST', '/api/drafts', { data: { ...brujah(), characterId: old.id } });
+    const id = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    const res = await send('POST', `/api/drafts/${id}/create`, {});
+    expect(res.status).toBe(200);
+    const after = store.campaign.getCharacter(old.id)!;
+    expect(after.name).toBe('Nico');
+    expect(after.hasSheet).toBe(true);
+    // Attributes come from the sheet; the trackers in play are kept.
+    expect(after.values).toMatchObject({ stamina: 3, vitae: 3 });
+    expect(store.campaign.charactersOwnedBy('111')).toHaveLength(1);
+
+    const again = await send('POST', '/api/drafts', { data: { ...brujah(), characterId: old.id } });
+    const againId = ((await again.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${againId}/create`, {})).status).toBe(409);
+  });
+
+  it('keeps a Chronicle and its characters on the same tier of play', async () => {
+    const send = await asUser();
+    expect(
+      (
+        await send('POST', '/api/chronicles', {
+          guild: 'g',
+          name: 'Roma',
+          sect: 'camarilla',
+          tier: 'mortal',
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await send('POST', '/api/chronicles', {
+          guild: 'g',
+          name: 'Roma',
+          sect: 'camarilla',
+          tier: 'ancilla',
+        })
+      ).status,
+    ).toBe(200);
+    const rome = store.campaign.chroniclesRunBy('111')[0]!;
+    expect(rome.tier).toBe('ancilla');
+    const neonate = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Giovane',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+    });
+    const dusk = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Crepuscolo',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'duskborn', stamina: 2, composure: 2, resolve: 2 }),
+    });
+    if (typeof neonate !== 'object' || typeof dusk !== 'object') throw new Error('setup');
+    expect(store.campaign.join(rome.id, neonate.id)).toBe('tier');
+
+    // Back to "any tier", both join; a Neonate tier then fits both (Duskborn play as Neonates).
+    expect((await send('POST', `/api/chronicles/${rome.id}`, { tier: '' })).status).toBe(200);
+    expect(store.campaign.join(rome.id, neonate.id)).toBe('ok');
+    expect(store.campaign.join(rome.id, dusk.id)).toBe('ok');
+    const refused = await send('POST', `/api/chronicles/${rome.id}`, {
+      name: 'Nuova',
+      tier: 'elder',
+    });
+    expect(refused.status).toBe(409);
+    expect(store.campaign.getChronicle(rome.id)).toMatchObject({ name: 'Roma' });
+    expect((await send('POST', `/api/chronicles/${rome.id}`, { tier: 'neonate' })).status).toBe(
+      200,
+    );
+
+    // A member can't move to another tier while the Chronicle has one.
+    const moved = await send('POST', `/api/characters/${neonate.id}`, { tier: 'ancilla' });
+    expect(moved.status).toBe(409);
+    expect(((await moved.json()) as { error: string }).error).toBe('tier');
+  });
+
+  it('shows the full sheet to owner and Storyteller, and lets only the Storyteller approve', async () => {
+    const send = await asUser();
+    const saved = await send('POST', '/api/drafts', {
+      data: {
+        ...brujah(),
+        sire: 'brood-child',
+        sireDiscipline: 'presence',
+        broodmate: 'Ada',
+        path: 'honor',
+      },
+    });
+    const draftId = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    const made = await send('POST', `/api/drafts/${draftId}/create`, { guild: 'g' });
+    expect(made.status).toBe(200);
+    const id = ((await made.json()) as { character: { id: number } }).character.id;
+
+    const sheet = (await (await send('GET', `/api/characters/${id}/sheet`)).json()) as {
+      character: { pending: number };
+      sheet: { approvals: { code: string; status: string }[] };
+      canApprove: boolean;
+    };
+    expect(sheet.character.pending).toBe(2);
+    expect(sheet.sheet.approvals.map((a) => [a.code, a.status])).toEqual([
+      ['brood-child', 'pending'],
+      ['path', 'pending'],
+    ]);
+    // Not in a Chronicle: nobody can approve yet, not even the owner.
+    expect(sheet.canApprove).toBe(false);
+    expect(
+      (await send('POST', `/api/characters/${id}/approval`, { index: 0, approved: true })).status,
+    ).toBe(403);
+
+    const ch = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '222',
+      name: 'Altrui',
+      sect: 'anarch',
+    });
+    if (typeof ch !== 'object') throw new Error('setup');
+    expect(store.campaign.join(ch.id, id)).toBe('ok');
+    // The owner still can't approve their own choices; the other Storyteller can.
+    expect(
+      (await send('POST', `/api/characters/${id}/approval`, { index: 0, approved: true })).status,
+    ).toBe(403);
+    const own = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Mia',
+      sect: 'anarch',
+    });
+    if (typeof own !== 'object') throw new Error('setup');
+    store.campaign.leave(id);
+    store.campaign.join(own.id, id);
+    const ok = await send('POST', `/api/characters/${id}/approval`, { index: 1, approved: false });
+    expect(ok.status).toBe(200);
+    expect(store.campaign.getSheet(id)?.approvals).toMatchObject([
+      { code: 'brood-child', status: 'pending' },
+      { code: 'path', status: 'rejected' },
+    ]);
+    expect(
+      (await send('POST', `/api/characters/${id}/approval`, { index: 5, approved: true })).status,
+    ).toBe(400);
+
+    // Someone else's character is not found.
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altro',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+      sheet: { data: brujah(), approvals: [] },
+    });
+    if (typeof theirs !== 'object') throw new Error('setup');
+    expect((await send('GET', `/api/characters/${theirs.id}/sheet`)).status).toBe(404);
+    expect((await get('/scheda')).status).toBe(302);
   });
 });

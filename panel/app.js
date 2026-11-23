@@ -14,6 +14,9 @@ const TEXT = {
     'characters.new': 'Nuovo personaggio',
     'characters.guided': 'Crea scheda guidata',
     'drafts.title': 'Schede in corso',
+    'characters.complete': 'Completa la scheda',
+    'characters.sheet': 'Scheda',
+    'characters.pending': 'da approvare',
     'drafts.untitled': 'Senza nome',
     'drafts.continue': 'Continua',
     'drafts.updated': 'modificata il',
@@ -38,6 +41,10 @@ const TEXT = {
     'error.invalid': 'Controlla i campi: qualcosa non va.',
     'error.change': 'Modifica non riuscita. Ricarica la pagina e riprova.',
     'chronicles.new': 'Nuova Cronaca',
+    'chronicles.tier': 'Livello di gioco',
+    'chronicles.anyTier': 'qualsiasi livello',
+    'error.tier':
+      'Il livello non corrisponde: i personaggi di una Cronaca devono avere il suo livello di gioco.',
     'chronicles.empty': 'Non sei Narratore di nessuna Cronaca. Creane una con "Nuova Cronaca".',
     goLive: 'Metti in onda',
     sect: 'Setta',
@@ -106,6 +113,9 @@ const TEXT = {
     'characters.new': 'New character',
     'characters.guided': 'Guided character sheet',
     'drafts.title': 'Sheets in progress',
+    'characters.complete': 'Complete the sheet',
+    'characters.sheet': 'Sheet',
+    'characters.pending': 'to approve',
     'drafts.untitled': 'Untitled',
     'drafts.continue': 'Continue',
     'drafts.updated': 'changed on',
@@ -130,6 +140,9 @@ const TEXT = {
     'error.invalid': 'Check the fields: something is wrong.',
     'error.change': 'The change failed. Reload the page and try again.',
     'chronicles.new': 'New Chronicle',
+    'chronicles.tier': 'Tier of play',
+    'chronicles.anyTier': 'any tier',
+    'error.tier': 'The tier does not match: characters in a Chronicle must have its tier of play.',
     'chronicles.empty': 'You run no Chronicle. Make one with "New Chronicle".',
     goLive: 'Put on air',
     sect: 'Sect',
@@ -250,7 +263,12 @@ async function change(method, url, body) {
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    const key = { duplicate: 'error.duplicate', limit: 'error.limit', invalid: 'error.invalid' };
+    const key = {
+      duplicate: 'error.duplicate',
+      limit: 'error.limit',
+      invalid: 'error.invalid',
+      tier: 'error.tier',
+    };
     notify(tr(key[data.error] ?? 'error.change'));
     return false;
   }
@@ -361,7 +379,9 @@ function characterForm(c, onDone) {
 
 function characterCard(c, chronicle) {
   const card = el('article', 'card');
-  card.append(el('h3', '', c.name));
+  const title = el('h3', '', c.name);
+  if (c.pending) title.append(el('span', 'badge', tr('characters.pending')));
+  card.append(title);
   card.append(el('div', 'meta', `${c.clan} · ${c.tier} · ${c.chronicle ?? tr('noChronicle')}`));
   const h = c.health;
   card.append(
@@ -415,6 +435,17 @@ function characterCard(c, chronicle) {
         actions.replaceWith(form);
       }),
     );
+    if (c.sheet) {
+      const sheet = el('a', 'button', tr('characters.sheet'));
+      sheet.href = `/scheda?id=${c.id}`;
+      actions.append(sheet);
+    }
+    if (c.owned && !c.sheet && c.tierId !== 'ghoul') {
+      // Characters made before the wizard have trackers only: the wizard can fill in the rest.
+      const complete = el('a', 'button', tr('characters.complete'));
+      complete.href = `/crea?personaggio=${c.id}`;
+      actions.append(complete);
+    }
     if (c.owned) {
       actions.append(
         confirmButton(tr('delete'), () => change('DELETE', `/api/characters/${c.id}`)),
@@ -473,6 +504,14 @@ function chronicleForm(ch, onDone) {
   form.append(
     field(tr('name'), name),
     field(tr('sect'), select('sect', me.options.sects, ch?.sectId ?? 'camarilla')),
+    field(
+      tr('chronicles.tier'),
+      select(
+        'tier',
+        [{ id: '', name: tr('chronicles.anyTier') }, ...me.options.chronicleTiers],
+        ch?.tierId ?? '',
+      ),
+    ),
   );
   const actions = el('div', 'actions');
   const submit = el('button', 'primary', tr(ch ? 'save' : 'create'));
@@ -482,7 +521,7 @@ function chronicleForm(ch, onDone) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
-    const body = { name: data.get('name'), sect: data.get('sect') };
+    const body = { name: data.get('name'), sect: data.get('sect'), tier: data.get('tier') };
     if (!ch) body.guild = data.get('guild') ?? me.guilds[0].id;
     submit.disabled = true;
     const ok = await change('POST', ch ? `/api/chronicles/${ch.id}` : '/api/chronicles', body);
@@ -518,7 +557,8 @@ function chronicleBlock(ch) {
     el('span', 'boxes', boxes(ch.masquerade, 10 - ch.masquerade)),
     value,
   );
-  block.append(title, el('div', 'meta', ch.sect), masquerade, tools);
+  const meta = [ch.sect, ch.tier ?? tr('chronicles.anyTier')].join(' · ');
+  block.append(title, el('div', 'meta', meta), masquerade, tools);
   const cards = el('div', 'cards');
   cards.append(...ch.characters.map((c) => characterCard(c, ch)));
   block.append(ch.characters.length ? cards : el('p', 'empty', tr('noMembers')));

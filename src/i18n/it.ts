@@ -261,6 +261,8 @@ export const it: Messages = {
     'Tutti i tuoi personaggi sono già in una Cronaca. Creane uno nuovo con `/elder character create`, poi premi di nuovo il pulsante.',
   'chronicle.pickPlaceholder': 'Il tuo personaggio',
   'chronicle.busy': "**{name}** gioca già in un'altra Cronaca.",
+  'chronicle.wrongTier': '**{name}** non può entrare: la Cronaca è di livello {tier}.',
+  'character.wrongTier': 'Il nuovo livello non corrisponde a quello della Cronaca.',
   'chronicle.joined.private': '**{name}** entra in {chronicle}.',
   'chronicle.joined': '**{name}** ({user}) entra in {chronicle}.',
   'session.new.chronicle':

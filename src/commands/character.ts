@@ -251,6 +251,7 @@ export const character: Command = {
       );
       if (updated === 'duplicate')
         return replyEphemeral(interaction, locale, 'character.duplicate');
+      if (updated === 'tier') return replyEphemeral(interaction, locale, 'character.wrongTier');
       if (!updated || updated === 'limit') return;
       await interaction.reply({ ...sheetMessage(locale, updated, chronicle, true), ...ephemeral });
       return;
