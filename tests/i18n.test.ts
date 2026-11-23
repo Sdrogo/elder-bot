@@ -1,6 +1,4 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { session } from '../src/commands/session.js';
 import { en } from '../src/i18n/en.js';
 import { LOCALES, localeFor, resolveLocale, t, tn } from '../src/i18n/index.js';
 import { de } from '../src/i18n/de.js';
@@ -31,9 +29,7 @@ describe('catalogs', () => {
   }
 
   it('fills placeholders and picks the plural form', () => {
-    expect(t('it', 'session.language.set', { language: 'Italiano' })).toBe(
-      'Lingua del tavolo: Italiano.',
-    );
+    expect(t('it', 'chronicle.busy', { name: 'Lucrezia' })).toContain('Lucrezia');
     expect(tn('en', 'dice.count', 1)).toBe('1 die');
     expect(tn('en', 'dice.count', 3)).toBe('3 dice');
     expect(tn('it', 'roll.successes', 1)).toBe('1 successo');
@@ -63,64 +59,41 @@ describe('table language', () => {
   });
   afterEach(() => store.close());
 
-  /** A fake /elder session language interaction, enough for the command to run. */
-  function languageCommand(value: string, userId = 'st', locale = 'en-US') {
-    const replies: { embeds: { toJSON(): { description?: string } }[] }[] = [];
-    const interaction = {
-      channelId: 'c1',
-      locale,
-      user: { id: userId },
-      memberPermissions: null,
-      options: {
-        getSubcommand: () => 'language',
-        getString: () => value,
-        getUser: () => null,
-      },
-      reply: async (message: (typeof replies)[number]) => {
-        replies.push(message);
-      },
-    } as unknown as ChatInputCommandInteraction;
-    return { interaction, replies };
+  /** A Chronicle played in channel c1, with the language set on the panel. */
+  function chronicleIn(channelId: string, locale?: string) {
+    const c = store.campaign.createChronicle({
+      guildId: 'g1',
+      storytellerId: 'st',
+      name: `Roma ${channelId}`,
+      sect: 'camarilla',
+    });
+    if (typeof c !== 'object') throw new Error(c);
+    store.bindChronicle(channelId, c.id);
+    store.campaign.setChronicleLocale(c.id, locale);
+    return c;
   }
 
-  it("beats the user's Discord language", () => {
+  it("is the Chronicle's and beats the user's Discord language", () => {
     expect(localeFor({ channelId: 'c1', locale: 'it' }, store)).toBe('it');
-    store.setTableLocale('c1', 'en');
+    chronicleIn('c1', 'en');
     expect(localeFor({ channelId: 'c1', locale: 'it' }, store)).toBe('en');
     expect(localeFor({ channelId: 'c2', locale: 'it' }, store)).toBe('it');
   });
 
-  it('is set by the Storyteller and cleared by auto', async () => {
-    store.setStoryteller('c1', 'st');
-    const set = languageCommand('it');
-    await session.execute(set.interaction, { store });
-    expect(store.getTableLocale('c1')).toBe('it');
-    expect(set.replies[0]?.embeds[0]?.toJSON().description).toBe('Lingua del tavolo: Italiano.');
-    expect(localeFor({ channelId: 'c1', locale: 'en-US' }, store)).toBe('it');
-
-    const auto = languageCommand('auto');
-    await session.execute(auto.interaction, { store });
-    expect(store.getTableLocale('c1')).toBeUndefined();
+  it("follows each user's Discord with no language set", () => {
+    const c = chronicleIn('c1', 'it');
+    store.campaign.setChronicleLocale(c.id, undefined);
     expect(localeFor({ channelId: 'c1', locale: 'en-US' }, store)).toBe('en');
   });
 
-  it('can only be changed by the Storyteller', async () => {
-    store.setStoryteller('c1', 'st');
-    const other = languageCommand('it', 'player');
-    await session.execute(other.interaction, { store });
-    expect(store.getTableLocale('c1')).toBeUndefined();
-  });
-
-  it('is cleared when the session ends', () => {
-    store.setTableLocale('c1', 'it');
-    store.setTableLocale('c2', 'it');
+  it('stays when the session ends', () => {
+    chronicleIn('c1', 'it');
     store.endSession('c1');
-    expect(store.getTableLocale('c1')).toBeUndefined();
-    expect(store.getTableLocale('c2')).toBe('it');
+    expect(store.getTableLocale('c1')).toBe('it');
   });
 
   it('ignores an unknown stored value', () => {
-    store.setTableLocale('c1', 'xx');
+    chronicleIn('c1', 'xx');
     expect(localeFor({ channelId: 'c1', locale: 'it' }, store)).toBe('it');
   });
 });

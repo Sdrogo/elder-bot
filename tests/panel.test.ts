@@ -42,6 +42,9 @@ beforeEach(async () => {
     clientSecret: 'shh',
     fetchFn: fakeDiscord,
     guildsOf: async () => [{ id: 'g', name: 'Tavolo' }],
+    channelsOf: async () => [{ id: '5551', name: '#tavolo' }],
+    // Everyone is on the server except user 404.
+    memberName: async (_guild, id) => (id === '40404' ? undefined : `Utente ${id}`),
   });
   server = createServer((req, res) => void handle(req, res));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -400,6 +403,104 @@ describe('Storyteller controls', () => {
     if (typeof other !== 'object') throw new Error('setup');
     expect((await send(`/api/chronicles/${other.id}/live`, {})).status).toBe(404);
     expect((await send(`/api/chronicles/${other.id}/masquerade`, { delta: 1 })).status).toBe(404);
+  });
+});
+
+describe('sessions and hand-overs from the panel', () => {
+  async function setup() {
+    const cookie = await login();
+    const me = (await (await get('/api/me', cookie)).json()) as { csrf: string };
+    const send = (path: string, body?: unknown) =>
+      fetch(base + path, {
+        method: 'POST',
+        headers: {
+          cookie,
+          'content-type': 'application/json',
+          'x-csrf-token': me.csrf,
+          origin: PUBLIC,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    await send('/api/chronicles', { guild: 'g', name: 'Roma', sect: 'camarilla' });
+    const [ch] = store.campaign.chroniclesRunBy('111');
+    return { cookie, send, ch: ch! };
+  }
+
+  it('plays a Chronicle in a channel, with its language, and frees it', async () => {
+    const { cookie, send, ch } = await setup();
+    const channels = await (await get('/api/guilds/g/channels', cookie)).json();
+    expect(channels).toEqual({ channels: [{ id: '5551', name: '#tavolo' }] });
+    expect((await get('/api/guilds/other/channels', cookie)).status).toBe(404);
+
+    const edit = (patch: object) =>
+      send(`/api/chronicles/${ch.id}`, { name: 'Roma', sect: 'camarilla', ...patch });
+    expect((await edit({ channel: '9999' })).status).toBe(400);
+    expect((await edit({ locale: 'xx' })).status).toBe(400);
+    expect((await edit({ channel: '5551', locale: 'it' })).status).toBe(200);
+    expect(store.getStoryteller('5551')).toBe('111');
+    expect(store.getTableLocale('5551')).toBe('it');
+    const view = (await (await get('/api/me', cookie)).json()) as {
+      chronicles: { channel: string; channelName: string; locale: string }[];
+    };
+    expect(view.chronicles[0]).toMatchObject({
+      channel: '5551',
+      channelName: '#tavolo',
+      locale: 'it',
+    });
+
+    expect((await edit({ channel: '', locale: '' })).status).toBe(200);
+    expect(store.getStoryteller('5551')).toBeUndefined();
+    expect(store.campaign.getChronicle(ch.id)?.locale).toBeUndefined();
+  });
+
+  it('ends a session, archives and hands over a Chronicle, with no body needed', async () => {
+    const { send, ch } = await setup();
+    await send(`/api/chronicles/${ch.id}`, { channel: '5551' });
+    const task = { name: 'Hack', target: 5, maxTests: 3, testsDone: 1, successes: 2 };
+    store.saveProlonged('5551', '222', task);
+    expect((await send(`/api/chronicles/${ch.id}/end`)).status).toBe(200);
+    expect(store.getProlonged('5551', '222')).toBeUndefined();
+    expect((await send(`/api/chronicles/${ch.id}/live`)).status).toBe(200);
+
+    expect((await send(`/api/chronicles/${ch.id}/transfer`, { to: '40404' })).status).toBe(400);
+    expect((await send(`/api/chronicles/${ch.id}/transfer`, { to: '111' })).status).toBe(400);
+    expect((await send(`/api/chronicles/${ch.id}/transfer`, { to: '22222' })).status).toBe(200);
+    expect(store.getStoryteller('5551')).toBe('22222');
+    expect(store.campaign.liveChronicle('g', '111')).toBeUndefined();
+    // No longer theirs: no more changes.
+    expect((await send(`/api/chronicles/${ch.id}/archive`)).status).toBe(404);
+
+    await send('/api/chronicles', { guild: 'g', name: 'Napoli', sect: 'anarch' });
+    const [napoli] = store.campaign.chroniclesRunBy('111');
+    expect((await send(`/api/chronicles/${napoli!.id}/archive`)).status).toBe(200);
+    expect(store.campaign.getChronicle(napoli!.id)?.archived).toBe(true);
+  });
+
+  it('lets only the owner give a character to someone on the server', async () => {
+    const { cookie, send } = await setup();
+    const values = newCharacter({ tier: 'neonate', stamina: 3, composure: 4, resolve: 2 });
+    const make = (ownerId: string, name: string) => {
+      const c = store.campaign.createCharacter({
+        guildId: 'g',
+        ownerId,
+        name,
+        clan: 'brujah',
+        values,
+      });
+      if (typeof c !== 'object') throw new Error('setup');
+      return c;
+    };
+    const mine = make('111', 'Lucrezia');
+    const theirs = make('22222', 'Altro');
+    const people = (await (await get('/api/guilds/g/people', cookie)).json()) as {
+      people: { id: string; name: string }[];
+    };
+    expect(people.people).toEqual([{ id: '22222', name: 'Utente 22222' }]);
+
+    expect((await send(`/api/characters/${theirs.id}/give`, { to: '111' })).status).toBe(404);
+    expect((await send(`/api/characters/${mine.id}/give`, { to: '40404' })).status).toBe(400);
+    expect((await send(`/api/characters/${mine.id}/give`, { to: '22222' })).status).toBe(204);
+    expect(store.campaign.getCharacter(mine.id)?.ownerId).toBe('22222');
   });
 });
 

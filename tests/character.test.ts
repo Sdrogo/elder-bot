@@ -84,8 +84,6 @@ describe('campaign component ids', () => {
   it('survive a round trip', () => {
     const refs: CampaignRef[] = [
       { kind: 'adjust', characterId: 4, track: 'vitae', delta: -1 },
-      { kind: 'delete', characterId: 4 },
-      { kind: 'give', characterId: 4, fromId: '111', toId: '222', accept: true },
       { kind: 'pick', chronicleId: 2, userId: '333' },
       { kind: 'join', chronicleId: 2, userId: '333' },
     ];

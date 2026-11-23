@@ -8,7 +8,7 @@ import {
 import { SUCCESS_THRESHOLD, type TestResult } from '../dice/test.js';
 import type { Pool } from '../dice/test.js';
 import { t, tn, type Locale } from '../i18n/index.js';
-import type { RollRequest, RollResponse } from '../game/roll.js';
+import { failedDice, type RollRequest, type RollResponse } from '../game/roll.js';
 import { encodeRollId } from './customId.js';
 import { diceEmoji } from './diceEmojis.js';
 
@@ -200,6 +200,16 @@ export function rollMessage(
           ButtonStyle.Primary,
         ),
       );
+      // With failed normal dice, one click rerolls the best ones (up to 3).
+      if (failedDice(result.dice).length) {
+        buttons.push(
+          button(
+            encodeRollId('wp-auto', request, { normal: result.dice, hunger: result.hunger }),
+            t(locale, 'button.willpowerBest'),
+            ButtonStyle.Primary,
+          ),
+        );
+      }
     }
     if (response.bargainAvailable) {
       buttons.push(button(encodeRollId('bargain', request), TERMS.bargain, ButtonStyle.Danger));

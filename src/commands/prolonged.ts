@@ -1,4 +1,12 @@
-import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  MessageFlags,
+  SlashCommandBuilder,
+  type ButtonBuilder,
+  type ButtonInteraction,
+} from 'discord.js';
 import {
   PROLONGED_TARGETS,
   PROLONGED_TESTS,
@@ -12,6 +20,7 @@ import { choice, described, localeFor, t, type Locale } from '../i18n/index.js';
 import {
   COLORS,
   TERMS,
+  button,
   consequenceFields,
   formatDice,
   formatPool,
@@ -19,7 +28,7 @@ import {
 } from '../ui/format.js';
 import { rollerHunger } from './campaignShared.js';
 import { hungerOption, where } from './shared.js';
-import type { Command } from './types.js';
+import type { Command, Context } from './types.js';
 
 const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prolonged.description')
   .addSubcommand((s) =>
@@ -54,9 +63,7 @@ const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prol
         described(o.setName('bonus'), 'opt.prolonged.bonus').setMinValue(-10).setMaxValue(10),
       )
       .addIntegerOption((o) => hungerOption(o, 'opt.prolonged.hunger')),
-  )
-  .addSubcommand((s) => described(s.setName('status'), 'cmd.prolonged.status.description'))
-  .addSubcommand((s) => described(s.setName('cancel'), 'cmd.prolonged.cancel.description'));
+  );
 
 export const prolonged: Command = {
   data,
@@ -74,7 +81,10 @@ export const prolonged: Command = {
         interaction.options.getInteger('tests', true),
       );
       store.saveProlonged(channelId, userId, task);
-      await interaction.reply({ embeds: [taskEmbed(locale, task, interaction.user.displayName)] });
+      await interaction.reply({
+        embeds: [taskEmbed(locale, task, interaction.user.displayName)],
+        components: [cancelRow(locale, userId)],
+      });
       return;
     }
 
@@ -82,21 +92,6 @@ export const prolonged: Command = {
       await interaction.reply({
         content: t(locale, 'prolonged.none'),
         flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    if (sub === 'status') {
-      await interaction.reply({
-        embeds: [taskEmbed(locale, current, interaction.user.displayName)],
-      });
-      return;
-    }
-
-    if (sub === 'cancel') {
-      store.deleteProlonged(channelId, userId);
-      await interaction.reply({
-        content: t(locale, 'prolonged.cancelled', { name: current.name }),
       });
       return;
     }
@@ -157,7 +152,10 @@ export const prolonged: Command = {
     } else if (status === 'failed') {
       embed.setColor(COLORS.painful).setFooter({ text: t(locale, 'prolonged.failed') });
     }
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({
+      embeds: [embed],
+      components: status === 'ongoing' ? [cancelRow(locale, userId)] : [],
+    });
     showRoll(store, where(interaction), (who) => {
       const shown = resultOf(result);
       return {
@@ -168,6 +166,42 @@ export const prolonged: Command = {
     });
   },
 };
+
+const CANCEL_PREFIX = 'pl:cancel:';
+
+export function isProlongedId(customId: string): boolean {
+  return customId.startsWith(CANCEL_PREFIX);
+}
+
+/** The button that drops the player's task; only that player can press it. */
+function cancelRow(locale: Locale, userId: string): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    button(`${CANCEL_PREFIX}${userId}`, t(locale, 'button.prolongedCancel'), ButtonStyle.Secondary),
+  );
+}
+
+export async function handleProlongedButton(
+  interaction: ButtonInteraction,
+  { store }: Context,
+): Promise<void> {
+  const locale = localeFor(interaction, store);
+  const userId = interaction.customId.slice(CANCEL_PREFIX.length);
+  if (interaction.user.id !== userId) {
+    await interaction.reply({
+      content: t(locale, 'button.notYours'),
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  const current = store.getProlonged(interaction.channelId, userId);
+  if (!current) {
+    await interaction.update({ components: [] });
+    return;
+  }
+  store.deleteProlonged(interaction.channelId, userId);
+  await interaction.update({ components: [] });
+  await interaction.followUp({ content: t(locale, 'prolonged.cancelled', { name: current.name }) });
+}
 
 function taskEmbed(locale: Locale, task: ProlongedTask, player: string): EmbedBuilder {
   return new EmbedBuilder()

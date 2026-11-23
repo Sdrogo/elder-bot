@@ -8,21 +8,29 @@ beforeEach(() => {
 afterEach(() => store.close());
 
 describe('Store', () => {
-  it('keeps one Storyteller per channel', () => {
+  it('takes the Storyteller from the Chronicle played in the channel', () => {
     expect(store.getStoryteller('c1')).toBeUndefined();
-    store.setStoryteller('c1', 'u1');
-    store.setStoryteller('c1', 'u2');
+    const c = store.campaign.createChronicle({
+      guildId: 'g1',
+      storytellerId: 'u1',
+      name: 'Roma',
+      sect: 'camarilla',
+    });
+    if (typeof c !== 'object') throw new Error(c);
+    store.bindChronicle('c1', c.id);
+    expect(store.getStoryteller('c1')).toBe('u1');
+    store.campaign.transferChronicle(c.id, 'u2');
     expect(store.getStoryteller('c1')).toBe('u2');
     expect(store.getStoryteller('c2')).toBeUndefined();
+    store.campaign.unbindChannel(c.id);
+    expect(store.getStoryteller('c1')).toBeUndefined();
   });
 
-  it('ending a session wipes the table, Storyteller included', () => {
+  it('ending a session drops the prolonged tasks of that table only', () => {
     const task = { name: 'Hack', target: 5, maxTests: 3, testsDone: 1, successes: 2 };
-    store.setStoryteller('c1', 'u1');
     store.saveProlonged('c1', 'u2', task);
     store.saveProlonged('c2', 'u2', task);
     store.endSession('c1');
-    expect(store.getStoryteller('c1')).toBeUndefined();
     expect(store.getProlonged('c1', 'u2')).toBeUndefined();
     expect(store.getProlonged('c2', 'u2')).toEqual(task);
   });

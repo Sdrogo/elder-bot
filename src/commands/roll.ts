@@ -11,12 +11,16 @@ const data = addTestOptions(
         .setMinValue(0)
         .setMaxValue(30),
   ) as SlashCommandBuilder,
-);
+).addBooleanOption((o) => described(o.setName('npc'), 'opt.roll.npc'));
 
 export const roll: Command = {
   data,
   async execute(interaction, ctx) {
-    const title = t(localeFor(interaction, ctx.store), 'roll.title');
-    await replyWithRoll(interaction, ctx, interaction.options.getInteger('dice', true), title);
+    // An NPC's pool from its stat block: no Hunger dice, no Willpower, no Beast's Bargain.
+    const npc = interaction.options.getBoolean('npc') ?? false;
+    const title = t(localeFor(interaction, ctx.store), npc ? 'npc.name' : 'roll.title');
+    await replyWithRoll(interaction, ctx, interaction.options.getInteger('dice', true), title, {
+      npc,
+    });
   },
 };

@@ -49,6 +49,7 @@ import {
   isResolution,
 } from '../state/stage.js';
 import { MASQUERADE_BOXES, type Store } from '../state/store.js';
+import { LANGUAGE_NAMES, LOCALES, isLocale } from '../i18n/index.js';
 import { authorizeUrl, identify, type Fetch, type OAuthApp } from './discord.js';
 
 // The web panel: "Log in with Discord", then each user sees their own characters and Chronicles.
@@ -144,6 +145,10 @@ export interface PanelDeps {
    * Without it, only the servers where they already have a character or a Chronicle count.
    */
   guildsOf?: (userId: string) => Promise<Guild[]>;
+  /** Text channels of a server where both the user and the bot can read and write. */
+  channelsOf?: (guildId: string, userId: string) => Promise<Guild[]>;
+  /** A member's name on a server, or undefined when they are not on it. */
+  memberName?: (guildId: string, userId: string) => Promise<string | undefined>;
 }
 
 export interface Guild {
@@ -225,6 +230,7 @@ export function characterView(
   const editable = c.ownerId === viewerId || (!!viewerId && chronicle?.storytellerId === viewerId);
   return {
     id: c.id,
+    guild: c.guildId,
     name: c.name,
     clan: CLAN_NAMES[c.clan],
     clanId: c.clan,
@@ -484,6 +490,68 @@ export function createPanelHandler(deps: PanelDeps) {
     if (guildCache.size > 1000) guildCache.clear();
     guildCache.set(userId, { at: now(), guilds });
     return guilds;
+  }
+
+  const channelCache = new Map<string, { at: number; channels: Guild[] }>();
+
+  /** Channels where a user may play a Chronicle on that server; empty without the bot's help. */
+  async function channelsFor(guildId: string, userId: string): Promise<Guild[]> {
+    const key = `${guildId}:${userId}`;
+    const cached = channelCache.get(key);
+    if (cached && now() - cached.at < GUILDS_TTL_MS) return cached.channels;
+    let channels: Guild[] = [];
+    if (deps.channelsOf) {
+      try {
+        channels = await deps.channelsOf(guildId, userId);
+      } catch (error) {
+        console.error('Canali Discord non letti:', (error as Error).message);
+      }
+    }
+    if (channelCache.size > 1000) channelCache.clear();
+    channelCache.set(key, { at: now(), channels });
+    return channels;
+  }
+
+  const nameCache = new Map<string, { at: number; name: string | undefined }>();
+
+  /** A user's name on a server; undefined when they are not a member. */
+  async function nameOn(guildId: string, userId: string): Promise<string | undefined> {
+    const key = `${guildId}:${userId}`;
+    const cached = nameCache.get(key);
+    if (cached && now() - cached.at < GUILDS_TTL_MS) return cached.name;
+    let name: string | undefined;
+    if (deps.memberName) {
+      try {
+        name = await deps.memberName(guildId, userId);
+      } catch (error) {
+        console.error('Membro Discord non letto:', (error as Error).message);
+        return undefined;
+      }
+    } else if (store.campaign.peopleOf(guildId).includes(userId)) {
+      // Without Discord (tests, local runs), only people the bot already knows count.
+      name = userId;
+    }
+    if (nameCache.size > 5000) nameCache.clear();
+    nameCache.set(key, { at: now(), name });
+    return name;
+  }
+
+  /** People the bot knows on a server, for handing over a character or a Chronicle. */
+  async function peopleFor(guildId: string, userId: string): Promise<Guild[]> {
+    const ids = store.campaign.peopleOf(guildId).filter((id) => id !== userId);
+    const people: Guild[] = [];
+    for (const id of ids.slice(0, 50)) {
+      const name = await nameOn(guildId, id);
+      if (name !== undefined) people.push({ id, name });
+    }
+    return people.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** A Discord user id typed or picked on the panel, checked against the server. */
+  async function recipient(guildId: string, value: unknown, userId: string) {
+    if (typeof value !== 'string' || !/^\d{5,20}$/.test(value) || value === userId)
+      return undefined;
+    return (await nameOn(guildId, value)) === undefined ? undefined : value;
   }
 
   const cookie = (name: string, value: string, maxAgeSeconds: number) =>
@@ -906,6 +974,22 @@ export function createPanelHandler(deps: PanelDeps) {
       case 'live':
         campaign.setLive(chronicle.id);
         return ok();
+      case 'end':
+        // End of a session at the Chronicle's table: prolonged tasks still open are dropped.
+        if (chronicle.channelId) store.endSession(chronicle.channelId);
+        return ok();
+      case 'archive':
+        campaign.archiveChronicle(chronicle.id);
+        return ok();
+      case 'transfer': {
+        const to = await recipient(chronicle.guildId, body.to, userId);
+        if (!to) return json(res, 400, { error: 'invalid', field: 'to' });
+        if (campaign.chronicles(chronicle.guildId, to).length >= LIMITS.chroniclesPerStoryteller) {
+          return json(res, 409, { error: 'limit' });
+        }
+        campaign.transferChronicle(chronicle.id, to);
+        return ok();
+      }
       case 'masquerade': {
         if (!isInt(body.delta, -MASQUERADE_BOXES, MASQUERADE_BOXES)) {
           return json(res, 400, { error: 'invalid body' });
@@ -947,6 +1031,21 @@ export function createPanelHandler(deps: PanelDeps) {
           }
           tier = body.tier === '' ? undefined : body.tier;
         }
+        // The channel where it is played ('' frees it) and the bot's language at its table.
+        let channel: string | null | undefined;
+        if (body.channel !== undefined) {
+          if (body.channel === '') channel = null;
+          else {
+            const channels = await channelsFor(chronicle.guildId, userId);
+            if (!channels.some((c) => c.id === body.channel)) {
+              return json(res, 400, { error: 'invalid', field: 'channel' });
+            }
+            channel = body.channel as string;
+          }
+        }
+        if (body.locale !== undefined && body.locale !== '' && !isLocale(body.locale)) {
+          return json(res, 400, { error: 'invalid', field: 'locale' });
+        }
         // Checked before anything changes: a refused tier leaves the Chronicle as it was.
         if (
           tier !== null &&
@@ -956,6 +1055,16 @@ export function createPanelHandler(deps: PanelDeps) {
         }
         campaign.updateChronicle(chronicle.id, patch);
         if (tier !== null) campaign.setChronicleTier(chronicle.id, tier);
+        if (channel === null) campaign.unbindChannel(chronicle.id);
+        else if (channel !== undefined && channel !== chronicle.channelId) {
+          store.bindChronicle(channel, chronicle.id);
+        }
+        if (body.locale !== undefined) {
+          campaign.setChronicleLocale(
+            chronicle.id,
+            isLocale(body.locale) ? body.locale : undefined,
+          );
+        }
         return ok();
       }
     }
@@ -1143,6 +1252,11 @@ export function createPanelHandler(deps: PanelDeps) {
       const view = (c: Character) =>
         characterView(c, chronicles, me.userId, store.stage.camOf(c.id), pendingOf(c));
       const stage = store.stage.settings(me.userId);
+      // The names of the channels where the Chronicles are played.
+      const channelNames = new Map<string, string>();
+      for (const guildId of new Set(runs.filter((c) => c.channelId).map((c) => c.guildId))) {
+        for (const ch of await channelsFor(guildId, me.userId)) channelNames.set(ch.id, ch.name);
+      }
       return json(res, 200, {
         user: { id: me.userId, name: me.name },
         csrf: me.csrf,
@@ -1157,6 +1271,9 @@ export function createPanelHandler(deps: PanelDeps) {
           tierId: c.tier ?? '',
           guild: c.guildId,
           masquerade: c.masquerade,
+          channel: c.channelId ?? '',
+          channelName: c.channelId ? (channelNames.get(c.channelId) ?? c.channelId) : null,
+          locale: c.locale ?? '',
           live: campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id,
           characters: campaign.members(c.id).map(view),
         })),
@@ -1187,10 +1304,25 @@ export function createPanelHandler(deps: PanelDeps) {
           tiers: TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
           sects: SECTS.map((id) => ({ id, name: SECT_NAMES[id] })),
           chronicleTiers: CHRONICLE_TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
+          languages: LOCALES.map((id) => ({ id, name: LANGUAGE_NAMES[id] })),
           maxAttribute: LIMITS.attribute,
           maxName: LIMITS.nameLength,
         },
       });
+    }
+
+    // GET /api/guilds/:id/channels|people: choices for the Chronicle and hand-over forms.
+    const guildPath = /^\/api\/guilds\/([0-9A-Za-z]{1,20})\/(channels|people)$/.exec(path);
+    if (guildPath && method === 'GET') {
+      const guildId = guildPath[1]!;
+      if (!(await guildsFor(me.userId)).some((g) => g.id === guildId)) {
+        return json(res, 404, { error: 'not found' });
+      }
+      const list =
+        guildPath[2] === 'channels'
+          ? await channelsFor(guildId, me.userId)
+          : await peopleFor(guildId, me.userId);
+      return json(res, 200, { [guildPath[2]!]: list });
     }
 
     // Every change below: a JSON body, the CSRF token and the panel's own origin.
@@ -1221,9 +1353,11 @@ export function createPanelHandler(deps: PanelDeps) {
     const sheetPath = /^\/api\/characters\/(\d{1,12})\/(sheet|approval)$/.exec(path);
     if (sheetPath) return sheetApi(req, res, me, method, Number(sheetPath[1]), sheetPath[2]!);
 
-    const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam))?)?$/.exec(path);
+    const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam|give))?)?$/.exec(path);
     const chroniclePath =
-      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove))?)?$/.exec(path);
+      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove|end|archive|transfer))?)?$/.exec(
+        path,
+      );
     if (!(characterPath || chroniclePath) || !['POST', 'DELETE'].includes(method)) {
       return json(res, 404, { error: 'not found' });
     }
@@ -1233,8 +1367,8 @@ export function createPanelHandler(deps: PanelDeps) {
     if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
       return json(res, 429, { error: 'too many requests' });
     }
-    // A new webcam link needs no body.
-    const noBody = method === 'DELETE' || (characterPath?.[2] === 'cam' && !text.trim());
+    // Deleting, a new webcam link and the Chronicle's buttons (on air, end, archive) need no body.
+    const noBody = method === 'DELETE' || !text.trim();
     const body = noBody ? {} : parseObject(text);
     if (!body) return json(res, 400, { error: 'invalid body' });
     const { campaign } = store;
@@ -1290,6 +1424,18 @@ export function createPanelHandler(deps: PanelDeps) {
       if (method === 'POST') store.stage.renewCam(character.id);
       else store.stage.removeCam(character.id);
       return done(character);
+    }
+
+    if (sub === 'give') {
+      // POST /api/characters/:id/give {to}: the owner hands the character to another player.
+      if (method !== 'POST' || character.ownerId !== me.userId) {
+        return json(res, 403, { error: 'owner only' });
+      }
+      const to = await recipient(character.guildId, body.to, me.userId);
+      if (!to) return json(res, 400, { error: 'invalid', field: 'to' });
+      const moved = campaign.transferCharacter(character.id, me.userId, to);
+      if (moved === 'duplicate' || moved === 'limit') return json(res, 409, { error: moved });
+      return moved ? send(res, 204, '') : json(res, 404, { error: 'not found' });
     }
 
     if (method === 'DELETE') {

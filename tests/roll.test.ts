@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { performRoll, rerollWithWillpower, type RollRequest } from '../src/game/roll.js';
+import {
+  failedDice,
+  performRoll,
+  rerollWithWillpower,
+  type RollRequest,
+} from '../src/game/roll.js';
 import { decodeRollId, encodeRollId } from '../src/ui/customId.js';
 import { commands } from '../src/commands/index.js';
 
@@ -146,13 +151,19 @@ describe('slash commands', () => {
       'roll',
       'contest',
       'prolonged',
-      'npc',
       'frenzy',
       'masquerade',
-      'session',
-      'character',
-      'chronicle',
+      'sheet',
+      'invite',
       'panel',
     ]);
+  });
+});
+
+describe('one-click Willpower reroll', () => {
+  it('picks up to 3 failed normal dice, never successes', () => {
+    expect(failedDice([10, 1, 6, 5, 2, 4])).toEqual([1, 3, 4]);
+    expect(failedDice([6, 7, 10])).toEqual([]);
+    expect(failedDice([1])).toEqual([0]);
   });
 });

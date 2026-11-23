@@ -16,6 +16,7 @@ import {
 import { isStoryteller, storytellerOnly } from '../auth/storyteller.js';
 import {
   WILLPOWER_REROLL,
+  failedDice,
   judge,
   performRoll,
   rerollWithWillpower,
@@ -183,6 +184,20 @@ export async function handleRollButton(
       return;
     }
 
+    // The best reroll in one click: up to 3 failed normal dice, never the Hunger dice.
+    case 'wp-auto': {
+      if (!ref.faces) return;
+      const spender = store.campaign.activeCharacter(channelId, request.userId);
+      if (spender && spender.values.willpower <= 0) {
+        await replyEphemeral(interaction, t(locale, 'willpower.none', { name: spender.name }));
+        return;
+      }
+      const failed = failedDice(ref.faces.normal);
+      if (!failed.length) return replyEphemeral(interaction, t(locale, 'willpower.noFailures'));
+      await spendWillpower(interaction, ctx, locale, { ...ref, faces: ref.faces }, failed);
+      return;
+    }
+
     // Back to the roll as it was, with its buttons.
     case 'wp-cancel': {
       if (!ref.faces) return;
@@ -208,6 +223,26 @@ export async function handleRollSelect(
     await replyEphemeral(interaction, t(locale, 'button.notYours'));
     return;
   }
+  await spendWillpower(
+    interaction,
+    ctx,
+    locale,
+    { ...ref, faces: ref.faces },
+    interaction.values.map(Number),
+  );
+}
+
+/**
+ * Push Yourself (p. 104): rerolls the picked normal dice, once per roll, and takes 1 Willpower
+ * from the roller's character at this table.
+ */
+async function spendWillpower(
+  interaction: ButtonInteraction | StringSelectMenuInteraction,
+  ctx: Context,
+  locale: Locale,
+  ref: RollRef & { faces: NonNullable<RollRef['faces']> },
+  picked: number[],
+): Promise<void> {
   if (!claim(interaction, 'willpower')) return alreadyUsed(interaction, locale);
 
   const request: RollRequest = { ...ref.request, channelId: interaction.channelId };
@@ -215,7 +250,7 @@ export async function handleRollSelect(
     request,
     ref.faces.normal,
     ref.faces.hunger,
-    interaction.values.map(Number),
+    picked,
     ctx.roller,
   );
   const original = interaction.message.embeds[0];

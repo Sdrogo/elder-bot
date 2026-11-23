@@ -10,7 +10,7 @@ Il bot riceve da Discord solo le interazioni con i suoi comandi e pulsanti. Non 
 
 Per far funzionare la partita salva, per ogni canale in cui viene usato:
 
-- l'ID Discord del canale e degli utenti che tirano o che fanno da Narratore;
+- l'ID Discord del canale e degli utenti che tirano;
 - i valori di gioco: il Masquerade Tracker e l'avanzamento dei compiti prolungati;
 - i testi scritti nei comandi che devono restare tra un tiro e l'altro: i nomi dei compiti prolungati.
 
@@ -18,7 +18,7 @@ Se un giocatore crea un personaggio, o un Narratore una Cronaca, il bot salva an
 
 - l'ID Discord del proprietario del personaggio e del Narratore della Cronaca;
 - il personaggio: nome, clan, livello di gioco, Stamina, Composure, Resolve e i tracciati (Health, Vitae, Willpower, Humanity);
-- la Cronaca: nome, setta, Masquerade Tracker, canale in cui si gioca e quali personaggi ne fanno parte;
+- la Cronaca: nome, setta, Masquerade Tracker, canale in cui si gioca, lingua del bot e quali personaggi ne fanno parte;
 - un registro delle modifiche ai tracciati (chi, cosa, quando), cancellato dopo 30 giorni.
 
 Se usi il pannello web, al login Discord comunica al bot solo il tuo ID e il tuo nome visualizzato (permesso `identify`). Il bot salva una sessione con questi due dati e l'impronta del cookie di accesso; la sessione scade dopo 30 giorni o quando premi "Esci". Se il Narratore crea una chiave per l'overlay di OBS, il bot ne salva solo l'impronta e la data; la chiave permette solo di leggere la sua Cronaca in onda, muoverne i tracciati e scegliere quale Cronaca è in onda. Per la scena di OBS il bot salva anche, per il Narratore, l'immagine di sfondo che carica e le impostazioni della scena; per ogni Cronaca, l'ultimo tiro (nomi, dadi ed esito) da mostrare nel riquadro dei tiri. Se un giocatore attiva la webcam per OBS, il bot salva solo un codice casuale del suo flusso: il video passa direttamente dal browser del giocatore a OBS tramite [VDO.Ninja](https://vdo.ninja), non dal bot, e non comprende l'audio. Il pannello non usa cookie di tracciamento né servizi di analisi. Il traffico passa da Cloudflare, che ne è responsabile secondo la propria [informativa](https://www.cloudflare.com/privacypolicy/).
@@ -31,11 +31,11 @@ I dati servono solo a far funzionare il gioco: tenere i punteggi di ogni tavolo 
 
 ## Dove e per quanto
 
-I dati stanno in un database sul server privato di chi gestisce il bot, con una copia di sicurezza notturna sullo stesso server che viene sovrascritta dopo 14 giorni. Personaggi e Cronache restano finché il proprietario non li cancella (`/elder character delete`; una Cronaca archiviata resta salvata). Lo stato dei canali resta finché il Narratore non chiude la partita con `/elder session end`, che cancella lo stato del canale, o finché il bot non viene rimosso o spento. I log tecnici, che possono contenere ID Discord in caso di errore, vengono ruotati automaticamente.
+I dati stanno in un database sul server privato di chi gestisce il bot, con una copia di sicurezza notturna sullo stesso server che viene sovrascritta dopo 14 giorni. Personaggi e Cronache restano finché il proprietario non li cancella dal pannello web (una Cronaca archiviata resta salvata). I compiti prolungati di un canale restano finché il Narratore non chiude la sessione dal pannello, o finché il bot non viene rimosso o spento. I log tecnici, che possono contenere ID Discord in caso di errore, vengono ruotati automaticamente.
 
 ## I tuoi diritti
 
-Puoi vedere i tuoi personaggi con `/elder character list` e cancellarli con `/elder character delete`. Per tutto il resto puoi chiedere di vedere o cancellare i dati legati al tuo ID Discord aprendo una [issue su GitHub](https://github.com/Sdrogo/elder-bot/issues) (senza scrivere lì dati personali), oppure chiedere al Narratore di chiudere la partita nel tuo canale. Se sei nell'Unione Europea hai anche i diritti previsti dal GDPR, compreso il reclamo al Garante per la protezione dei dati personali.
+Puoi vedere e cancellare i tuoi personaggi dal pannello web (`/elder panel`). Per tutto il resto puoi chiedere di vedere o cancellare i dati legati al tuo ID Discord aprendo una [issue su GitHub](https://github.com/Sdrogo/elder-bot/issues) (senza scrivere lì dati personali), oppure chiedere al Narratore di chiudere la sessione nel tuo canale. Se sei nell'Unione Europea hai anche i diritti previsti dal GDPR, compreso il reclamo al Garante per la protezione dei dati personali.
 
 ## Discord
 
