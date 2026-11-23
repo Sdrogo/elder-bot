@@ -801,7 +801,10 @@ async function loadPanel() {
 
   document.getElementById('chronicles-empty').hidden = me.chronicles.length > 0;
   document.getElementById('chronicles').replaceChildren(...me.chronicles.map(chronicleBlock));
-  document.getElementById('overlay').replaceChildren(overlayBox());
+  // The OBS overlay is for Storytellers; a player only needs their webcam link, on the card.
+  const overlay = document.getElementById('overlay');
+  if (me.overlay) overlay.replaceChildren(overlayBox());
+  else overlay.replaceChildren();
   await loadDrafts();
 }
 
