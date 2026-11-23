@@ -283,7 +283,12 @@ const boxes = (filled, empty, crossed = 0) =>
 /** One tracker row; with `track` and an editable character, − and + buttons around the value. */
 function track(c, name, boxText, value, key) {
   const row = el('div', 'track');
-  row.append(el('span', 'label', name), el('span', 'boxes', boxText));
+  const label = el('span', 'label', name);
+  // Drop, heart, brain and face from the overlay's icons, beside the four main trackers.
+  if (['health', 'vitae', 'willpower', 'humanity'].includes(key) && window.ELDER?.trackerIcon) {
+    label.prepend(window.ELDER.trackerIcon(key));
+  }
+  row.append(label, el('span', 'boxes', boxText));
   const end = el('span', 'value');
   if (key && c.editable) {
     const step = (delta) => () =>

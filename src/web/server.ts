@@ -90,6 +90,7 @@ const GAME_MODULES = new Set([
 
 const OVERLAY_FILES: Record<string, string> = {
   'common.js': 'text/javascript; charset=utf-8',
+  'icons.js': 'text/javascript; charset=utf-8',
   'frame.js': 'text/javascript; charset=utf-8',
   'overlay.css': 'text/css; charset=utf-8',
 };
