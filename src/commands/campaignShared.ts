@@ -8,6 +8,8 @@ import { isAdmin } from '../auth/campaign.js';
 import { CLAN_NAMES, hungerDice, vitaeMax } from '../game/character.js';
 import { t, type Locale, type MessageKey } from '../i18n/index.js';
 import type { Character, Chronicle } from '../state/campaign.js';
+import { parseDraft } from '../game/draft.js';
+import type { SheetDraft } from '../game/creation.js';
 import type { Context } from './types.js';
 
 /** Discord lists at most 25 autocomplete suggestions. */
@@ -161,10 +163,11 @@ export function rollerHunger(
   { store }: Context,
   locale: Locale,
   option = 'hunger',
+  character?: Character,
 ): { hunger: number; note?: APIEmbedField } {
   const given = interaction.options.getInteger(option);
   if (given !== null) return { hunger: given };
-  const c = store.campaign.activeCharacter(interaction.channelId, interaction.user.id);
+  const c = character ?? store.campaign.activeCharacter(interaction.channelId, interaction.user.id);
   if (!c) return { hunger: 0 };
   const hunger = hungerDice(c.values);
   return {
@@ -179,4 +182,26 @@ export function rollerHunger(
       }),
     },
   };
+}
+
+/**
+ * The character whose sheet a roll uses: the user's character at this channel's Chronicle,
+ * otherwise their only character with a full sheet on this server.
+ */
+export function sheetCharacter(
+  { store }: Context,
+  where: { guildId: string | null; channelId: string | null; userId: string },
+): { character: Character; sheet: SheetDraft } | { character?: Character; sheet?: undefined } {
+  const { campaign } = store;
+  let character = where.channelId
+    ? campaign.activeCharacter(where.channelId, where.userId)
+    : undefined;
+  if (!character && where.guildId) {
+    const own = campaign.charactersOf(where.guildId, where.userId).filter((c) => c.hasSheet);
+    if (own.length === 1) character = own[0];
+  }
+  if (!character) return {};
+  const stored = character.hasSheet ? campaign.getSheet(character.id) : undefined;
+  const sheet = stored ? parseDraft(stored.data) : undefined;
+  return sheet ? { character, sheet } : { character };
 }

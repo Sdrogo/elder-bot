@@ -42,7 +42,7 @@ describe('/elder', () => {
     const dice =
       roll && 'options' in roll ? roll.options?.find((o) => o.name === 'dice') : undefined;
     expect(dice?.description_localizations?.it).toBe(
-      'Attributo + Abilità, Disciplina o Composure + Resolve',
+      'Pool come numero (oppure lascialo vuoto e usa attribute + with dalla scheda)',
     );
     expect(roll?.description_localizations?.it).toContain('Attributo + Abilità');
   });

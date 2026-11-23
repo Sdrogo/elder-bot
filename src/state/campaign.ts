@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { SURGE_TTL_MS, parseSurges, type Surges } from '../game/sheetPool.js';
 import {
   LIMITS,
   normalize,
@@ -194,6 +195,9 @@ export class Campaign {
       CREATE TABLE IF NOT EXISTS character_sheets (
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         data TEXT NOT NULL, approvals TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS character_surges (
+        character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
+        data TEXT NOT NULL, at INTEGER NOT NULL);
     `);
     // Chronicles made before tiers of play have none: they take any character.
     const columns = db.prepare('PRAGMA table_info(chronicles)').all() as { name: string }[];
@@ -283,6 +287,45 @@ export class Campaign {
           createdAt: row.created_at,
         }
       : undefined;
+  }
+
+  // Blood Surge: lasts the scene (p. 147). Kept per character until the scene or session ends,
+  // and forgotten after SURGE_TTL_MS in case nobody ends it.
+
+  getSurges(characterId: number, now = Date.now()): Surges {
+    const row = this.db
+      .prepare('SELECT data, at FROM character_surges WHERE character_id = ?')
+      .get(characterId) as { data: string; at: number } | undefined;
+    if (!row) return {};
+    if (now - row.at > SURGE_TTL_MS) {
+      this.clearSurges(characterId);
+      return {};
+    }
+    return parseSurges(JSON.parse(row.data));
+  }
+
+  /** Saves the active surges; the clock restarts with each new surge. */
+  setSurges(characterId: number, surges: Surges, now = Date.now()): void {
+    this.db
+      .prepare(
+        `INSERT INTO character_surges (character_id, data, at) VALUES (?, ?, ?)
+         ON CONFLICT (character_id) DO UPDATE SET data = excluded.data, at = excluded.at`,
+      )
+      .run(characterId, JSON.stringify(surges), now);
+  }
+
+  clearSurges(characterId: number): void {
+    this.db.prepare('DELETE FROM character_surges WHERE character_id = ?').run(characterId);
+  }
+
+  /** End of a session: every surge in the Chronicle ends. */
+  clearChronicleSurges(chronicleId: number): void {
+    this.db
+      .prepare(
+        `DELETE FROM character_surges WHERE character_id IN
+           (SELECT character_id FROM chronicle_members WHERE chronicle_id = ?)`,
+      )
+      .run(chronicleId);
   }
 
   getCharacter(id: number): Character | undefined {

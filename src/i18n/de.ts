@@ -9,7 +9,8 @@ export const de: Messages = {
 
   'cmd.roll.description':
     'Probe: Attribut + Fertigkeit (oder Disziplin), Erfolg ab 6, eine 10 zählt 2',
-  'opt.roll.dice': 'Attribut + Fertigkeit, Disziplin oder Composure + Resolve',
+  'opt.roll.dice':
+    'Pool als Zahl (oder leer lassen und attribute + with vom Charakterbogen nutzen)',
 
   'opt.test.difficulty': 'Schwierigkeit: benötigte Erfolge',
   'opt.test.bonus': 'Bonuswürfel (positiv) oder Maluswürfel (negativ)',
@@ -159,6 +160,45 @@ export const de: Messages = {
   'sheet.noChronicle': 'keine Chronik',
   'button.pickCharacter': 'Charakter wählen',
   'opt.roll.npc': 'Wurf für einen NSC: Pool aus dem Werteblock, ohne Hunger-Würfel',
+  'opt.roll.attribute': 'Attribut vom Charakterbogen',
+  'opt.roll.with':
+    'Was dazukommt: Fertigkeit, Spezialisierung, Disziplin, Kraft, Attribut oder Lifepath',
+  'opt.roll.surge': 'Blood Surge: Vitae ausgeben, um ein Attribut oder eine Disziplin zu steigern',
+  'sheetRoll.pool': 'Pool',
+  'sheetRoll.mixed':
+    'Nutze `dice` oder die Bogen-Optionen (`attribute`, `with`, `surge`), nicht beides.',
+  'sheetRoll.needPool': 'Gib den Pool an: `dice`, oder `attribute` + `with` vom Charakterbogen.',
+  'sheetRoll.npc': 'NSC-Würfe nutzen `dice`: die Bogen-Optionen sind für Spielercharaktere.',
+  'sheetRoll.noCharacter':
+    'Hier gibt es keinen Charakter mit vollständigem Bogen: würfle im Kanal deiner Chronik oder vervollständige den Bogen im Panel. `dice` geht immer.',
+  'sheetRoll.noSheet':
+    '{name} hat nur Leisten: vervollständige den Bogen im Panel, um daraus zu würfeln, oder nutze `dice`.',
+  'sheetRoll.hint.noCharacter': 'Kein Charakter mit vollständigem Bogen hier: nutze dice',
+  'sheetRoll.hint.noSheet': 'Vervollständige den Bogen im Panel, oder nutze dice',
+  'sheetRoll.pickFromList': 'Wähle `{option}` aus der Liste, die Discord vorschlägt.',
+  'sheetRoll.issue.needAttribute':
+    'Wähle ein `attribute` (oder eine Kraft in `with`, die ihr eigenes mitbringt).',
+  'sheetRoll.issue.needSecond':
+    'Wähle, was `with` dem Attribut kommt: Fertigkeit, Disziplin, Kraft, Attribut oder Lifepath.',
+  'sheetRoll.issue.sameAttribute': 'Wähle zwei verschiedene Attribute.',
+  'sheetRoll.issue.unknownTrait':
+    'Dieser Wert steht nicht auf dem Bogen: wähle einen aus der Liste.',
+  'sheetRoll.issue.noPower': 'Dein Charakter kennt diese Kraft nicht.',
+  'sheetRoll.issue.noDiscipline': 'Dein Charakter hat keine Punkte in dieser Disziplin.',
+  'sheetRoll.issue.noSpecialty':
+    'Diese Spezialisierung steht nicht mehr auf dem Bogen: wähle neu aus der Liste.',
+  'sheetRoll.issue.surgeNoDiscipline': 'Blood Surge braucht mindestens 1 Punkt in der Disziplin.',
+  'sheetRoll.issue.surgeLimit': 'Dieser Blood Surge überschreitet die Grenze deines Tiers.',
+  'sheetRoll.issue.surgeVitae': 'Nicht genug Vitae für diesen Blood Surge.',
+  'sheetRoll.surgeSpent': '{name} gibt {cost} Vitae aus: {trait} +{dots} bis zum Ende der Szene.',
+  'sheetRoll.surgeActive': 'Aktiv bis zum Ende der Szene: {list}.',
+  'sheetRoll.surgeEnded': 'Blood Surge für {name} beendet.',
+  'sheetRoll.impaired': '{attributes} Impaired (Health oder Willpower auf 0): −{dice} Würfel.',
+  'sheetRoll.powerAttribute':
+    'Diese Kraft nutzt normalerweise {attribute}: der Storyteller entscheidet.',
+  'sheetRoll.trackerDiffers':
+    '{attribute}: {sheet} auf dem Bogen, {tracker} auf den Leisten. Der Wurf nutzt den Bogen.',
+  'button.surgeEnd': 'Blood Surge beenden',
   'button.masqueradeThreat': 'Bedrohungsprobe',
   'button.prolongedCancel': 'Aufgabe abbrechen',
   'button.willpowerBest': 'Willpower: Fehlschläge neu würfeln',

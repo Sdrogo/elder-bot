@@ -7,7 +7,7 @@ export const en = {
   'cmd.elder.description': 'Dice rolls for Vampire: The Masquerade 6e',
 
   'cmd.roll.description': 'Test: Attribute + Skill (or Discipline), success on 6+, a 10 counts 2',
-  'opt.roll.dice': 'Attribute + Skill, Discipline, or Composure + Resolve',
+  'opt.roll.dice': 'Pool as a number (or leave it out and use attribute + with from your sheet)',
 
   'opt.test.difficulty': 'Difficulty: successes needed to win',
   'opt.test.bonus': 'Bonus dice (positive) or penalty dice (negative)',
@@ -154,6 +154,42 @@ export const en = {
   'sheet.noChronicle': 'no Chronicle',
   'button.pickCharacter': 'Choose a character',
   'opt.roll.npc': 'Roll for an NPC: the pool from their stat block, no Hunger dice',
+  'opt.roll.attribute': 'Attribute from your character sheet',
+  'opt.roll.with': 'What goes with it: Skill, specialty, Discipline, power, Attribute or lifepath',
+  'opt.roll.surge': 'Blood Surge: spend Vitae to raise an Attribute or Discipline for the scene',
+  'sheetRoll.pool': 'Pool',
+  'sheetRoll.mixed':
+    'Use either `dice` or the sheet options (`attribute`, `with`, `surge`), not both.',
+  'sheetRoll.needPool': 'Give the pool: `dice`, or `attribute` + `with` from your character sheet.',
+  'sheetRoll.npc': 'NPC rolls use `dice`: the sheet options are for player characters.',
+  'sheetRoll.noCharacter':
+    "No character with a full sheet here: roll in your Chronicle's channel, or complete the sheet on the panel. You can always use `dice`.",
+  'sheetRoll.noSheet':
+    '{name} has trackers only: complete the sheet on the panel to roll from it, or use `dice`.',
+  'sheetRoll.hint.noCharacter': 'No character with a full sheet here: use dice',
+  'sheetRoll.hint.noSheet': 'Complete the sheet on the panel, or use dice',
+  'sheetRoll.pickFromList': 'Pick `{option}` from the list Discord suggests.',
+  'sheetRoll.issue.needAttribute':
+    'Choose an `attribute` (or a power in `with`, which brings its own).',
+  'sheetRoll.issue.needSecond':
+    'Choose what goes `with` the Attribute: a Skill, Discipline, power, Attribute or lifepath.',
+  'sheetRoll.issue.sameAttribute': 'Pick two different Attributes.',
+  'sheetRoll.issue.unknownTrait': 'That trait is not on the sheet: pick one from the list.',
+  'sheetRoll.issue.noPower': 'Your character does not know that power.',
+  'sheetRoll.issue.noDiscipline': 'Your character has no dots in that Discipline.',
+  'sheetRoll.issue.noSpecialty':
+    'That specialty is not on the sheet any more: pick again from the list.',
+  'sheetRoll.issue.surgeNoDiscipline': 'Blood Surge needs at least 1 dot in the Discipline.',
+  'sheetRoll.issue.surgeLimit': 'That Blood Surge goes past the limit of your tier.',
+  'sheetRoll.issue.surgeVitae': 'Not enough Vitae for that Blood Surge.',
+  'sheetRoll.surgeSpent': '{name} spends {cost} Vitae: {trait} +{dots} until the end of the scene.',
+  'sheetRoll.surgeActive': 'Active until the end of the scene: {list}.',
+  'sheetRoll.surgeEnded': 'Blood Surge ended for {name}.',
+  'sheetRoll.impaired': '{attributes} Impaired (Health or Willpower at 0): −{dice} dice.',
+  'sheetRoll.powerAttribute': 'This power normally uses {attribute}: the Storyteller decides.',
+  'sheetRoll.trackerDiffers':
+    '{attribute}: {sheet} on the sheet, {tracker} on the trackers. The roll uses the sheet.',
+  'button.surgeEnd': 'End Blood Surge',
   'button.masqueradeThreat': 'Threat test',
   'button.prolongedCancel': 'Cancel task',
   'button.willpowerBest': 'Willpower: reroll failures',
