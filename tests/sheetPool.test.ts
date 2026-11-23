@@ -222,3 +222,16 @@ describe('stored surges', () => {
     expect(campaign.getSurges(c.id)).toEqual({});
   });
 });
+
+describe('/elder contest options', () => {
+  it('read a typed number as a tie-break and a picked trait as a sheet pool', async () => {
+    const { tieNumber, wantsSheet } = await import('../src/commands/contest.js');
+    expect(tieNumber('3')).toBe(3);
+    expect(tieNumber('attr:wits')).toBeUndefined();
+    expect(tieNumber(null)).toBeUndefined();
+    expect(wantsSheet('3', null)).toBe(false);
+    expect(wantsSheet('attr:wits', null)).toBe(true);
+    expect(wantsSheet(null, 'skill:fighting')).toBe(true);
+    expect(wantsSheet(null, null, 'attr:strength:1')).toBe(true);
+  });
+});

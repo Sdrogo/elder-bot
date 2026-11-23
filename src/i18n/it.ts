@@ -17,12 +17,13 @@ export const it: Messages = {
   'opt.test.reason': 'Cosa stai tentando',
 
   'cmd.contest.description': 'Test contrapposto: vince chi ottiene più successi',
-  'opt.contest.dice': 'Il tuo pool',
-  'opt.contest.opponent_dice': "Pool dell'avversario",
+  'opt.contest.dice': 'La tua pool come numero (oppure attribute + with dalla scheda)',
+  'opt.contest.opponent_dice':
+    "Pool dell'avversario come numero (oppure opponent_attribute + opponent_with)",
   'opt.contest.opponent': 'Giocatore avversario',
-  'opt.contest.attribute': 'Il tuo Attributo, per i pareggi',
+  'opt.contest.attribute': 'Attributo dalla scheda, o il suo valore per i pareggi se usi dice',
   'opt.contest.opponent_attribute':
-    "Attributo dell'avversario, per i pareggi (un PNG: metà del suo pool)",
+    'Attributo del giocatore avversario, o un numero per i pareggi (PNG: metà pool)',
   'opt.contest.hunger': 'I tuoi dadi Hunger (0-5)',
   'opt.contest.opponent_hunger': "Dadi Hunger dell'avversario (un PG vampiro)",
   'opt.contest.reason': 'Posta in gioco',
@@ -196,6 +197,16 @@ export const it: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} sulla scheda, {tracker} sui tracker. Il tiro usa la scheda.',
   'button.surgeEnd': 'Fine Blood Surge',
+  'sheetRoll.contest.needOpponent': "Scegli l'`opponent` per tirare dalla sua scheda.",
+  'sheetRoll.contest.needOpponentPool':
+    "Indica la pool dell'avversario: `opponent_dice`, oppure `opponent_attribute` + `opponent_with` dalla scheda del giocatore avversario.",
+  'sheetRoll.contest.needPool':
+    'Indica la tua pool: `dice`, oppure `attribute` + `with` dalla scheda.',
+  'sheetRoll.hint.pickOpponent': "Scegli prima l'avversario",
+  'opt.contest.opponent_with': "Cosa va con l'Attributo del giocatore avversario, dalla sua scheda",
+  'opt.contest.surge':
+    'Blood Surge: spendi Vitae per alzare un Attributo o una Disciplina per la scena',
+  'opt.contest.with': 'Cosa va col tuo Attributo: Skill, specialità, Disciplina, potere, lifepath',
   'button.masqueradeThreat': 'Test di minaccia',
   'button.prolongedCancel': 'Annulla compito',
   'button.willpowerBest': 'Willpower: rilancia i fallimenti',

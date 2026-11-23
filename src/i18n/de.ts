@@ -19,11 +19,14 @@ export const de: Messages = {
   'opt.test.reason': 'Was du versuchst',
 
   'cmd.contest.description': 'Vergleichende Probe: die meisten Erfolge gewinnen',
-  'opt.contest.dice': 'Dein Pool',
-  'opt.contest.opponent_dice': 'Pool des Gegners',
+  'opt.contest.dice': 'Dein Pool als Zahl (oder attribute + with vom Bogen)',
+  'opt.contest.opponent_dice':
+    'Pool des Gegners als Zahl (oder opponent_attribute + opponent_with)',
   'opt.contest.opponent': 'Gegnerischer Spieler',
-  'opt.contest.attribute': 'Dein Attribut, bei Gleichstand',
-  'opt.contest.opponent_attribute': 'Attribut des Gegners, bei Gleichstand (ein NSC: halber Pool)',
+  'opt.contest.attribute':
+    'Attribut vom Bogen, oder sein Wert für Gleichstände, wenn du dice nutzt',
+  'opt.contest.opponent_attribute':
+    'Attribut des gegnerischen Spielers, oder eine Zahl für Gleichstände (NSC: halber Pool)',
   'opt.contest.hunger': 'Deine Hunger-Würfel (0-5)',
   'opt.contest.opponent_hunger': 'Hunger-Würfel des Gegners (ein Vampir-SC)',
   'opt.contest.reason': 'Worum es geht',
@@ -199,6 +202,16 @@ export const de: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} auf dem Bogen, {tracker} auf den Leisten. Der Wurf nutzt den Bogen.',
   'button.surgeEnd': 'Blood Surge beenden',
+  'sheetRoll.contest.needOpponent': 'Wähle den `opponent`, um von seinem Bogen zu würfeln.',
+  'sheetRoll.contest.needOpponentPool':
+    'Gib den Pool des Gegners an: `opponent_dice`, oder `opponent_attribute` + `opponent_with` vom Bogen des gegnerischen Spielers.',
+  'sheetRoll.contest.needPool': 'Gib deinen Pool an: `dice`, oder `attribute` + `with` vom Bogen.',
+  'sheetRoll.hint.pickOpponent': 'Wähle zuerst den Gegner',
+  'opt.contest.opponent_with': 'Was zum Attribut des gegnerischen Spielers kommt, von seinem Bogen',
+  'opt.contest.surge':
+    'Blood Surge: Vitae ausgeben, um ein Attribut oder eine Disziplin zu steigern',
+  'opt.contest.with':
+    'Was zu deinem Attribut kommt: Fertigkeit, Spezialisierung, Disziplin, Kraft, Lifepath',
   'button.masqueradeThreat': 'Bedrohungsprobe',
   'button.prolongedCancel': 'Aufgabe abbrechen',
   'button.willpowerBest': 'Willpower: Fehlschläge neu würfeln',
