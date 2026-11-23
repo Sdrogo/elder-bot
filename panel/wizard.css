@@ -385,8 +385,13 @@ ul.issues li.hint {
 }
 
 .sheet-grid .attr-grid {
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 24px;
+}
+
+/* Attributes take a whole row: three columns of name and five dots don't fit in one card. */
+.sheet-section.wide {
+  grid-column: 1 / -1;
 }
 
 .sheet-section h3 {
@@ -436,4 +441,61 @@ ul.issues li.hint {
 
 .lifepath .specialties {
   padding: 2px 0 8px 16px;
+}
+
+.resource-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resource-row strong {
+  font-size: 14px;
+}
+
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.num {
+  min-width: 1.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Longer explanations, folded under a card or a row. */
+.choice-wrap {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+details.more {
+  font-size: 13px;
+  color: var(--text);
+}
+
+details.more summary {
+  cursor: pointer;
+  color: var(--quiet);
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+details.more p {
+  margin: 6px 0;
+  line-height: 1.45;
+}
+
+.choice-wrap details.more {
+  padding: 0 12px;
+}
+
+.discipline > details.more,
+.lifepath > details.more {
+  margin: 4px 0 8px;
 }

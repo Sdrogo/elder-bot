@@ -65,7 +65,13 @@ function lifepath(v: unknown): LifepathPick | undefined {
 
 function resource(v: unknown): ResourcePick | undefined {
   if (!isObj(v) || !RESOURCE_KINDS.includes(v.kind as ResourceKind)) return undefined;
-  return { kind: v.kind as ResourceKind, detail: text(v.detail) ?? '', dots: dots(v.dots) ?? 0 };
+  const pick: ResourcePick = {
+    kind: v.kind as ResourceKind,
+    detail: text(v.detail) ?? '',
+    dots: dots(v.dots) ?? 0,
+  };
+  if (v.coterie === true && pick.kind === 'haven') pick.coterie = true;
+  return pick;
 }
 
 function flaw(v: unknown): FlawPick | undefined {

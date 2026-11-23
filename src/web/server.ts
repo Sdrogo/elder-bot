@@ -82,6 +82,7 @@ const GAME_MODULES = new Set([
   'alpha2/background',
   'alpha2/clans',
   'alpha2/core',
+  'alpha2/details',
   'alpha2/disciplines',
   'alpha2/prereq',
   'alpha2/tiers',

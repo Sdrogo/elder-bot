@@ -10,12 +10,14 @@ import {
   disciplineRoom,
   emptyDraft,
   evaluate,
+  isCoterieHaven,
   lifepathCount,
   lifepathOptions,
   meritOptions,
   pathOptions,
   powerOptions,
   ranksFit,
+  resourceKey,
   sireDisciplineOptions,
   sireOptions,
   skillDots,
@@ -41,6 +43,13 @@ import {
   SKILLS,
 } from '/game/alpha2/core.js';
 import { DISCIPLINE_NAMES, POWERS_BY_ID } from '/game/alpha2/disciplines.js';
+import {
+  DISCIPLINE_DETAILS,
+  DISCIPLINE_RULES,
+  LIFEPATH_DETAILS,
+  MERIT_DETAILS,
+  POWER_DETAILS,
+} from '/game/alpha2/details.js';
 import { CREATION_TIERS } from '/game/alpha2/prereq.js';
 import {
   LIFEPATH_RESOURCE_DOTS,
@@ -81,6 +90,8 @@ const TEXT = {
     'disc.outClan': 'fuori clan',
     'disc.sire': 'punto del Sire',
     'disc.noPowers': 'Nel playtest questa Disciplina non ha ancora poteri.',
+    more: 'Dettagli',
+    'disc.rules': 'Come funzionano i poteri',
     'traits.title': (n) => (n === 1 ? 'Scegli 1 tratto di clan' : `Scegli ${n} tratti di clan`),
     'traits.note': 'Alcuni tratti chiedono punti in una Disciplina o un livello più alto.',
     'traits.noClan': 'Scegli prima un clan.',
@@ -92,8 +103,15 @@ const TEXT = {
     'hum.humanity': 'La strada di quasi tutti i vampiri: restare legati alla propria umanità.',
     'res.title': 'Resources',
     'res.note': (n, max) =>
-      `Ai punti dei lifepath si aggiungono ${n} punti da mettere dove vuoi. La stessa Resource da più fonti si somma, fino a ${max} punti.`,
+      `Ai punti dei lifepath si aggiungono ${n} punti da mettere dove vuoi: puoi alzare una Resource dei lifepath, aggiungerne una nuova o contribuire all’haven di coterie. La stessa Resource da più fonti si somma, fino a ${max} punti.`,
     'res.fromLifepaths': 'Dai lifepath',
+    'res.fromLifepathsNote':
+      'I pallini grigi vengono dai lifepath; con + li alzi usando i punti extra.',
+    'res.coterie': 'Haven di coterie',
+    'res.coterieAdd': 'Contribuisci all’haven di coterie',
+    'res.coterieName': 'Nome dell’haven (facoltativo)',
+    'res.coterieHint':
+      'I tuoi punti vanno nell’haven condiviso con la coterie e non contano come Resource tua.',
     'res.none': 'Nessun punto messo nelle Resources dei lifepath.',
     'res.extra': 'Resources extra',
     'res.add': 'Aggiungi Resource',
@@ -285,6 +303,8 @@ const TEXT = {
     'disc.outClan': 'out of clan',
     'disc.sire': "Sire's dot",
     'disc.noPowers': 'This Discipline has no powers in the playtest yet.',
+    more: 'Details',
+    'disc.rules': 'How powers work',
     'traits.title': (n) => (n === 1 ? 'Choose 1 clan trait' : `Choose ${n} clan traits`),
     'traits.note': 'Some traits need dots in a Discipline or a higher tier.',
     'traits.noClan': 'Choose a clan first.',
@@ -296,8 +316,14 @@ const TEXT = {
     'hum.humanity': 'The road of almost every vampire: holding on to what is left of being human.',
     'res.title': 'Resources',
     'res.note': (n, max) =>
-      `On top of the lifepaths' dots you have ${n} dots to put anywhere. The same Resource from several sources adds up, to at most ${max} dots.`,
+      `On top of the lifepaths' dots you have ${n} dots to put anywhere: raise a lifepath Resource, add a new one or contribute to the coterie's haven. The same Resource from several sources adds up, to at most ${max} dots.`,
     'res.fromLifepaths': 'From lifepaths',
+    'res.fromLifepathsNote': 'Grey dots come from the lifepaths; + raises them with extra dots.',
+    'res.coterie': 'Coterie haven',
+    'res.coterieAdd': 'Contribute to the coterie haven',
+    'res.coterieName': 'Haven name (optional)',
+    'res.coterieHint':
+      'Your dots go into the haven you share with the coterie, not into your own Resources.',
     'res.none': 'No dots in the lifepaths’ Resources yet.',
     'res.extra': 'Extra Resources',
     'res.add': 'Add a Resource',
@@ -469,6 +495,7 @@ const over = (i) => i.value - i.limit;
 /** A readable name for an issue's target: a lifepath, Skill, Attribute, category, clan… */
 function nameOf(target) {
   if (!target) return '';
+  if (target === 'coterie-haven') return tr('res.coterie');
   if (LIFEPATHS_BY_ID.has(target)) return LIFEPATHS_BY_ID.get(target).name;
   if (SKILL_INFO[target]) return SKILL_INFO[target].name;
   if (ATTRIBUTE_NAMES[target]) return ATTRIBUTE_NAMES[target];
@@ -518,6 +545,13 @@ function button(text, onClick, className = '') {
 
 const dotsText = (n, max) => '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n));
 
+/** Dots with the number beside them, which is easier to add up (Andrea's choice). */
+function rating(n, max) {
+  const box = el('span', 'rating');
+  box.append(el('span', 'dots', dotsText(n, max)), el('span', 'num', String(Math.max(0, n))));
+  return box;
+}
+
 /** − dots + : `canAdd` says whether + may go one higher. */
 /**
  * − dots + : `canAdd` says whether + may go one higher. `base` dots come from elsewhere (another
@@ -534,16 +568,36 @@ function stepper(value, { min = 0, max, canAdd = true, onChange, label, plain = 
   let shown;
   if (plain) shown = el('span', 'count', `+${value}`);
   else {
-    shown = el('span', 'dots');
-    if (base) shown.append(el('span', 'other', '●'.repeat(base)));
-    shown.append(dotsText(value, max - base));
+    shown = el('span', 'rating');
+    const dots = el('span', 'dots');
+    if (base) dots.append(el('span', 'other', '●'.repeat(base)));
+    dots.append(dotsText(value, max - base));
+    // The number beside the dots is the whole level, easier to add up than dots.
+    shown.append(dots, el('span', 'num', String(base + value)));
   }
   box.append(minus, shown, plus);
   return box;
 }
 
 /** A clickable card; locked ones show why instead of acting. */
-function choiceCard({ title, lines = [], selected, available = true, reasons = [], onPick }) {
+/** A folded box with a longer explanation; paragraphs are separated by blank lines. */
+function more(text, label = tr('more')) {
+  const box = el('details', 'more');
+  box.append(el('summary', '', label));
+  for (const para of text.split('\n\n')) box.append(el('p', '', para));
+  return box;
+}
+
+/** A choice card, with its longer explanation folded underneath when there is one. */
+function choiceCard({ more: text, ...card }) {
+  const pick = choiceButton(card);
+  if (!text) return pick;
+  const wrap = el('div', 'choice-wrap');
+  wrap.append(pick, more(text));
+  return wrap;
+}
+
+function choiceButton({ title, lines = [], selected, available = true, reasons = [], onPick }) {
   const card = el(
     'button',
     'choice' + (selected ? ' selected' : '') + (available ? '' : ' locked'),
@@ -1011,6 +1065,7 @@ const VIEWS = {
             ],
             available: o.available && !full,
             reasons: o.available ? [{ kind: 'full' }] : o.reasons,
+            more: LIFEPATH_DETAILS[lp.id],
             onPick: () =>
               update((x) => {
                 x.lifepaths.push({ id: lp.id, skills: {}, resources: lp.resources.map(() => 0) });
@@ -1087,7 +1142,7 @@ const VIEWS = {
       const own = d.extraSkills[skill] ?? 0;
       const counts = el('div', 'skill-counts');
       counts.append(
-        el('span', 'dots', dotsText(total, cap)),
+        rating(total, cap),
         el(
           'span',
           'quiet',
@@ -1118,7 +1173,7 @@ const VIEWS = {
     const box = el('div');
     const t = TIER_RULES[d.tier];
     box.append(stepHead(tr('disc.title'), tr('disc.note', t)));
-    box.append(hints('disciplines'));
+    box.append(more(DISCIPLINE_RULES, tr('disc.rules')), hints('disciplines'));
     for (const room of disciplineRoom(d)) {
       const disc = room.discipline;
       const card = el('div', 'card discipline');
@@ -1138,6 +1193,7 @@ const VIEWS = {
         }),
       );
       card.append(head);
+      if (DISCIPLINE_DETAILS[disc]) card.append(more(DISCIPLINE_DETAILS[disc]));
       if (!room.hasPowers) card.append(el('p', 'quiet', tr('disc.noPowers')));
       else if (room.dots > 0) {
         const grid = el('div', 'choices powers');
@@ -1151,6 +1207,7 @@ const VIEWS = {
                 p.it,
               ],
               selected: d.powers.includes(p.id),
+              more: POWER_DETAILS[p.id],
               available: o.available,
               reasons: o.reasons,
               onPick: () => update((x) => toggle(x.powers, p.id)),
@@ -1199,6 +1256,7 @@ const VIEWS = {
           title: merit.name,
           lines: [merit.it],
           selected: d.merits.includes(o.id),
+          more: MERIT_DETAILS[o.id],
           available: o.available,
           reasons: o.reasons,
           onPick: () => update((x) => toggle(x.merits, o.id)),
@@ -1246,50 +1304,78 @@ const VIEWS = {
     const box = el('div');
     const t = TIER_RULES[d.tier];
     box.append(stepHead(tr('res.title'), tr('res.note', t.extraResources, t.maxDots)));
+    const extra = current.pools.extraResources;
+    const canAdd = extra.spent < extra.budget && d.extraResources.length < 12;
+
+    // Lifepath Resources, one row per Resource: the lifepaths' dots dimmed, extra dots on top.
     const fromLifepaths = el('div', 'card');
     fromLifepaths.append(el('h3', '', tr('res.fromLifepaths')));
-    let any = false;
+    const rows = new Map();
     for (const pick of d.lifepaths) {
       const lp = LIFEPATHS_BY_ID.get(pick.id);
       lp?.resources.forEach((r, i) => {
         const dots = pick.resources[i] ?? 0;
         if (!dots) return;
-        any = true;
-        const subject = pick.resourceDetails?.[i] || r.detail;
-        const row = el('div', 'trait');
-        row.append(
-          el(
-            'span',
-            '',
-            subject ? `${RESOURCE_INFO[r.kind].name}: ${subject}` : RESOURCE_INFO[r.kind].name,
-          ),
-          el('span', 'dots', dotsText(dots, t.maxDots)),
-        );
-        fromLifepaths.append(row);
+        const subject = pick.resourceDetails?.[i] || r.detail || '';
+        const key = resourceKey(r.kind, subject);
+        const row = rows.get(key) ?? { kind: r.kind, subject, dots: 0 };
+        row.dots += dots;
+        rows.set(key, row);
       });
     }
-    if (!any) fromLifepaths.append(el('p', 'quiet', tr('res.none')));
-    box.append(fromLifepaths);
-
-    box.append(el('h3', '', tr('res.extra')));
-    const extra = current.pools.extraResources;
-    d.extraResources.forEach((r, n) => {
-      const row = el('div', 'card resource-row');
-      const kind = el('select');
-      for (const k of RESOURCE_KINDS) {
-        const opt = el('option', '', RESOURCE_INFO[k].name);
-        opt.value = k;
-        opt.selected = r.kind === k;
-        kind.append(opt);
-      }
-      kind.addEventListener('change', () =>
-        update((x) => {
-          x.extraResources[n].kind = kind.value;
+    const isRaise = (r, key) => !isCoterieHaven(r) && resourceKey(r.kind, r.detail) === key;
+    for (const [key, row] of rows) {
+      const n = d.extraResources.findIndex((r) => isRaise(r, key));
+      const raised = n >= 0 ? d.extraResources[n].dots : 0;
+      const name = RESOURCE_INFO[row.kind].name;
+      const line = el('div', 'trait');
+      line.append(
+        el('span', '', row.subject ? `${name}: ${row.subject}` : name),
+        stepper(raised, {
+          max: t.maxDots,
+          base: Math.min(row.dots, t.maxDots),
+          canAdd: extra.spent < extra.budget && (n >= 0 || d.extraResources.length < 12),
+          label: name,
+          onChange: (v) =>
+            update((x) => {
+              const k = x.extraResources.findIndex((r) => isRaise(r, key));
+              if (k < 0) x.extraResources.push({ kind: row.kind, detail: row.subject, dots: v });
+              else if (v > 0) x.extraResources[k].dots = v;
+              else x.extraResources.splice(k, 1);
+            }),
         }),
       );
+      fromLifepaths.append(line);
+    }
+    if (rows.size) fromLifepaths.append(el('p', 'quiet', tr('res.fromLifepathsNote')));
+    else fromLifepaths.append(el('p', 'quiet', tr('res.none')));
+    box.append(fromLifepaths);
+
+    // New Resources and the coterie haven. Raises of lifepath Resources are shown above.
+    box.append(el('h3', '', tr('res.extra')));
+    d.extraResources.forEach((r, n) => {
+      if (!isCoterieHaven(r) && rows.has(resourceKey(r.kind, r.detail))) return;
+      const coterie = isCoterieHaven(r);
+      const row = el('div', 'card resource-row');
+      let kind;
+      if (coterie) kind = el('strong', '', tr('res.coterie'));
+      else {
+        kind = el('select');
+        for (const k of RESOURCE_KINDS) {
+          const opt = el('option', '', RESOURCE_INFO[k].name);
+          opt.value = k;
+          opt.selected = r.kind === k;
+          kind.append(opt);
+        }
+        kind.addEventListener('change', () =>
+          update((x) => {
+            x.extraResources[n].kind = kind.value;
+          }),
+        );
+      }
       const detail = el('input');
       detail.maxLength = 120;
-      detail.placeholder = tr('lp.detail');
+      detail.placeholder = coterie ? tr('res.coterieName') : tr('lp.detail');
       detail.value = r.detail;
       detail.addEventListener('input', () =>
         update((x) => {
@@ -1302,7 +1388,7 @@ const VIEWS = {
         stepper(r.dots, {
           max: t.maxDots,
           canAdd: extra.spent < extra.budget,
-          label: RESOURCE_INFO[r.kind].name,
+          label: coterie ? tr('res.coterie') : RESOURCE_INFO[r.kind].name,
           onChange: (v) =>
             update((x) => {
               x.extraResources[n].dots = v;
@@ -1314,7 +1400,9 @@ const VIEWS = {
           }),
         ),
       );
-      row.append(el('span', 'quiet hint', RESOURCE_INFO[r.kind].it));
+      row.append(
+        el('span', 'quiet hint', coterie ? tr('res.coterieHint') : RESOURCE_INFO[r.kind].it),
+      );
       box.append(row);
     });
     const add = button(tr('res.add'), () =>
@@ -1322,8 +1410,19 @@ const VIEWS = {
         x.extraResources.push({ kind: 'contact', detail: '', dots: 1 });
       }),
     );
-    add.disabled = extra.spent >= extra.budget || d.extraResources.length >= 12;
-    box.append(add, hints('resources'));
+    add.disabled = !canAdd;
+    const buttons = el('div', 'resource-buttons');
+    buttons.append(add);
+    if (!d.extraResources.some(isCoterieHaven)) {
+      const coterie = button(tr('res.coterieAdd'), () =>
+        update((x) => {
+          x.extraResources.push({ kind: 'haven', detail: '', dots: 1, coterie: true });
+        }),
+      );
+      coterie.disabled = !canAdd;
+      buttons.append(coterie);
+    }
+    box.append(buttons, hints('resources'));
     return box;
   },
 
@@ -1520,6 +1619,7 @@ function chosenLifepath(pick, n) {
   );
   card.append(head);
   if (!lp) return card;
+  if (LIFEPATH_DETAILS[lp.id]) card.append(more(LIFEPATH_DETAILS[lp.id]));
   const sp = current.pools.lifepathSkills[n];
   const rp = current.pools.lifepathResources[n];
   const cap = skillCap();
@@ -1545,10 +1645,10 @@ function chosenLifepath(pick, n) {
       }),
     );
     card.append(row);
-    // Specialties right where the dots go; the first lifepath feeding the Skill shows them.
+    // Specialties right where the dots go, under every lifepath that feeds the Skill: the boxes
+    // are the same specialties, so typing in one updates the others.
     const slots = specialtySlots(d, s.skill);
-    const first = d.lifepaths.findIndex((p) => (p.skills[s.skill] ?? 0) > 0);
-    if (slots && first === n) card.append(specialtyInputs(s.skill, slots));
+    if (slots && value > 0) card.append(specialtyInputs(s.skill, slots));
   }
 
   card.append(pool(tr('lp.resources'), rp));
@@ -1589,10 +1689,12 @@ function chosenLifepath(pick, n) {
   return card;
 }
 
+let specialtyLists = 0;
+
 /** One text box per specialty slot, with the packet's examples and the lifepaths' as hints. */
 function specialtyInputs(skill, slots) {
   const wrap = el('div', 'specialties');
-  const listId = `spec-${skill}`;
+  const listId = `spec-${skill}-${++specialtyLists}`;
   const list = el('datalist');
   list.id = listId;
   const fromLifepaths = d.lifepaths.flatMap(
@@ -1616,15 +1718,20 @@ function specialtyInputs(skill, slots) {
         ? tr('skills.specialtyExtra')
         : `${tr('skills.specialty')} ${i + 1}`;
     input.value = chosen[i] ?? '';
-    input.addEventListener('input', () =>
+    input.dataset.specialty = `${skill}:${i}`;
+    input.addEventListener('input', () => {
+      // The same slot can show in several lifepaths: keep the copies in step.
+      for (const other of document.querySelectorAll(`input[data-specialty="${skill}:${i}"]`)) {
+        if (other !== input) other.value = input.value;
+      }
       update((x) => {
         const names = [...(x.specialties[skill] ?? [])];
         names[i] = input.value;
         while (names.length && !names[names.length - 1]) names.pop();
         if (names.length) x.specialties[skill] = names.map((s) => s ?? '');
         else delete x.specialties[skill];
-      }, false),
-    );
+      }, false);
+    });
     wrap.append(input);
   }
   return wrap;
