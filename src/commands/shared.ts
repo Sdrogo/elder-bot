@@ -1,7 +1,10 @@
-import type {
-  ChatInputCommandInteraction,
-  SlashCommandBuilder,
-  SlashCommandIntegerOption,
+import {
+  ActionRowBuilder,
+  type APIEmbedField,
+  type ButtonBuilder,
+  type ChatInputCommandInteraction,
+  type SlashCommandBuilder,
+  type SlashCommandIntegerOption,
 } from 'discord.js';
 import { MAX_HUNGER } from '../dice/test.js';
 import { performRoll, type RollRequest } from '../game/roll.js';
@@ -33,16 +36,26 @@ export function hungerOption(
   return described(o.setName('hunger'), key).setMinValue(0).setMaxValue(MAX_HUNGER);
 }
 
+export interface RollExtras {
+  npc?: boolean;
+  /** Hunger already worked out (a roll from a character sheet); otherwise from the option. */
+  hunger?: { hunger: number; note?: APIEmbedField };
+  /** Fields shown before the Hunger note: the pool from the sheet, Blood Surge, Impairment. */
+  notes?: APIEmbedField[];
+  /** Buttons on a row of their own under the roll's buttons. */
+  extraButtons?: ButtonBuilder[];
+}
+
 /** Rolls a test for /roll, for a player or an NPC. `title` is used when the player gives no reason. */
 export async function replyWithRoll(
   interaction: ChatInputCommandInteraction,
   ctx: Context,
   dice: number,
   title: string,
-  { npc = false }: { npc?: boolean } = {},
+  { npc = false, hunger, notes = [], extraButtons = [] }: RollExtras = {},
 ): Promise<void> {
   const locale = localeFor(interaction, ctx.store);
-  const fromCharacter = npc ? { hunger: 0 } : rollerHunger(interaction, ctx, locale);
+  const fromCharacter = npc ? { hunger: 0 } : (hunger ?? rollerHunger(interaction, ctx, locale));
   const request: RollRequest = {
     channelId: interaction.channelId,
     userId: interaction.user.id,
@@ -56,8 +69,12 @@ export async function replyWithRoll(
   const response = performRoll(request, { roller: ctx.roller, npc });
   const reason = interaction.options.getString('reason');
   const fullTitle = `${interaction.user.displayName}: ${reason ?? title}`;
-  const notes = fromCharacter.note ? [fromCharacter.note] : [];
-  await interaction.reply(rollMessage(locale, response, fullTitle, notes));
+  const allNotes = [...notes, ...(fromCharacter.note ? [fromCharacter.note] : [])];
+  const message = rollMessage(locale, response, fullTitle, allNotes);
+  if (extraButtons.length) {
+    message.components.push(new ActionRowBuilder<ButtonBuilder>().addComponents(extraButtons));
+  }
+  await interaction.reply(message);
   showRoll(ctx.store, where(interaction), (who) => shownTest(who, reason ?? title, response));
 }
 

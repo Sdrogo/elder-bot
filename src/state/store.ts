@@ -152,11 +152,14 @@ export class Store {
   }
 
   /**
-   * End of a session at this table: prolonged tasks still running are dropped. The Storyteller,
-   * the language and the Masquerade Tracker belong to the Chronicle and stay.
+   * End of a session at this table: prolonged tasks still running are dropped and Blood
+   * Surges end. The Storyteller, the language and the Masquerade Tracker belong to the Chronicle and stay.
    */
   endSession(channelId: string): void {
     this.db.prepare('DELETE FROM prolonged WHERE channel_id = ?').run(channelId);
+    // Blood Surge lasts a scene at most: none survives the end of the session.
+    const chronicle = this.campaign.chronicleByChannel(channelId);
+    if (chronicle) this.campaign.clearChronicleSurges(chronicle.id);
   }
 
   close(): void {

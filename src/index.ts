@@ -11,6 +11,7 @@ import { commands } from './commands/index.js';
 import { autocompleteElder, runElder } from './commands/elder.js';
 import { handleMasqueradeButton, isMasqueradeId } from './commands/masquerade.js';
 import { handleProlongedButton, isProlongedId } from './commands/prolonged.js';
+import { handleSurgeButton, isSurgeId } from './interactions/surgeButtons.js';
 import type { Context } from './commands/types.js';
 import { loadConfig } from './config.js';
 import { localeFor, resolveLocale, t } from './i18n/index.js';
@@ -56,6 +57,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
       if (isCampaignId(id)) await handleCampaignButton(interaction, ctx);
       else if (isMasqueradeId(id)) await handleMasqueradeButton(interaction, ctx);
       else if (isProlongedId(id)) await handleProlongedButton(interaction, ctx);
+      else if (isSurgeId(id)) await handleSurgeButton(interaction, ctx);
       else await handleRollButton(interaction, ctx);
     } else if (interaction.isStringSelectMenu()) {
       if (isCampaignId(interaction.customId)) await handleCampaignSelect(interaction, ctx);

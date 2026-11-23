@@ -9,7 +9,7 @@ export const fr: Messages = {
 
   'cmd.roll.description':
     'Test : Attribut + Compétence (ou Discipline), réussite sur 6+, un 10 compte 2',
-  'opt.roll.dice': 'Attribut + Compétence, Discipline ou Composure + Resolve',
+  'opt.roll.dice': 'Réserve en nombre (ou laisse vide et utilise attribute + with de ta fiche)',
 
   'opt.test.difficulty': 'Difficulté : réussites nécessaires pour gagner',
   'opt.test.bonus': 'Dés bonus (positif) ou dés de malus (négatif)',
@@ -160,6 +160,46 @@ export const fr: Messages = {
   'sheet.noChronicle': 'aucune Chronique',
   'button.pickCharacter': 'Choisir un personnage',
   'opt.roll.npc': 'Jet pour un PNJ : la réserve de sa fiche, sans dés de Hunger',
+  'opt.roll.attribute': 'Attribut de la fiche de ton personnage',
+  'opt.roll.with':
+    'Ce qui va avec : Compétence, spécialité, Discipline, pouvoir, Attribut ou lifepath',
+  'opt.roll.surge': 'Blood Surge : dépense de la Vitae pour hausser un Attribut ou une Discipline',
+  'sheetRoll.pool': 'Réserve',
+  'sheetRoll.mixed':
+    'Utilise `dice` ou les options de la fiche (`attribute`, `with`, `surge`), pas les deux.',
+  'sheetRoll.needPool':
+    'Indique la réserve : `dice`, ou `attribute` + `with` depuis la fiche de ton personnage.',
+  'sheetRoll.npc':
+    'Les jets de PNJ utilisent `dice` : les options de la fiche sont pour les personnages joueurs.',
+  'sheetRoll.noCharacter':
+    'Aucun personnage avec une fiche complète ici : lance dans le salon de ta Chronique ou complète la fiche sur le panneau. Tu peux toujours utiliser `dice`.',
+  'sheetRoll.noSheet':
+    "{name} n'a que des jauges : complète la fiche sur le panneau pour lancer depuis elle, ou utilise `dice`.",
+  'sheetRoll.hint.noCharacter': 'Aucun personnage avec fiche complète ici : utilise dice',
+  'sheetRoll.hint.noSheet': 'Complète la fiche sur le panneau, ou utilise dice',
+  'sheetRoll.pickFromList': 'Choisis `{option}` dans la liste proposée par Discord.',
+  'sheetRoll.issue.needAttribute':
+    'Choisis un `attribute` (ou un pouvoir dans `with`, qui apporte le sien).',
+  'sheetRoll.issue.needSecond':
+    "Choisis ce qui va `with` l'Attribut : Compétence, Discipline, pouvoir, Attribut ou lifepath.",
+  'sheetRoll.issue.sameAttribute': 'Choisis deux Attributs différents.',
+  'sheetRoll.issue.unknownTrait': "Ce trait n'est pas sur la fiche : choisis-en un dans la liste.",
+  'sheetRoll.issue.noPower': 'Ton personnage ne connaît pas ce pouvoir.',
+  'sheetRoll.issue.noDiscipline': "Ton personnage n'a aucun point dans cette Discipline.",
+  'sheetRoll.issue.noSpecialty':
+    "Cette spécialité n'est plus sur la fiche : choisis à nouveau dans la liste.",
+  'sheetRoll.issue.surgeNoDiscipline': 'Blood Surge demande au moins 1 point dans la Discipline.',
+  'sheetRoll.issue.surgeLimit': 'Ce Blood Surge dépasse la limite de ton tier.',
+  'sheetRoll.issue.surgeVitae': 'Pas assez de Vitae pour ce Blood Surge.',
+  'sheetRoll.surgeSpent':
+    "{name} dépense {cost} Vitae : {trait} +{dots} jusqu'à la fin de la scène.",
+  'sheetRoll.surgeActive': "Actif jusqu'à la fin de la scène : {list}.",
+  'sheetRoll.surgeEnded': 'Blood Surge terminé pour {name}.',
+  'sheetRoll.impaired': '{attributes} Impaired (Health ou Willpower à 0) : −{dice} dés.',
+  'sheetRoll.powerAttribute': 'Ce pouvoir utilise normalement {attribute} : le Storyteller décide.',
+  'sheetRoll.trackerDiffers':
+    '{attribute} : {sheet} sur la fiche, {tracker} sur les jauges. Le jet utilise la fiche.',
+  'button.surgeEnd': 'Fin du Blood Surge',
   'button.masqueradeThreat': 'Test de menace',
   'button.prolongedCancel': 'Annuler la tâche',
   'button.willpowerBest': 'Willpower : relancer les échecs',

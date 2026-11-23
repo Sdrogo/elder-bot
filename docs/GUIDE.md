@@ -100,17 +100,32 @@ A standard, Power or Self-Control test.
 
 `/elder roll dice [difficulty] [bonus] [hunger] [take_half] [reason] [npc]`
 
-| Option       | What it does                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------- |
-| `dice`       | Attribute + Skill (0–30)                                                                                      |
-| `difficulty` | Successes needed to win (1–15)                                                                                |
-| `bonus`      | Bonus (positive) or penalty (negative) dice, −10 to +10                                                       |
-| `hunger`     | Your Hunger dice (0–5)                                                                                        |
-| `take_half`  | **Taking Half**: no roll, half your pool (rounded up) counts as successes. Only when you are not under stress |
-| `reason`     | What you are attempting, shown in the title                                                                   |
-| `npc`        | A test for an NPC (see below)                                                                                 |
+`/elder roll attribute with [surge] [difficulty] [bonus] [hunger] [take_half] [reason]`
+
+| Option       | What it does                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `dice`       | The pool as a number (0–30). Leave it out to roll from the character sheet                                          |
+| `attribute`  | An Attribute from your sheet, picked from the list with its dots                                                    |
+| `with`       | What goes with it: a Skill or one of its specialties (+1), a Discipline, a power, another Attribute, a lifepath (2) |
+| `surge`      | **Blood Surge**: spend Vitae to raise an Attribute (1 Vitae a dot) or a Discipline (2 Vitae a dot) for the scene    |
+| `difficulty` | Successes needed to win (1–15)                                                                                      |
+| `bonus`      | Bonus (positive) or penalty (negative) dice, −10 to +10                                                             |
+| `hunger`     | Your Hunger dice (0–5)                                                                                              |
+| `take_half`  | **Taking Half**: no roll, half your pool (rounded up) counts as successes. Only when you are not under stress       |
+| `reason`     | What you are attempting, shown in the title                                                                         |
+| `npc`        | A test for an NPC (see below)                                                                                       |
 
 Example: `/elder roll dice:7 difficulty:2 hunger:1 reason:Climb the wall`
+
+#### Rolling from the sheet
+
+A character with a full sheet (made with the panel's wizard) can roll without counting dots. In the Chronicle's channel, pick `attribute` and `with` from the lists: the bot adds the dots and writes the sum on the roll, for example _Dexterity 3 + Fighting 2 + Hand-to-Hand 1 = 6_.
+
+- **Power test**: pick the power in `with`. Its Attribute comes with it, so `attribute` can stay empty. Another Attribute is allowed (the Storyteller decides), and the roll says so.
+- **Two Attributes** (a task everyone knows, like driving) or a **lifepath** (2 dots, when no Skill fits) are in the same list.
+- **Impairment**: at 0 Health the Physical Attributes lose 2 dice, at 0 Willpower the Social and Mental ones do. The bot takes them off and says why.
+- **Blood Surge**: `surge` lists what your Vitae and your tier allow (an Attribute up to +2 for neonates, +4 ancillae, +6 elders; a Discipline up to the tier maximum). The Vitae are spent before the roll, so Hunger dice already count them. The surge stays on the character for the rest of the scene and is added to the next rolls from the sheet. It ends with the **End Blood Surge** button, when the session ends on the panel, or after 3 hours.
+- Hunger dice come from the character's Vitae, as always; the `hunger` option still overrides them.
 
 ### `/elder contest`
 

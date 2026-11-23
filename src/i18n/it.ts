@@ -8,7 +8,7 @@ export const it: Messages = {
   'cmd.elder.description': 'Tiri di dado per Vampire: The Masquerade 6e',
 
   'cmd.roll.description': 'Test: Attributo + Abilità (o Disciplina), successo con 6+, un 10 vale 2',
-  'opt.roll.dice': 'Attributo + Abilità, Disciplina o Composure + Resolve',
+  'opt.roll.dice': 'Pool come numero (oppure lascialo vuoto e usa attribute + with dalla scheda)',
 
   'opt.test.difficulty': 'Difficoltà: successi necessari per vincere',
   'opt.test.bonus': 'Dadi bonus (positivi) o penalità (negativi)',
@@ -157,6 +157,45 @@ export const it: Messages = {
   'sheet.noChronicle': 'nessuna Cronaca',
   'button.pickCharacter': 'Scegli un personaggio',
   'opt.roll.npc': 'Tiro per un PNG: il pool dalla sua scheda, senza dadi Hunger',
+  'opt.roll.attribute': 'Attributo dalla scheda del personaggio',
+  'opt.roll.with': 'Cosa va insieme: Skill, specialità, Disciplina, potere, Attributo o lifepath',
+  'opt.roll.surge':
+    'Blood Surge: spendi Vitae per alzare un Attributo o una Disciplina per la scena',
+  'sheetRoll.pool': 'Pool',
+  'sheetRoll.mixed':
+    'Usa `dice` oppure le opzioni della scheda (`attribute`, `with`, `surge`), non entrambi.',
+  'sheetRoll.needPool':
+    'Indica la pool: `dice`, oppure `attribute` + `with` dalla scheda del personaggio.',
+  'sheetRoll.npc':
+    'I tiri dei PNG usano `dice`: le opzioni della scheda sono per i personaggi dei giocatori.',
+  'sheetRoll.noCharacter':
+    'Nessun personaggio con scheda completa qui: tira nel canale della tua Cronaca o completa la scheda sul pannello. Puoi sempre usare `dice`.',
+  'sheetRoll.noSheet':
+    '{name} ha solo i tracker: completa la scheda sul pannello per tirare da lì, oppure usa `dice`.',
+  'sheetRoll.hint.noCharacter': 'Nessun personaggio con scheda completa qui: usa dice',
+  'sheetRoll.hint.noSheet': 'Completa la scheda sul pannello, oppure usa dice',
+  'sheetRoll.pickFromList': 'Scegli `{option}` dalla lista suggerita da Discord.',
+  'sheetRoll.issue.needAttribute':
+    'Scegli un `attribute` (oppure un potere in `with`, che porta il suo).',
+  'sheetRoll.issue.needSecond':
+    "Scegli cosa va `with` l'Attributo: una Skill, Disciplina, potere, Attributo o lifepath.",
+  'sheetRoll.issue.sameAttribute': 'Scegli due Attributi diversi.',
+  'sheetRoll.issue.unknownTrait': 'Questo tratto non è sulla scheda: scegline uno dalla lista.',
+  'sheetRoll.issue.noPower': 'Il tuo personaggio non conosce questo potere.',
+  'sheetRoll.issue.noDiscipline': 'Il tuo personaggio non ha punti in questa Disciplina.',
+  'sheetRoll.issue.noSpecialty':
+    'Questa specialità non è più sulla scheda: scegli di nuovo dalla lista.',
+  'sheetRoll.issue.surgeNoDiscipline': 'Blood Surge richiede almeno 1 punto nella Disciplina.',
+  'sheetRoll.issue.surgeLimit': 'Questo Blood Surge supera il limite del tuo tier.',
+  'sheetRoll.issue.surgeVitae': 'Non hai abbastanza Vitae per questo Blood Surge.',
+  'sheetRoll.surgeSpent': '{name} spende {cost} Vitae: {trait} +{dots} fino alla fine della scena.',
+  'sheetRoll.surgeActive': 'Attivo fino alla fine della scena: {list}.',
+  'sheetRoll.surgeEnded': 'Blood Surge terminato per {name}.',
+  'sheetRoll.impaired': '{attributes} Impaired (Health o Willpower a 0): −{dice} dadi.',
+  'sheetRoll.powerAttribute': 'Questo potere di solito usa {attribute}: decide lo Storyteller.',
+  'sheetRoll.trackerDiffers':
+    '{attribute}: {sheet} sulla scheda, {tracker} sui tracker. Il tiro usa la scheda.',
+  'button.surgeEnd': 'Fine Blood Surge',
   'button.masqueradeThreat': 'Test di minaccia',
   'button.prolongedCancel': 'Annulla compito',
   'button.willpowerBest': 'Willpower: rilancia i fallimenti',

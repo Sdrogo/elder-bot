@@ -9,7 +9,7 @@ export const es: Messages = {
 
   'cmd.roll.description':
     'Prueba: Atributo + Habilidad (o Disciplina), éxito con 6+, un 10 cuenta 2',
-  'opt.roll.dice': 'Atributo + Habilidad, Disciplina o Composure + Resolve',
+  'opt.roll.dice': 'Reserva como número (o déjala vacía y usa attribute + with de tu ficha)',
 
   'opt.test.difficulty': 'Dificultad: éxitos necesarios para ganar',
   'opt.test.bonus': 'Dados de bonificación (positivos) o penalización (negativos)',
@@ -160,6 +160,44 @@ export const es: Messages = {
   'sheet.noChronicle': 'sin Crónica',
   'button.pickCharacter': 'Elegir personaje',
   'opt.roll.npc': 'Tirada de un PNJ: la reserva de su ficha, sin dados de Hunger',
+  'opt.roll.attribute': 'Atributo de la ficha de tu personaje',
+  'opt.roll.with': 'Qué va con él: Habilidad, especialidad, Disciplina, poder, Atributo o lifepath',
+  'opt.roll.surge':
+    'Blood Surge: gasta Vitae para subir un Atributo o una Disciplina durante la escena',
+  'sheetRoll.pool': 'Reserva',
+  'sheetRoll.mixed':
+    'Usa `dice` o las opciones de la ficha (`attribute`, `with`, `surge`), no ambos.',
+  'sheetRoll.needPool':
+    'Indica la reserva: `dice`, o `attribute` + `with` de la ficha de tu personaje.',
+  'sheetRoll.npc':
+    'Las tiradas de PNJ usan `dice`: las opciones de la ficha son para personajes jugadores.',
+  'sheetRoll.noCharacter':
+    'No hay aquí un personaje con ficha completa: tira en el canal de tu Crónica o completa la ficha en el panel. Siempre puedes usar `dice`.',
+  'sheetRoll.noSheet':
+    '{name} solo tiene contadores: completa la ficha en el panel para tirar desde ella, o usa `dice`.',
+  'sheetRoll.hint.noCharacter': 'No hay personaje con ficha completa aquí: usa dice',
+  'sheetRoll.hint.noSheet': 'Completa la ficha en el panel, o usa dice',
+  'sheetRoll.pickFromList': 'Elige `{option}` de la lista que sugiere Discord.',
+  'sheetRoll.issue.needAttribute': 'Elige un `attribute` (o un poder en `with`, que trae el suyo).',
+  'sheetRoll.issue.needSecond':
+    'Elige qué va `with` el Atributo: Habilidad, Disciplina, poder, Atributo o lifepath.',
+  'sheetRoll.issue.sameAttribute': 'Elige dos Atributos distintos.',
+  'sheetRoll.issue.unknownTrait': 'Ese rasgo no está en la ficha: elige uno de la lista.',
+  'sheetRoll.issue.noPower': 'Tu personaje no conoce ese poder.',
+  'sheetRoll.issue.noDiscipline': 'Tu personaje no tiene puntos en esa Disciplina.',
+  'sheetRoll.issue.noSpecialty':
+    'Esa especialidad ya no está en la ficha: elige de nuevo de la lista.',
+  'sheetRoll.issue.surgeNoDiscipline': 'Blood Surge necesita al menos 1 punto en la Disciplina.',
+  'sheetRoll.issue.surgeLimit': 'Ese Blood Surge supera el límite de tu tier.',
+  'sheetRoll.issue.surgeVitae': 'No tienes Vitae suficiente para ese Blood Surge.',
+  'sheetRoll.surgeSpent': '{name} gasta {cost} Vitae: {trait} +{dots} hasta el final de la escena.',
+  'sheetRoll.surgeActive': 'Activo hasta el final de la escena: {list}.',
+  'sheetRoll.surgeEnded': 'Blood Surge terminado para {name}.',
+  'sheetRoll.impaired': '{attributes} Impaired (Health o Willpower a 0): −{dice} dados.',
+  'sheetRoll.powerAttribute': 'Este poder normalmente usa {attribute}: decide el Storyteller.',
+  'sheetRoll.trackerDiffers':
+    '{attribute}: {sheet} en la ficha, {tracker} en los contadores. La tirada usa la ficha.',
+  'button.surgeEnd': 'Terminar Blood Surge',
   'button.masqueradeThreat': 'Prueba de amenaza',
   'button.prolongedCancel': 'Cancelar tarea',
   'button.willpowerBest': 'Willpower: repetir fallos',
