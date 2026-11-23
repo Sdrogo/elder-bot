@@ -385,8 +385,13 @@ ul.issues li.hint {
 }
 
 .sheet-grid .attr-grid {
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 24px;
+}
+
+/* Attributes take a whole row: three columns of name and five dots don't fit in one card. */
+.sheet-section.wide {
+  grid-column: 1 / -1;
 }
 
 .sheet-section h3 {
@@ -436,4 +441,14 @@ ul.issues li.hint {
 
 .lifepath .specialties {
   padding: 2px 0 8px 16px;
+}
+
+.resource-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resource-row strong {
+  font-size: 14px;
 }

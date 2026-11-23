@@ -3,7 +3,13 @@
 // Storyteller of its Chronicle can read it; the Storyteller also answers the choices that need
 // their approval. Every text goes in with textContent: names come from users.
 
-import { evaluate, resourceTotals, skillDots } from '/game/creation.js';
+import {
+  coterieHavenDots,
+  evaluate,
+  isCoterieHaven,
+  resourceTotals,
+  skillDots,
+} from '/game/creation.js';
 import { LIFEPATHS_BY_ID, MERITS_BY_ID, PATHS, SIRES_BY_ID } from '/game/alpha2/background.js';
 import { CLAN_INFO, CLAN_TRAITS_BY_ID } from '/game/alpha2/clans.js';
 import {
@@ -32,6 +38,7 @@ const TEXT = {
     merits: 'Merit',
     morality: 'Humanity o Path',
     resources: 'Resources',
+    coterieHaven: 'Haven di coterie',
     flaws: 'Flaws',
     trackers: 'Tracciati',
     approvals: 'Approvazioni del Narratore',
@@ -62,6 +69,7 @@ const TEXT = {
     merits: 'Merits',
     morality: 'Humanity or Path',
     resources: 'Resources',
+    coterieHaven: 'Coterie haven',
     flaws: 'Flaws',
     trackers: 'Trackers',
     approvals: 'Storyteller approvals',
@@ -195,7 +203,9 @@ function draw({ character, sheet, canApprove }) {
     }
     attrs.append(col);
   }
-  grid.append(section(tr('attributes'), attrs));
+  const attrSection = section(tr('attributes'), attrs);
+  attrSection.classList.add('wide');
+  grid.append(attrSection);
 
   const skills = el('div');
   for (const skill of SKILLS) {
@@ -266,6 +276,12 @@ function draw({ character, sheet, canApprove }) {
     const subject = written.get(key);
     const name = RESOURCE_INFO[kind]?.name ?? kind;
     res.append(row(subject ? `${name}: ${subject}` : name, dotsText(n, t.maxDots)));
+  }
+  const coterie = coterieHavenDots(d);
+  if (coterie) {
+    const subject = d.extraResources.find((r) => isCoterieHaven(r) && r.detail.trim())?.detail;
+    const label = subject ? `${tr('coterieHaven')}: ${subject.trim()}` : tr('coterieHaven');
+    res.append(row(label, dotsText(coterie, t.maxDots)));
   }
   grid.append(section(tr('resources'), res.childElementCount ? res : empty()));
 
