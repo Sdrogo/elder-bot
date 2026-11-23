@@ -14,6 +14,7 @@ const TEXT = {
     'characters.new': 'Nuovo personaggio',
     'characters.guided': 'Crea scheda guidata',
     'drafts.title': 'Schede in corso',
+    'characters.complete': 'Completa la scheda',
     'drafts.untitled': 'Senza nome',
     'drafts.continue': 'Continua',
     'drafts.updated': 'modificata il',
@@ -106,6 +107,7 @@ const TEXT = {
     'characters.new': 'New character',
     'characters.guided': 'Guided character sheet',
     'drafts.title': 'Sheets in progress',
+    'characters.complete': 'Complete the sheet',
     'drafts.untitled': 'Untitled',
     'drafts.continue': 'Continue',
     'drafts.updated': 'changed on',
@@ -415,6 +417,12 @@ function characterCard(c, chronicle) {
         actions.replaceWith(form);
       }),
     );
+    if (c.owned && !c.sheet && c.tierId !== 'ghoul') {
+      // Characters made before the wizard have trackers only: the wizard can fill in the rest.
+      const complete = el('a', 'button', tr('characters.complete'));
+      complete.href = `/crea?personaggio=${c.id}`;
+      actions.append(complete);
+    }
     if (c.owned) {
       actions.append(
         confirmButton(tr('delete'), () => change('DELETE', `/api/characters/${c.id}`)),

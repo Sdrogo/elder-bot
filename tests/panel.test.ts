@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newCharacter } from '../src/game/character.js';
 import { emptyDraft, type SheetDraft } from '../src/game/creation.js';
 import { MAX_DRAFTS } from '../src/state/drafts.js';
+import { brujah } from './fixtures/sheets.js';
 import { Store } from '../src/state/store.js';
 import { createPanelHandler } from '../src/web/server.js';
 
@@ -705,5 +706,78 @@ describe('character creation wizard', () => {
     expect((await send('POST', '/api/drafts', { data: { tier: 'neonate' } })).status).toBe(409);
     const big = { tier: 'neonate', name: 'x'.repeat(20_000) };
     expect((await send('POST', '/api/drafts', { data: big })).status).toBe(413);
+  });
+
+  it('creates a character with its full sheet from a complete draft, only once', async () => {
+    const send = await asUser();
+    const half = await send('POST', '/api/drafts', { data: { tier: 'neonate', name: 'Mezza' } });
+    const halfId = ((await half.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${halfId}/create`, { guild: 'g' })).status).toBe(400);
+
+    const saved = await send('POST', '/api/drafts', { data: brujah() });
+    const id = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${id}/create`, { guild: 'other' })).status).toBe(400);
+    expect((await send('POST', `/api/drafts/${id}/create`, { guild: 'g' }, 'wrong')).status).toBe(
+      403,
+    );
+    const res = await send('POST', `/api/drafts/${id}/create`, { guild: 'g' });
+    expect(res.status).toBe(200);
+    const { character } = (await res.json()) as {
+      character: { id: number; name: string; clanId: string; sheet: boolean };
+    };
+    expect(character).toMatchObject({ name: 'Nico', clanId: 'brujah', sheet: true });
+    const stored = store.campaign.getCharacter(character.id)!;
+    // Stamina 3, Composure 3 and Resolve 2 from the sheet drive the trackers.
+    expect(stored.values).toMatchObject({ tier: 'neonate', stamina: 3, health: 8, willpower: 5 });
+    expect(store.campaign.getSheet(character.id)?.data).toMatchObject({ sire: 'caring' });
+    // The draft is gone, so the same sheet can't make a second character.
+    expect((await send('POST', `/api/drafts/${id}/create`, { guild: 'g' })).status).toBe(404);
+
+    // Deleting the character deletes its sheet too.
+    expect((await send('DELETE', `/api/characters/${character.id}`)).status).toBe(204);
+    expect(store.campaign.getSheet(character.id)).toBeUndefined();
+  });
+
+  it('completes a tracker-only character instead of making a new one', async () => {
+    const old = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Vecchio',
+      clan: 'brujah',
+      values: {
+        ...newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+        vitae: 3,
+      },
+    });
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altrui',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+    });
+    if (typeof old !== 'object' || typeof theirs !== 'object') throw new Error('setup');
+    const send = await asUser();
+
+    const stolen = await send('POST', '/api/drafts', {
+      data: { ...brujah(), characterId: theirs.id },
+    });
+    const stolenId = ((await stolen.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${stolenId}/create`, {})).status).toBe(404);
+
+    const saved = await send('POST', '/api/drafts', { data: { ...brujah(), characterId: old.id } });
+    const id = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    const res = await send('POST', `/api/drafts/${id}/create`, {});
+    expect(res.status).toBe(200);
+    const after = store.campaign.getCharacter(old.id)!;
+    expect(after.name).toBe('Nico');
+    expect(after.hasSheet).toBe(true);
+    // Attributes come from the sheet; the trackers in play are kept.
+    expect(after.values).toMatchObject({ stamina: 3, vitae: 3 });
+    expect(store.campaign.charactersOwnedBy('111')).toHaveLength(1);
+
+    const again = await send('POST', '/api/drafts', { data: { ...brujah(), characterId: old.id } });
+    const againId = ((await again.json()) as { draft: { id: number } }).draft.id;
+    expect((await send('POST', `/api/drafts/${againId}/create`, {})).status).toBe(409);
   });
 });
