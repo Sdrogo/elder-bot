@@ -180,6 +180,7 @@ const TEXT = {
     'skills.fromLifepaths': 'dai lifepath',
     'skills.extra': 'extra',
     'skills.specialty': 'Specialità',
+    'skills.specialtyExtra': 'Specialità extra (due lifepath)',
     'cat.physical': 'Fisici',
     'cat.social': 'Sociali',
     'cat.mental': 'Mentali',
@@ -379,6 +380,7 @@ const TEXT = {
     'skills.fromLifepaths': 'from lifepaths',
     'skills.extra': 'extra',
     'skills.specialty': 'Specialty',
+    'skills.specialtyExtra': 'Extra specialty (two lifepaths)',
     'cat.physical': 'Physical',
     'cat.social': 'Social',
     'cat.mental': 'Mental',
@@ -517,15 +519,25 @@ function button(text, onClick, className = '') {
 const dotsText = (n, max) => '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n));
 
 /** − dots + : `canAdd` says whether + may go one higher. */
-function stepper(value, { min = 0, max, canAdd = true, onChange, label, plain = false }) {
+/**
+ * − dots + : `canAdd` says whether + may go one higher. `base` dots come from elsewhere (another
+ * lifepath, the extra points): they show first, dimmed, so the dots add up to the real level.
+ */
+function stepper(value, { min = 0, max, canAdd = true, onChange, label, plain = false, base = 0 }) {
   const box = el('span', 'stepper');
   const minus = button('−', () => onChange(value - 1), 'step-btn');
   minus.disabled = value <= min;
   minus.setAttribute('aria-label', `${label} −1`);
   const plus = button('+', () => onChange(value + 1), 'step-btn');
-  plus.disabled = !canAdd || value >= max;
+  plus.disabled = !canAdd || base + value >= max;
   plus.setAttribute('aria-label', `${label} +1`);
-  const shown = plain ? el('span', 'count', `+${value}`) : el('span', 'dots', dotsText(value, max));
+  let shown;
+  if (plain) shown = el('span', 'count', `+${value}`);
+  else {
+    shown = el('span', 'dots');
+    if (base) shown.append(el('span', 'other', '●'.repeat(base)));
+    shown.append(dotsText(value, max - base));
+  }
   box.append(minus, shown, plus);
   return box;
 }
@@ -1520,6 +1532,8 @@ function chosenLifepath(pick, n) {
       el('span', '', skillLabel(s)),
       stepper(value, {
         max: cap,
+        // The Skill's level so far: other lifepaths and extra points show before this one's.
+        base: skillDots(d, s.skill) - value,
         canAdd: sp.spent < sp.budget && skillDots(d, s.skill) < cap,
         label: SKILL_INFO[s.skill].name,
         onChange: (v) =>
@@ -1531,6 +1545,10 @@ function chosenLifepath(pick, n) {
       }),
     );
     card.append(row);
+    // Specialties right where the dots go; the first lifepath feeding the Skill shows them.
+    const slots = specialtySlots(d, s.skill);
+    const first = d.lifepaths.findIndex((p) => (p.skills[s.skill] ?? 0) > 0);
+    if (slots && first === n) card.append(specialtyInputs(s.skill, slots));
   }
 
   card.append(pool(tr('lp.resources'), rp));
@@ -1587,11 +1605,16 @@ function specialtyInputs(skill, slots) {
   }
   wrap.append(list);
   const chosen = d.specialties[skill] ?? [];
+  // Two lifepaths investing in the same Skill give one more specialty: the last box is that one.
+  const overlap = d.lifepaths.filter((p) => (p.skills[skill] ?? 0) > 0).length >= 2;
   for (let i = 0; i < slots; i++) {
     const input = el('input');
     input.maxLength = 40;
     input.setAttribute('list', listId);
-    input.placeholder = `${tr('skills.specialty')} ${i + 1}`;
+    input.placeholder =
+      overlap && i === slots - 1
+        ? tr('skills.specialtyExtra')
+        : `${tr('skills.specialty')} ${i + 1}`;
     input.value = chosen[i] ?? '';
     input.addEventListener('input', () =>
       update((x) => {

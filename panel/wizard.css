@@ -429,3 +429,11 @@ ul.issues li.hint {
   border-color: var(--blood);
   color: #ff8a9a;
 }
+
+.dots .other {
+  color: var(--quiet);
+}
+
+.lifepath .specialties {
+  padding: 2px 0 8px 16px;
+}
