@@ -2,6 +2,8 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newCharacter } from '../src/game/character.js';
+import { emptyDraft, type SheetDraft } from '../src/game/creation.js';
+import { MAX_DRAFTS } from '../src/state/drafts.js';
 import { Store } from '../src/state/store.js';
 import { createPanelHandler } from '../src/web/server.js';
 
@@ -181,24 +183,24 @@ describe('web panel', () => {
   });
 });
 
-describe('panel changes', () => {
-  /** Logs in as 111 and returns a sender of changes with the session's CSRF token. */
-  async function asUser() {
-    const cookie = await login();
-    const me = (await (await get('/api/me', cookie)).json()) as { csrf: string };
-    return (method: string, path: string, body?: unknown, csrf = me.csrf) =>
-      fetch(base + path, {
-        method,
-        headers: {
-          cookie,
-          'content-type': 'application/json',
-          'x-csrf-token': csrf,
-          origin: PUBLIC,
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-  }
+/** Logs in as 111 and returns a sender of changes with the session's CSRF token. */
+async function asUser() {
+  const cookie = await login();
+  const me = (await (await get('/api/me', cookie)).json()) as { csrf: string };
+  return (method: string, path: string, body?: unknown, csrf = me.csrf) =>
+    fetch(base + path, {
+      method,
+      headers: {
+        cookie,
+        'content-type': 'application/json',
+        'x-csrf-token': csrf,
+        origin: PUBLIC,
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+}
 
+describe('panel changes', () => {
   const sheet = { tier: 'neonate' as const, stamina: 3, composure: 4, resolve: 2 };
 
   it('creates a character on a server the user shares with the bot', async () => {
@@ -621,5 +623,87 @@ describe('overlay keys', () => {
     const row = db.prepare('SELECT key_hash FROM overlay_keys').get() as { key_hash: string };
     expect(row.key_hash).not.toContain(second.slice(4));
     db.close();
+  });
+});
+
+describe('character creation wizard', () => {
+  it('serves its page to logged-in users and the rules engine as browser modules', async () => {
+    expect((await get('/crea')).status).toBe(302);
+    const cookie = await login();
+    const page = await get('/crea', cookie);
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain('/wizard.js');
+    const engine = await get('/game/creation.js');
+    expect(engine.status).toBe(200);
+    expect(engine.headers.get('content-type')).toContain('javascript');
+    const code = await engine.text();
+    expect(code).toContain("from './alpha2/background.js'");
+    expect(code).not.toContain('interface SheetDraft');
+    expect((await get('/game/alpha2/clans.js')).status).toBe(200);
+    // Only the engine's own modules: not the server, not the sources, no way up the tree.
+    for (const path of ['/game/draft.js', '/game/creation.ts', '/game/../web/server.js']) {
+      expect((await get(path)).status).not.toBe(200);
+    }
+    expect((await get('/wizard.js')).status).toBe(200);
+  });
+
+  it('saves, lists, updates and deletes the user own drafts', async () => {
+    const send = await asUser();
+    const empty = await (await send('GET', '/api/drafts')).json();
+    expect(empty).toEqual({ drafts: [] });
+
+    const created = await send('POST', '/api/drafts', {
+      data: {
+        tier: 'neonate',
+        name: 'Lucia',
+        clan: 'brujah',
+        sire: 'caring',
+        lifepaths: [{ id: 'criminal', skills: { fighting: 3, knowledge: 2 }, resources: [1, 2] }],
+        attributes: { strength: 3, wits: 99 },
+        powers: ['awe', 'not-a-power'],
+        evil: '<script>',
+      },
+    });
+    expect(created.status).toBe(200);
+    const { draft } = (await created.json()) as { draft: { id: number; data: SheetDraft } };
+    // Unknown ids, Skills outside the lifepath and silly numbers are dropped, not kept.
+    expect(draft.data.name).toBe('Lucia');
+    expect(draft.data.attributes).toEqual({ strength: 3 });
+    expect(draft.data.powers).toEqual(['awe']);
+    expect(draft.data.lifepaths[0]!.skills).toEqual({ fighting: 3 });
+    expect(draft.data.lifepaths[0]!.resources).toEqual([1, 2, 0]);
+    expect(draft.data).not.toHaveProperty('evil');
+
+    const updated = await send('POST', `/api/drafts/${draft.id}`, {
+      data: { ...draft.data, clan: 'gangrel' },
+    });
+    expect(((await updated.json()) as { draft: { data: SheetDraft } }).draft.data.clan).toBe(
+      'gangrel',
+    );
+    const list = (await (await send('GET', '/api/drafts')).json()) as { drafts: unknown[] };
+    expect(list.drafts).toHaveLength(1);
+
+    expect((await send('POST', '/api/drafts', { data: { tier: 'ghoul' } })).status).toBe(400);
+    expect((await send('POST', '/api/drafts', { data: draft.data }, 'wrong')).status).toBe(403);
+
+    expect((await send('DELETE', `/api/drafts/${draft.id}`)).status).toBe(204);
+    expect((await send('GET', `/api/drafts/${draft.id}`)).status).toBe(404);
+  });
+
+  it('keeps other people drafts out of reach and caps how many one user keeps', async () => {
+    const other = store.drafts.create('222', emptyDraft('elder'));
+    if (other === 'limit') throw new Error('setup');
+    const send = await asUser();
+    expect((await send('GET', `/api/drafts/${other.id}`)).status).toBe(404);
+    expect((await send('POST', `/api/drafts/${other.id}`, { data: other.data })).status).toBe(404);
+    expect((await send('DELETE', `/api/drafts/${other.id}`)).status).toBe(404);
+    expect(store.drafts.get(other.id, '222')).toBeDefined();
+
+    for (let i = 0; i < MAX_DRAFTS; i++) {
+      expect((await send('POST', '/api/drafts', { data: { tier: 'neonate' } })).status).toBe(200);
+    }
+    expect((await send('POST', '/api/drafts', { data: { tier: 'neonate' } })).status).toBe(409);
+    const big = { tier: 'neonate', name: 'x'.repeat(20_000) };
+    expect((await send('POST', '/api/drafts', { data: big })).status).toBe(413);
   });
 });

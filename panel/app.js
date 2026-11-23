@@ -12,6 +12,11 @@ const TEXT = {
     'characters.title': 'I miei personaggi',
     'characters.empty': 'Non hai ancora personaggi. Creane uno con "Nuovo personaggio".',
     'characters.new': 'Nuovo personaggio',
+    'characters.guided': 'Crea scheda guidata',
+    'drafts.title': 'Schede in corso',
+    'drafts.untitled': 'Senza nome',
+    'drafts.continue': 'Continua',
+    'drafts.updated': 'modificata il',
     'chronicles.title': 'Le mie Cronache',
     noChronicle: 'nessuna Cronaca',
     live: 'in onda',
@@ -99,6 +104,11 @@ const TEXT = {
     'characters.title': 'My characters',
     'characters.empty': 'No characters yet. Make one with "New character".',
     'characters.new': 'New character',
+    'characters.guided': 'Guided character sheet',
+    'drafts.title': 'Sheets in progress',
+    'drafts.untitled': 'Untitled',
+    'drafts.continue': 'Continue',
+    'drafts.updated': 'changed on',
     'chronicles.title': 'My Chronicles',
     noChronicle: 'no Chronicle',
     live: 'on air',
@@ -701,6 +711,38 @@ function overlayBox(newKey) {
   return box;
 }
 
+/** A sheet in progress from the guided creation, with links to go on or throw it away. */
+function draftCard(draft) {
+  const card = el('div', 'card');
+  const data = draft.data;
+  card.append(el('h3', '', data.name || tr('drafts.untitled')));
+  const tier = data.tier.charAt(0).toUpperCase() + data.tier.slice(1);
+  const when = new Date(draft.updatedAt).toLocaleDateString(lang);
+  const meta = [tier, data.clan ? clanName(data.clan) : '', `${tr('drafts.updated')} ${when}`];
+  card.append(el('div', 'meta', meta.filter(Boolean).join(' · ')));
+  const actions = el('div', 'actions');
+  const go = el('a', 'button', tr('drafts.continue'));
+  go.href = `/crea?bozza=${draft.id}`;
+  actions.append(
+    go,
+    confirmButton(tr('delete'), () => change('DELETE', `/api/drafts/${draft.id}`)),
+  );
+  card.append(actions);
+  return card;
+}
+
+/** Alpha 2.0 clans are the bot's own, but for Giovanni (the bot still says Hecata). */
+const clanName = (id) =>
+  me.options.clans.find((c) => c.id === id)?.name ?? (id === 'giovanni' ? 'Giovanni' : id);
+
+async function loadDrafts() {
+  const response = await fetch('/api/drafts', { credentials: 'same-origin' });
+  if (!response.ok) return;
+  const { drafts } = await response.json();
+  document.getElementById('drafts').replaceChildren(...drafts.map(draftCard));
+  document.getElementById('drafts-section').hidden = drafts.length === 0;
+}
+
 async function loadPanel() {
   const response = await fetch('/api/me', { credentials: 'same-origin' });
   if (response.status === 401) {
@@ -723,6 +765,7 @@ async function loadPanel() {
   const overlay = document.getElementById('overlay');
   if (me.overlay) overlay.replaceChildren(overlayBox());
   else overlay.replaceChildren();
+  await loadDrafts();
 }
 
 function setUpPanel() {

@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ProlongedTask } from '../dice/prolonged.js';
 import { Campaign } from './campaign.js';
+import { Drafts } from './drafts.js';
 import { OverlayKeys, ViewKeys } from './overlayKeys.js';
 import { WebSessions } from './sessions.js';
 import { Stage } from './stage.js';
@@ -26,6 +27,8 @@ export class Store {
   readonly viewKeys: ViewKeys;
   /** Webcams, scene settings and last rolls for the OBS scene. */
   readonly stage: Stage;
+  /** Character sheets in progress from the panel's creation wizard. */
+  readonly drafts: Drafts;
 
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -51,6 +54,7 @@ export class Store {
     this.overlayKeys = new OverlayKeys(this.db);
     this.viewKeys = new ViewKeys(this.db);
     this.stage = new Stage(this.db);
+    this.drafts = new Drafts(this.db);
   }
 
   /** Marked boxes on the Masquerade Tracker (Storyteller Packet p. 32), 0 to 10. */
