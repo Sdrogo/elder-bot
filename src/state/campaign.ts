@@ -7,8 +7,24 @@ import {
   type CharacterValues,
   type Clan,
   type Sect,
+  type Tier,
   type Track,
 } from '../game/character.js';
+
+/** Tiers of play a Chronicle can be set to (Duskborn play at the Neonate tier, p. 114). */
+export const CHRONICLE_TIERS = ['neonate', 'ancilla', 'elder'] as const;
+export type ChronicleTier = (typeof CHRONICLE_TIERS)[number];
+export const isChronicleTier = (v: unknown): v is ChronicleTier =>
+  CHRONICLE_TIERS.includes(v as ChronicleTier);
+
+/**
+ * Whether a character may play in a Chronicle of that tier. A Chronicle with no tier takes
+ * anyone; ghouls have no Alpha 2.0 rules yet, so they are not held to one.
+ */
+export function tierFits(character: Tier, chronicle: ChronicleTier | undefined): boolean {
+  if (!chronicle || character === 'ghoul') return true;
+  return (character === 'duskborn' ? 'neonate' : character) === chronicle;
+}
 
 /** A player character, saved per Discord server and owned by one Discord user. */
 export interface Character {
@@ -43,6 +59,8 @@ export interface Chronicle {
   storytellerId: string;
   sect: Sect;
   masquerade: number;
+  /** Tier of play: its characters must match it. None takes any character. */
+  tier?: ChronicleTier;
   /** The Discord channel where this Chronicle is played, set by /elder session new. */
   channelId?: string;
   archived: boolean;
@@ -81,6 +99,7 @@ interface ChronicleRow {
   masquerade: number;
   channel_id: string | null;
   archived: number;
+  tier: string | null;
 }
 
 const toCharacter = (r: CharacterRow): Character => ({
@@ -113,6 +132,7 @@ const toChronicle = (r: ChronicleRow): Chronicle => ({
   storytellerId: r.storyteller_id,
   sect: r.sect as Sect,
   masquerade: r.masquerade,
+  ...(isChronicleTier(r.tier) ? { tier: r.tier } : {}),
   ...(r.channel_id !== null ? { channelId: r.channel_id } : {}),
   archived: r.archived === 1,
 });
@@ -171,6 +191,10 @@ export class Campaign {
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         data TEXT NOT NULL, approvals TEXT NOT NULL, created_at INTEGER NOT NULL);
     `);
+    // Chronicles made before tiers of play have none: they take any character.
+    const columns = db.prepare('PRAGMA table_info(chronicles)').all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'tier'))
+      db.exec('ALTER TABLE chronicles ADD COLUMN tier TEXT');
   }
 
   // Characters.
@@ -233,6 +257,13 @@ export class Campaign {
            approvals = excluded.approvals, created_at = excluded.created_at`,
       )
       .run(characterId, JSON.stringify(sheet.data), JSON.stringify(sheet.approvals), Date.now());
+  }
+
+  /** Replaces the approvals list of a character's sheet (the Storyteller's answers). */
+  setApprovals(characterId: number, approvals: unknown[]): void {
+    this.db
+      .prepare('UPDATE character_sheets SET approvals = ? WHERE character_id = ?')
+      .run(JSON.stringify(approvals), characterId);
   }
 
   getSheet(characterId: number): StoredSheet | undefined {
@@ -311,9 +342,13 @@ export class Campaign {
     id: number,
     patch: { name?: string; clan?: Clan; values?: Partial<CharacterValues> },
     actorId: string,
-  ): CreateResult<Character> | undefined {
+  ): CreateResult<Character> | 'tier' | undefined {
     const c = this.getCharacter(id);
     if (!c) return undefined;
+    const tier = patch.values?.tier;
+    if (tier !== undefined && tier !== c.values.tier && c.chronicleId !== undefined) {
+      if (!tierFits(tier, this.getChronicle(c.chronicleId)?.tier)) return 'tier';
+    }
     if (patch.name !== undefined) {
       const other = this.ownCharacterByName(c.guildId, c.ownerId, patch.name);
       if (other && other.id !== id) return 'duplicate';
@@ -457,6 +492,7 @@ export class Campaign {
     storytellerId: string;
     name: string;
     sect: Sect;
+    tier?: ChronicleTier;
   }): CreateResult<Chronicle> {
     const count = this.db
       .prepare(
@@ -471,11 +507,29 @@ export class Campaign {
     if (taken) return 'duplicate';
     const info = this.db
       .prepare(
-        `INSERT INTO chronicles (guild_id, slug, name, storyteller_id, sect, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO chronicles (guild_id, slug, name, storyteller_id, sect, tier, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(input.guildId, slug, input.name, input.storytellerId, input.sect, Date.now());
+      .run(
+        input.guildId,
+        slug,
+        input.name,
+        input.storytellerId,
+        input.sect,
+        input.tier ?? null,
+        Date.now(),
+      );
     return this.getChronicle(Number(info.lastInsertRowid))!;
+  }
+
+  /**
+   * Sets or clears a Chronicle's tier of play. 'members' when a character already in it
+   * would not fit: the Storyteller sorts that out first.
+   */
+  setChronicleTier(id: number, tier: ChronicleTier | undefined): 'ok' | 'members' {
+    if (this.members(id).some((c) => !tierFits(c.values.tier, tier))) return 'members';
+    this.db.prepare('UPDATE chronicles SET tier = ? WHERE id = ?').run(tier ?? null, id);
+    return 'ok';
   }
 
   getChronicle(id: number): Chronicle | undefined {
@@ -580,9 +634,10 @@ export class Campaign {
    * Adds a character to a Chronicle, at the end of the scene. 'busy' if it already plays in
    * another Chronicle that is not archived.
    */
-  join(chronicleId: number, characterId: number): 'ok' | 'busy' {
+  join(chronicleId: number, characterId: number): 'ok' | 'busy' | 'tier' {
     const c = this.getCharacter(characterId);
     if (c?.chronicleId !== undefined) return c.chronicleId === chronicleId ? 'ok' : 'busy';
+    if (c && !tierFits(c.values.tier, this.getChronicle(chronicleId)?.tier)) return 'tier';
     this.db
       .prepare(
         `INSERT INTO chronicle_members (character_id, chronicle_id, position)

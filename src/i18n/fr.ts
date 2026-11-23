@@ -264,6 +264,8 @@ export const fr: Messages = {
     'Tous tes personnages sont déjà dans une Chronique. Crées-en un avec `/elder character create`, puis appuie à nouveau sur le bouton.',
   'chronicle.pickPlaceholder': 'Ton personnage',
   'chronicle.busy': '**{name}** joue déjà dans une autre Chronique.',
+  'chronicle.wrongTier': '**{name}** ne peut pas rejoindre : la Chronique est de niveau {tier}.',
+  'character.wrongTier': 'Le nouveau niveau ne correspond pas à celui de sa Chronique.',
   'chronicle.joined.private': '**{name}** rejoint {chronicle}.',
   'chronicle.joined': '**{name}** ({user}) rejoint {chronicle}.',
   'session.new.chronicle':

@@ -116,6 +116,8 @@ const TEXT = {
     'create.duplicate': 'Hai già un personaggio con questo nome su quel server.',
     'create.limit': 'Hai già il numero massimo di personaggi su quel server.',
     'create.failed': 'Creazione non riuscita: controlla la scheda e riprova.',
+    'create.tier':
+      'Il personaggio è in una Cronaca di un altro livello: scegli il livello della Cronaca.',
     'side.disciplines': 'Discipline',
     'side.outOfClan': 'di cui fuori clan',
     'side.powers': 'Poteri',
@@ -315,6 +317,7 @@ const TEXT = {
     'create.duplicate': 'You already have a character with this name on that server.',
     'create.limit': 'You reached the maximum number of characters on that server.',
     'create.failed': 'Creation failed: check the sheet and try again.',
+    'create.tier': 'The character is in a Chronicle of another tier: pick the Chronicle’s tier.',
     'side.disciplines': 'Disciplines',
     'side.outOfClan': 'of which out of clan',
     'side.powers': 'Powers',
@@ -1432,7 +1435,7 @@ function createBox() {
           return;
         }
         const data = await response.json().catch(() => ({}));
-        const known = ['duplicate', 'limit'].includes(data.error);
+        const known = ['duplicate', 'limit', 'tier'].includes(data.error);
         notify(tr(known ? `create.${data.error}` : 'create.failed'));
       } catch {
         notify(tr('create.failed'));

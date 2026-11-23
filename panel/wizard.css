@@ -376,3 +376,56 @@ ul.issues li.hint {
   gap: 8px;
   justify-items: start;
 }
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sheet-grid .attr-grid {
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.sheet-section h3 {
+  margin-bottom: 8px;
+}
+
+.sheet-section h4 {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.power {
+  padding: 4px 0 4px 12px;
+  font-size: 14px;
+}
+
+.power p {
+  margin: 2px 0 0;
+}
+
+.status {
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 1px 10px;
+  border: 1px solid var(--line);
+}
+
+.status.pending {
+  border-color: #d9a441;
+  color: #f0c46a;
+}
+
+.status.approved {
+  border-color: #7fd18b;
+  color: #7fd18b;
+}
+
+.status.rejected {
+  border-color: var(--blood);
+  color: #ff8a9a;
+}

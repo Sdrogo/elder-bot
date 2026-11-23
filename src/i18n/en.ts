@@ -254,6 +254,8 @@ export const en = {
     'All your characters are already in a Chronicle. Create a new one with `/elder character create`, then press the button again.',
   'chronicle.pickPlaceholder': 'Your character',
   'chronicle.busy': '**{name}** already plays in another Chronicle.',
+  'chronicle.wrongTier': "**{name}** can't join: the Chronicle is {tier} tier.",
+  'character.wrongTier': 'The new tier does not match its Chronicle.',
   'chronicle.joined.private': '**{name}** joins {chronicle}.',
   'chronicle.joined': '**{name}** ({user}) joins {chronicle}.',
   'session.new.chronicle': "Chronicle: **{name}**. Hunger dice come from each character's Vitae.",
