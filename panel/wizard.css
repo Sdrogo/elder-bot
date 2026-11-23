@@ -1,0 +1,331 @@
+/* The guided character creation page: steps on top, the step on the left, points on the right. */
+
+.wizard {
+  max-width: 1200px;
+}
+
+.quiet {
+  color: var(--quiet);
+  font-size: 13px;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 16px;
+}
+
+.steps .tab {
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 14px;
+}
+
+.steps .tab.done::after {
+  content: ' ✓';
+  color: #7fd18b;
+}
+
+.steps .tab.error::after {
+  content: ' !';
+  color: #ff8a9a;
+  font-weight: 700;
+}
+
+.steps .tab[aria-current='step'] {
+  background: var(--blood);
+  border-color: var(--blood);
+  font-weight: 600;
+}
+
+.wizard-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 820px) {
+  .wizard-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.side {
+  position: sticky;
+  top: 12px;
+}
+
+.side h3 {
+  font-size: 14px;
+  margin: 14px 0 6px;
+  color: var(--quiet);
+}
+
+.step-head h2 {
+  margin-top: 0;
+}
+
+.step h3 {
+  font-size: 15px;
+  margin: 18px 0 8px;
+}
+
+.step .field {
+  max-width: 420px;
+  margin: 8px 0 12px;
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.choice {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  text-align: left;
+  background: var(--card);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.choice strong {
+  font-size: 15px;
+}
+
+.choice .line {
+  color: var(--quiet);
+  font-size: 13px;
+}
+
+.choice.selected {
+  border-color: var(--blood);
+  box-shadow: 0 0 0 1px var(--blood) inset;
+  background: linear-gradient(var(--blood-soft), var(--blood-soft)), var(--card);
+}
+
+.choice.locked {
+  opacity: 0.55;
+}
+
+.choice .reason {
+  font-size: 12px;
+  color: #ff8a9a;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 14px;
+}
+
+.chip.selected {
+  background: var(--blood);
+  border-color: var(--blood);
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.step-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 1;
+  font-size: 16px;
+}
+
+.dots {
+  letter-spacing: 2px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.trait {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.trait:last-of-type {
+  border-bottom: 0;
+}
+
+.trait .resource {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+
+.trait input,
+.specialties input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  max-width: 320px;
+}
+
+.lifepath {
+  margin-bottom: 10px;
+}
+
+.lifepath .pool {
+  margin-top: 10px;
+}
+
+.attr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.attr-grid .chips {
+  margin: 8px 0;
+}
+
+.attr-grid .chip {
+  font-size: 13px;
+  padding: 2px 10px;
+}
+
+.pool {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  padding: 2px 0;
+}
+
+.pool .count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.pool.full .count {
+  color: #7fd18b;
+}
+
+.pool.over .count {
+  color: #ff8a9a;
+}
+
+.skills {
+  display: grid;
+  gap: 6px;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.skill-name {
+  display: grid;
+}
+
+.skill-counts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.specialties {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+ul.issues {
+  margin: 8px 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+ul.issues li.error {
+  color: #ff8a9a;
+}
+
+ul.issues li.todo {
+  color: var(--text);
+}
+
+ul.issues li.hint {
+  color: var(--quiet);
+}
+
+.save {
+  margin: 0;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.save.saved {
+  color: #7fd18b;
+}
+
+.save.error {
+  color: #ff8a9a;
+}
+
+.step-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 520px) {
+  .skill-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .skill-counts {
+    justify-content: flex-start;
+  }
+}
+
+.lifepath-list summary {
+  cursor: pointer;
+  margin: 14px 0 4px;
+  color: var(--quiet);
+  font-size: 14px;
+}
+
+.stepper .count {
+  min-width: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

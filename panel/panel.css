@@ -350,3 +350,25 @@ button:disabled {
   width: 1.1rem;
   height: 1.1rem;
 }
+
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+a.button.primary {
+  background: var(--blood);
+  border-color: var(--blood);
+  font-weight: 600;
+}
+
+.subhead {
+  font-size: 15px;
+  margin: 16px 0 8px;
+  color: var(--quiet);
+}
+
+#drafts-section {
+  margin-bottom: 16px;
+}

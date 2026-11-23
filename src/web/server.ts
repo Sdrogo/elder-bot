@@ -27,6 +27,8 @@ import {
   type Clan,
 } from '../game/character.js';
 import type { Character, Chronicle } from '../state/campaign.js';
+import { parseDraft } from '../game/draft.js';
+import type { Draft } from '../state/drafts.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
 import {
   BACKGROUND_TYPES,
@@ -51,6 +53,8 @@ const STATE_MINUTES = 10;
 const RATE_LIMIT = 120;
 const LOGIN_LIMIT = 10;
 const MAX_BODY = 4096;
+/** A saved draft of a character sheet is bigger than any other change. */
+const MAX_DRAFT_BODY = 16_384;
 
 /** The static pages live in panel/ at the root of the repository (and of the image). */
 export const STATIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'panel');
@@ -59,6 +63,21 @@ export const STATIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '.
 export const OVERLAY_DIR = join(STATIC_DIR, '..', 'overlay', 'static');
 /** Clan and sect symbols (Paradox IP, not in git): a folder mounted read-only on the VPS. */
 export const SYMBOLS_DIR = join(STATIC_DIR, '..', 'symbols');
+
+/**
+ * The character creation engine runs in the browser too, as the same modules the server runs:
+ * dist/game in the image. Only these files are served, and only as JavaScript.
+ */
+export const GAME_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'game');
+const GAME_MODULES = new Set([
+  'creation',
+  'alpha2/background',
+  'alpha2/clans',
+  'alpha2/core',
+  'alpha2/disciplines',
+  'alpha2/prereq',
+  'alpha2/tiers',
+]);
 
 const OVERLAY_FILES: Record<string, string> = {
   'common.js': 'text/javascript; charset=utf-8',
@@ -84,6 +103,8 @@ const STREAM_TICK_MS = 1000;
 const STATIC_FILES: Record<string, string> = {
   '/app.js': 'text/javascript; charset=utf-8',
   '/panel.css': 'text/css; charset=utf-8',
+  '/wizard.js': 'text/javascript; charset=utf-8',
+  '/wizard.css': 'text/css; charset=utf-8',
 };
 
 const SECURITY_HEADERS = {
@@ -106,6 +127,7 @@ export interface PanelDeps {
   staticDir?: string;
   overlayDir?: string;
   symbolsDir?: string;
+  gameDir?: string;
   now?: () => number;
   /**
    * The Discord servers the bot shares with a user, where they can create characters.
@@ -324,6 +346,8 @@ export function createPanelHandler(deps: PanelDeps) {
   const { store } = deps;
   const overlayDir = deps.overlayDir ?? OVERLAY_DIR;
   const symbolsDir = deps.symbolsDir ?? SYMBOLS_DIR;
+  const gameDir = deps.gameDir ?? GAME_DIR;
+  const gameCache = new Map<string, Buffer>();
   const streams = new Map<ServerResponse, { userId: string; last: string }>();
   let ticker: NodeJS.Timeout | undefined;
 
@@ -488,6 +512,76 @@ export function createPanelHandler(deps: PanelDeps) {
       return;
     }
     send(res, 200, body, type, cache);
+  }
+
+  /**
+   * One engine module as browser JavaScript. The image has the compiled .js files; running from
+   * the sources (tsx, tests) there are only .ts files, turned into JavaScript on first request.
+   */
+  async function gameModule(name: string): Promise<Buffer> {
+    const cached = gameCache.get(name);
+    if (cached) return cached;
+    let body: Buffer;
+    try {
+      body = await readFile(join(gameDir, `${name}.js`));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      const source = await readFile(join(gameDir, `${name}.ts`), 'utf8');
+      const ts = (await import('typescript')).default;
+      const { outputText } = ts.transpileModule(source, {
+        compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+      });
+      body = Buffer.from(outputText);
+    }
+    gameCache.set(name, body);
+    return body;
+  }
+
+  const draftView = (d: Draft) => ({ id: d.id, updatedAt: d.updatedAt, data: d.data });
+
+  /** Drafts of the creation wizard: list, read, save, delete. Only the owner sees them. */
+  async function draftsApi(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    method: string,
+    idText: string | undefined,
+  ) {
+    const id = idText === undefined ? undefined : Number(idText);
+    if (method === 'GET') {
+      if (id === undefined) {
+        return json(res, 200, { drafts: store.drafts.ownedBy(me.userId).map(draftView) });
+      }
+      const draft = store.drafts.get(id, me.userId);
+      return draft
+        ? json(res, 200, { draft: draftView(draft) })
+        : json(res, 404, { error: 'not found' });
+    }
+    if (method !== 'POST' && method !== 'DELETE') return json(res, 404, { error: 'not found' });
+    if (method === 'DELETE' && id === undefined) return json(res, 404, { error: 'not found' });
+    const bytes = await readBytes(req, MAX_DRAFT_BODY);
+    if (bytes === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    if (method === 'DELETE') {
+      return store.drafts.delete(id!, me.userId)
+        ? send(res, 204, '')
+        : json(res, 404, { error: 'not found' });
+    }
+    const body = parseObject(bytes.toString('utf8'));
+    const data = body ? parseDraft(body.data) : undefined;
+    if (!data) return json(res, 400, { error: 'invalid body' });
+    if (id === undefined) {
+      const created = store.drafts.create(me.userId, data);
+      if (created === 'limit') return json(res, 409, { error: 'limit' });
+      return json(res, 200, { draft: draftView(created) });
+    }
+    const updated = store.drafts.update(id, me.userId, data);
+    return updated
+      ? json(res, 200, { draft: draftView(updated) })
+      : json(res, 404, { error: 'not found' });
   }
 
   async function page(res: ServerResponse, file: string) {
@@ -784,8 +878,18 @@ export function createPanelHandler(deps: PanelDeps) {
       return sendFile(req, res, body, STATIC_FILES[path]!);
     }
 
+    const gamePath = /^\/game\/([a-z0-9/]+)\.js$/.exec(path);
+    if (method === 'GET' && gamePath && GAME_MODULES.has(gamePath[1]!)) {
+      return sendFile(req, res, await gameModule(gamePath[1]!), 'text/javascript; charset=utf-8');
+    }
+
     if (method === 'GET' && path === '/') {
       return page(res, session(req) ? 'index.html' : 'login.html');
+    }
+
+    // The guided character creation: its own page, same login.
+    if (method === 'GET' && path === '/crea') {
+      return session(req) ? page(res, 'crea.html') : redirect(res, '/', []);
     }
 
     if (method === 'GET' && path === '/login') {
@@ -917,6 +1021,9 @@ export function createPanelHandler(deps: PanelDeps) {
       // Shown once: the database keeps only its hash.
       return json(res, 200, { key: store.overlayKeys.create(me.userId) });
     }
+
+    const draftPath = /^\/api\/drafts(?:\/(\d{1,12}))?$/.exec(path);
+    if (draftPath) return draftsApi(req, res, me, method, draftPath[1]);
 
     const stagePath = /^\/api\/stage(?:\/(cam|background))?$/.exec(path);
     if (stagePath) return stageChange(req, res, me, stagePath[1]);

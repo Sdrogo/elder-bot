@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>ElderBot</title>
-    <link rel="stylesheet" href="/panel.css?v=34" />
-    <script src="/overlay/static/common.js?v=34" defer></script>
-    <script src="/app.js?v=34" defer></script>
+    <link rel="stylesheet" href="/panel.css?v=36" />
+    <script src="/overlay/static/common.js?v=36" defer></script>
+    <script src="/app.js?v=36" defer></script>
   </head>
   <body data-page="panel">
     <header class="top">
@@ -20,11 +20,20 @@
       <section>
         <div class="section-head">
           <h2 data-t="characters.title">I miei personaggi</h2>
-          <button id="new-character" type="button" data-t="characters.new">
-            Nuovo personaggio
-          </button>
+          <div class="head-actions">
+            <a class="button primary" href="/crea" data-t="characters.guided"
+              >Crea scheda guidata</a
+            >
+            <button id="new-character" type="button" data-t="characters.new">
+              Nuovo personaggio
+            </button>
+          </div>
         </div>
         <div id="new-character-slot"></div>
+        <div id="drafts-section" hidden>
+          <h3 class="subhead" data-t="drafts.title">Schede in corso</h3>
+          <div class="cards" id="drafts"></div>
+        </div>
         <p class="empty" id="characters-empty" data-t="characters.empty" hidden>
           Non hai ancora personaggi.
         </p>
