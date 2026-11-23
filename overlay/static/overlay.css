@@ -139,34 +139,91 @@ body {
 .st .sym {
   background: var(--fg);
 }
-.hd {
-  width: 1.9cqw;
-  height: 2.2cqw;
-  display: block;
+/* Tracker icons (icons.js), in the tracker's colour. */
+.ico {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: currentColor;
+  vertical-align: -0.14em;
 }
-.hd .o {
-  fill: rgba(30, 12, 14, 0.85);
-  stroke: rgba(192, 38, 45, 0.55);
-  stroke-width: 1.6;
+.ico .shine {
+  fill: rgba(255, 255, 255, 0.35);
 }
-.hd .i,
-.hd .l {
+.ico .fold {
   fill: none;
-  stroke: rgba(192, 38, 45, 0.35);
-  stroke-width: 1.2;
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 1.3;
+  stroke-linecap: round;
 }
-.hd.on .o {
-  fill: #7d151b;
-  stroke: #e0454b;
+.ico-health {
+  color: var(--health);
 }
-.hd.on .i {
-  fill: #c0262d;
-  stroke: #ff6b70;
+.ico-willpower {
+  color: var(--will);
 }
-.hd.on .l {
-  stroke: #ff6b70;
+.ico-vitae {
+  color: var(--blood);
 }
-.hd.hot {
+.ico-humanity {
+  color: var(--human);
+}
+/* Dice (icons.js): Andrea's art as on Discord, the number at the bottom right. */
+.die {
+  position: relative;
+  display: inline-block;
+  width: 2cqw;
+  height: 2cqw;
+  flex: none;
+  color: #2e9a40;
+}
+.die .art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+.die > i {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: #8c8c8c;
+}
+.die > b {
+  position: absolute;
+  right: -6%;
+  bottom: -4%;
+  font: 700 0.95cqw/1 var(--cond);
+  color: #fff;
+  text-shadow:
+    0 0 0.15cqw #1e1f22,
+    0 0 0.15cqw #1e1f22,
+    0 0 0.15cqw #1e1f22;
+}
+.die.dot > b {
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.05cqw;
+  text-shadow: none;
+}
+.die.ten {
+  color: #3df065;
+}
+.die.hunger {
+  color: #b71c1c;
+}
+.die.hunger.ten {
+  color: #ff3d3d;
+}
+.die.hunger.one {
+  color: #dd3d3d;
+}
+.die.hunger > i {
+  background: #7a1f1f;
+}
+.die.hot {
   animation: glow 0.8s;
 }
 
@@ -189,12 +246,13 @@ body {
 }
 .trk {
   display: grid;
-  grid-template-columns: 5.4cqw minmax(0, 1fr);
+  grid-template-columns: 7cqw minmax(0, 1fr);
   align-items: center;
   gap: 0.5cqw;
   min-width: 0;
 }
 .trk > span {
+  white-space: nowrap;
   font-family: var(--cond);
   font-size: 1cqw;
   letter-spacing: 0.12em;
@@ -320,7 +378,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .b.hot,
   .seg.hot,
-  .hd.hot {
+  .die.hot {
     animation: none;
   }
   .toast {
@@ -361,7 +419,7 @@ body {
   grid-area: l;
   font-family: var(--cond);
   font-size: 0.72cqw;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   white-space: nowrap;
   overflow: hidden;
   text-transform: uppercase;
@@ -398,46 +456,42 @@ body {
 .nb.hot .nv {
   animation: numpop 0.7s;
 }
-.hd.big {
-  width: 2.7cqw;
-  height: 3.1cqw;
-}
-/* the Hunger die beside Vitae */
+/* the Hunger die beside Vitae: a red ankh with the number of Hunger dice, faded at 0 */
 .nx.hunger {
   overflow: visible;
   align-self: end;
   justify-self: start;
   margin-left: 0.2cqw;
 }
-.hd.big.hg {
-  width: 2.1cqw;
-  height: 2.4cqw;
+.nx.hunger .die {
+  width: 2.2cqw;
+  height: 2.2cqw;
   margin-bottom: -0.2cqw;
 }
-.hd.big.hg text {
-  font-size: 20px;
+.nx.hunger .die.none {
+  opacity: 0.35;
+}
+.nx.hunger .die > b {
+  font-size: 1.15cqw;
 }
 .trk .nx.hunger {
   grid-area: auto;
   align-self: center;
   margin: 0;
 }
-.trk .hd.big.hg {
-  width: 1.5cqw;
-  height: 1.7cqw;
+.trk .nx.hunger .die {
+  width: 1.6cqw;
+  height: 1.6cqw;
   margin: 0;
 }
-.hd.big text {
-  font-family: var(--cond);
-  font-weight: 700;
-  font-size: 17px;
-  fill: #fff;
-}
-.hd.big:not(.on) text {
-  fill: rgba(236, 230, 220, 0.6);
+.nl .ico,
+.trk > span .ico {
+  margin-right: 0.3em;
+  font-size: 1.25em;
+  opacity: 1;
 }
 .trk.vitae {
-  grid-template-columns: 5.4cqw minmax(0, 1fr) auto;
+  grid-template-columns: 7cqw minmax(0, 1fr) auto;
 }
 .st .trk {
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -613,64 +667,12 @@ body {
   gap: 0.2cqw;
   min-width: 0;
 }
-.dice .hd {
-  width: 1.75cqw;
-  height: 2cqw;
-}
-/* Roll dice: green for successes (brighter on a 10), plain for failures, red Hunger dice. */
-.dice .hd .i,
-.dice .hd .l {
-  fill: none;
-  stroke: rgba(236, 230, 220, 0.25);
-}
-.dice .hd.on .i,
-.dice .hd.on .l {
-  fill: none;
-  stroke: rgba(155, 229, 143, 0.5);
-}
-.dice .hd.hdie .i,
-.dice .hd.hdie .l {
-  stroke: rgba(255, 107, 112, 0.45);
-}
-.many .dice .hd {
-  width: 1.2cqw;
+.many .dice .die {
+  width: 1.4cqw;
   height: 1.4cqw;
 }
-.dice .hd .o {
-  fill: rgba(255, 255, 255, 0.06);
-  stroke: rgba(236, 230, 220, 0.45);
-}
-.dice .hd.on .o {
-  fill: rgba(63, 174, 74, 0.35);
-  stroke: var(--human);
-}
-.dice .hd.ten .o {
-  fill: rgba(120, 220, 110, 0.55);
-  stroke: #9be58f;
-}
-.dice .hd.hdie .o {
-  stroke: var(--blood);
-  fill: rgba(192, 38, 45, 0.18);
-}
-.dice .hd.hdie.on .o {
-  fill: rgba(192, 38, 45, 0.5);
-}
-.dice .hd.one .o {
-  fill: var(--blood);
-}
-.dice .hd text,
-.dice .hd.big text,
-.dice .hd.big:not(.on) text {
-  fill: var(--fg);
-  font: 700 17px var(--cond);
-}
-.dice .hd.big {
-  width: 1.75cqw;
-  height: 2cqw;
-}
-.many .dice .hd.big {
-  width: 1.2cqw;
-  height: 1.4cqw;
+.many .dice .die > b {
+  font-size: 0.75cqw;
 }
 .outcome {
   grid-area: outcome;
