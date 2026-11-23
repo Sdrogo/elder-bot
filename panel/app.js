@@ -1,4 +1,4 @@
-/* global document, window, fetch, FormData, location, navigator, setTimeout, URLSearchParams */
+/* global document, window, fetch, Event, FormData, location, navigator, setTimeout, URLSearchParams */
 // ElderBot web panel. No framework: the page asks /api/me and draws the cards.
 // Names come from users, so every text goes in with textContent, never as HTML.
 
@@ -23,7 +23,7 @@ const TEXT = {
     'chronicles.title': 'Le mie Cronache',
     noChronicle: 'nessuna Cronaca',
     live: 'in onda',
-    noMembers: 'Nessun personaggio. Invita i giocatori su Discord con /elder chronicle invite.',
+    noMembers: 'Nessun personaggio. Invita i giocatori su Discord con /elder invite.',
     error: 'Qualcosa è andato storto. Ricarica la pagina.',
     edit: 'Modifica',
     delete: 'Elimina',
@@ -35,7 +35,7 @@ const TEXT = {
     clan: 'Clan',
     tier: 'Livello',
     server: 'Server Discord',
-    noServer: 'Il bot non è in nessun server con te: aggiungilo o crea il PG su Discord.',
+    noServer: 'Il bot non è in nessun server con te: aggiungilo a un server.',
     'error.duplicate': 'Hai già un personaggio con questo nome su quel server.',
     'error.limit': 'Hai raggiunto il numero massimo di personaggi su quel server.',
     'error.invalid': 'Controlla i campi: qualcosa non va.',
@@ -101,6 +101,24 @@ const TEXT = {
     'overlay.key': 'Chiave',
     copy: 'Copia',
     copied: 'Copiata',
+    'chronicles.channel': 'Canale del tavolo',
+    'chronicles.noChannel': 'nessun canale',
+    'chronicles.channelNote':
+      'Il canale Discord dove si gioca: lì i tiri usano i PG della Cronaca e tu sei il Narratore.',
+    'chronicles.language': 'Lingua del bot',
+    'chronicles.autoLanguage': 'quella di Discord di ciascuno',
+    'chronicles.end': 'Chiudi sessione',
+    'chronicles.ended': 'Sessione chiusa: i compiti prolungati in corso sono stati annullati.',
+    'chronicles.archive': 'Archivia',
+    'chronicles.transfer': 'Cedi la Cronaca',
+    'characters.give': 'Cedi',
+    'give.to': 'A chi',
+    'give.other': 'Altro utente (ID Discord)…',
+    'give.id': 'ID Discord',
+    'give.idNote':
+      'Su Discord: tasto destro sul nome, "Copia ID utente" (serve la modalità sviluppatore).',
+    'give.confirm': 'Cedi',
+    'error.to': 'Utente non trovato su quel server.',
   },
   en: {
     'login.intro': 'Your Vampire: The Masquerade characters and Chronicles.',
@@ -122,7 +140,7 @@ const TEXT = {
     'chronicles.title': 'My Chronicles',
     noChronicle: 'no Chronicle',
     live: 'on air',
-    noMembers: 'No characters yet. Invite players on Discord with /elder chronicle invite.',
+    noMembers: 'No characters yet. Invite players on Discord with /elder invite.',
     error: 'Something went wrong. Reload the page.',
     edit: 'Edit',
     delete: 'Delete',
@@ -134,7 +152,7 @@ const TEXT = {
     clan: 'Clan',
     tier: 'Tier',
     server: 'Discord server',
-    noServer: 'The bot shares no server with you: add it, or create the character on Discord.',
+    noServer: 'The bot shares no server with you: add it to a server.',
     'error.duplicate': 'You already have a character with this name on that server.',
     'error.limit': 'You reached the maximum number of characters on that server.',
     'error.invalid': 'Check the fields: something is wrong.',
@@ -197,6 +215,23 @@ const TEXT = {
     'overlay.key': 'Key',
     copy: 'Copy',
     copied: 'Copied',
+    'chronicles.channel': 'Table channel',
+    'chronicles.noChannel': 'no channel',
+    'chronicles.channelNote':
+      "The Discord channel where it is played: rolls there use the Chronicle's characters and you are the Storyteller.",
+    'chronicles.language': 'Bot language',
+    'chronicles.autoLanguage': "each user's Discord language",
+    'chronicles.end': 'End session',
+    'chronicles.ended': 'Session ended: prolonged tasks still open were cancelled.',
+    'chronicles.archive': 'Archive',
+    'chronicles.transfer': 'Hand over the Chronicle',
+    'characters.give': 'Give away',
+    'give.to': 'To',
+    'give.other': 'Another user (Discord ID)…',
+    'give.id': 'Discord ID',
+    'give.idNote': 'On Discord: right-click the name, "Copy User ID" (needs Developer Mode).',
+    'give.confirm': 'Give',
+    'error.to': 'User not found on that server.',
   },
 };
 
@@ -269,7 +304,8 @@ async function change(method, url, body) {
       invalid: 'error.invalid',
       tier: 'error.tier',
     };
-    notify(tr(key[data.error] ?? 'error.change'));
+    const fieldKey = data.field === 'to' ? 'error.to' : undefined;
+    notify(tr(fieldKey ?? key[data.error] ?? 'error.change'));
     return false;
   }
   await loadPanel();
@@ -453,6 +489,11 @@ function characterCard(c, chronicle) {
     }
     if (c.owned) {
       actions.append(
+        button(tr('characters.give'), () => {
+          const url = `/api/characters/${c.id}/give`;
+          const form = recipientForm(c.guild, url, () => form.replaceWith(actions));
+          actions.replaceWith(form);
+        }),
         confirmButton(tr('delete'), () => change('DELETE', `/api/characters/${c.id}`)),
       );
     }
@@ -495,6 +536,59 @@ function camBox(c) {
   return box;
 }
 
+/** Channels or people of a Discord server, asked when a form opens. */
+async function choicesOf(guild, kind) {
+  const response = await fetch(`/api/guilds/${guild}/${kind}`, { credentials: 'same-origin' });
+  if (!response.ok) return [];
+  const data = await response.json().catch(() => ({}));
+  return Array.isArray(data[kind]) ? data[kind] : [];
+}
+
+/** Picks someone on the server (or types their Discord ID) and hands something over to them. */
+function recipientForm(guild, url, onDone) {
+  const form = el('form', 'sheet-form');
+  const pick = select('pick', [{ id: '', name: '…' }], '');
+  const id = el('input');
+  id.name = 'id';
+  id.inputMode = 'numeric';
+  id.pattern = '\\d{5,20}';
+  const idField = field(tr('give.id'), id);
+  const idNote = el('p', 'note', tr('give.idNote'));
+  idField.hidden = true;
+  idNote.hidden = true;
+  pick.addEventListener('change', () => {
+    const other = pick.value === 'other';
+    idField.hidden = !other;
+    idNote.hidden = !other;
+    id.required = other;
+  });
+  choicesOf(guild, 'people').then((people) => {
+    pick.replaceChildren();
+    for (const o of [...people, { id: 'other', name: tr('give.other') }]) {
+      const opt = el('option', '', o.name);
+      opt.value = o.id;
+      pick.append(opt);
+    }
+    pick.dispatchEvent(new Event('change'));
+  });
+  form.append(field(tr('give.to'), pick), idField, idNote);
+  const actions = el('div', 'actions');
+  const submit = el('button', 'primary', tr('give.confirm'));
+  submit.type = 'submit';
+  actions.append(submit, button(tr('cancel'), onDone));
+  form.append(actions);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const to = pick.value === 'other' ? id.value.trim() : pick.value;
+    if (!to) return;
+    submit.disabled = true;
+    const ok = await change('POST', url, { to });
+    submit.disabled = false;
+    if (ok) onDone();
+  });
+  return form;
+}
+
 /** The form for a new Chronicle (no `ch`) or for renaming one and changing its sect. */
 function chronicleForm(ch, onDone) {
   const form = el('form', 'sheet-form');
@@ -518,6 +612,43 @@ function chronicleForm(ch, onDone) {
       ),
     ),
   );
+  if (ch) {
+    // Where it is played on Discord and the bot's language there.
+    const channel = select(
+      'channel',
+      [
+        { id: '', name: tr('chronicles.noChannel') },
+        ...(ch.channel ? [{ id: ch.channel, name: ch.channelName ?? ch.channel }] : []),
+      ],
+      ch.channel,
+    );
+    choicesOf(ch.guild, 'channels').then((channels) => {
+      const current = channel.value;
+      channel.replaceChildren();
+      const list = [{ id: '', name: tr('chronicles.noChannel') }, ...channels];
+      if (current && !channels.some((c) => c.id === current)) {
+        list.push({ id: current, name: ch.channelName ?? current });
+      }
+      for (const o of list) {
+        const opt = el('option', '', o.name);
+        opt.value = o.id;
+        opt.selected = o.id === current;
+        channel.append(opt);
+      }
+    });
+    form.append(
+      field(tr('chronicles.channel'), channel),
+      el('p', 'note', tr('chronicles.channelNote')),
+      field(
+        tr('chronicles.language'),
+        select(
+          'locale',
+          [{ id: '', name: tr('chronicles.autoLanguage') }, ...me.options.languages],
+          ch.locale,
+        ),
+      ),
+    );
+  }
   const actions = el('div', 'actions');
   const submit = el('button', 'primary', tr(ch ? 'save' : 'create'));
   submit.type = 'submit';
@@ -527,7 +658,10 @@ function chronicleForm(ch, onDone) {
     event.preventDefault();
     const data = new FormData(form);
     const body = { name: data.get('name'), sect: data.get('sect'), tier: data.get('tier') };
-    if (!ch) body.guild = data.get('guild') ?? me.guilds[0].id;
+    if (ch) {
+      body.channel = data.get('channel') ?? '';
+      body.locale = data.get('locale') ?? '';
+    } else body.guild = data.get('guild') ?? me.guilds[0].id;
     submit.disabled = true;
     const ok = await change('POST', ch ? `/api/chronicles/${ch.id}` : '/api/chronicles', body);
     submit.disabled = false;
@@ -549,6 +683,20 @@ function chronicleBlock(ch) {
       tools.replaceWith(form);
     }),
   );
+  if (ch.channel) {
+    tools.append(
+      confirmButton(tr('chronicles.end'), async () => {
+        if (await change('POST', `${path}/end`)) notify(tr('chronicles.ended'));
+      }),
+    );
+  }
+  tools.append(
+    button(tr('chronicles.transfer'), () => {
+      const form = recipientForm(ch.guild, `${path}/transfer`, () => form.replaceWith(tools));
+      tools.replaceWith(form);
+    }),
+    confirmButton(tr('chronicles.archive'), () => change('POST', `${path}/archive`)),
+  );
   const masquerade = el('div', 'track masquerade');
   const step = (delta) => () => change('POST', `${path}/masquerade`, { delta });
   const value = el('span', 'value');
@@ -562,7 +710,11 @@ function chronicleBlock(ch) {
     el('span', 'boxes', boxes(ch.masquerade, 10 - ch.masquerade)),
     value,
   );
-  const meta = [ch.sect, ch.tier ?? tr('chronicles.anyTier')].join(' · ');
+  const meta = [
+    ch.sect,
+    ch.tier ?? tr('chronicles.anyTier'),
+    ch.channelName ?? tr('chronicles.noChannel'),
+  ].join(' · ');
   block.append(title, el('div', 'meta', meta), masquerade, tools);
   const cards = el('div', 'cards');
   cards.append(...ch.characters.map((c) => characterCard(c, ch)));

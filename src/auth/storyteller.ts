@@ -8,7 +8,7 @@ export interface MemberInfo {
 }
 
 /**
- * Each channel (table) has its own Storyteller, saved by /session. Server admins (Manage Server)
+ * Each channel (table) has the Storyteller of the Chronicle played there. Server admins (Manage Server)
  * always count too, so a table is never stuck if its Storyteller leaves.
  */
 export function isStoryteller(info: MemberInfo, storytellerId: string | undefined): boolean {

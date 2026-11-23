@@ -1,5 +1,12 @@
 import { rollDice, type DieRoller } from '../dice/roller.js';
-import { buildPool, evaluate, takeHalf, type Pool, type TestResult } from '../dice/test.js';
+import {
+  SUCCESS_THRESHOLD,
+  buildPool,
+  evaluate,
+  takeHalf,
+  type Pool,
+  type TestResult,
+} from '../dice/test.js';
 
 export interface RollRequest {
   channelId: string;
@@ -120,6 +127,14 @@ export function judge(
  * Push Yourself (p. 104): spend 1 Willpower to reroll up to 3 normal dice, never Hunger dice.
  * `picked` are indexes into `normal`.
  */
+/** The normal dice worth rerolling with Willpower: failures (below 6), at most 3. */
+export function failedDice(normal: number[]): number[] {
+  return normal
+    .map((face, i) => (face < SUCCESS_THRESHOLD ? i : -1))
+    .filter((i) => i >= 0)
+    .slice(0, WILLPOWER_REROLL);
+}
+
 export function rerollWithWillpower(
   request: RollRequest,
   normal: number[],

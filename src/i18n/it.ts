@@ -16,9 +16,6 @@ export const it: Messages = {
   'opt.test.take_half': 'Taking Half: niente tiro, metà del pool (per eccesso) come successi',
   'opt.test.reason': 'Cosa stai tentando',
 
-  'cmd.npc.description': 'Test per un PNG: tira il pool indicato nella sua scheda',
-  'opt.npc.dice': "Pool del PNG (Fisico, Sociale, Mentale o di un'Abilità)",
-
   'cmd.contest.description': 'Test contrapposto: vince chi ottiene più successi',
   'opt.contest.dice': 'Il tuo pool',
   'opt.contest.opponent_dice': "Pool dell'avversario",
@@ -41,18 +38,6 @@ export const it: Messages = {
   'opt.prolonged.dice': 'Attributo + Abilità',
   'opt.prolonged.bonus': 'Dadi bonus o penalità',
   'opt.prolonged.hunger': 'I tuoi dadi Hunger (0-5)',
-  'cmd.prolonged.status.description': 'Mostra il tuo compito prolungato',
-  'cmd.prolonged.cancel.description': 'Chiude il tuo compito prolungato',
-
-  'cmd.session.description': 'Sessioni, Narratore e lingua del tavolo',
-  'cmd.session.new.description': 'Nuova sessione: chi la avvia diventa Narratore',
-  'cmd.session.end.description':
-    'Chiude la sessione: azzera il tavolo e libera il ruolo di Narratore',
-  'cmd.session.storyteller.description': 'Mostra o cambia il Narratore di questo canale',
-  'opt.session.user': 'Il nuovo Narratore',
-  'cmd.session.language.description': 'Lingua delle risposte del bot in questo canale',
-  'opt.session.language': 'Lingua del tavolo, o auto per seguire la lingua di Discord di ciascuno',
-  'choice.language.auto': 'Auto (lingua di Discord)',
 
   // Shared roll output.
   'roll.title': 'Test',
@@ -98,7 +83,7 @@ export const it: Messages = {
   'retry.modal.dice': 'Nuovo pool (cambia Attributo o Abilità)',
   'retry.modal.invalid': 'Inserisci un numero intero da 0 a 30.',
 
-  // /elder npc and /elder contest.
+  // /elder roll npc:true and /elder contest.
   'npc.name': 'PNG',
   'contest.opponent': 'Avversario',
   'contest.title': '{a} contro {b}',
@@ -121,7 +106,7 @@ export const it: Messages = {
   'prolonged.failed': 'Tiri esauriti: compito fallito.',
   'prolonged.progress': 'Successi **{successes}/{target}** · tiri usati **{done}/{max}**',
 
-  // /elder session and the Storyteller.
+  // The Storyteller.
   // Willpower, /elder frenzy and /elder masquerade.
   'cmd.frenzy.description':
     'Resisti alla frenesia: Composure + Resolve, al massimo tanti dadi quanta Umanità',
@@ -139,17 +124,8 @@ export const it: Messages = {
   'frenzy.error.difficulty': 'Indica la `difficulty` decisa dal Narratore.',
   'frenzy.error.noHunger':
     'La Difficoltà della frenesia da fame sono i tuoi dadi Hunger: indica `hunger` (almeno 1) o una `difficulty`.',
-  'cmd.masquerade.description': 'Il Masquerade Tracker di questo tavolo',
-  'cmd.masquerade.show.description': 'Mostra il Masquerade Tracker',
-  'cmd.masquerade.mark.description': 'Segna caselle dopo una violazione (Narratore)',
-  'cmd.masquerade.clear.description':
-    'Cancella caselle quando la Masquerade viene riparata (Narratore)',
-  'cmd.masquerade.set.description': 'Imposta il tracker a mano (Narratore)',
-  'cmd.masquerade.threat.description': 'Threat test: un dado per casella segnata (Narratore)',
-  'opt.masquerade.mark': 'Caselle da segnare (predefinito 1)',
-  'opt.masquerade.clear': 'Caselle da cancellare (predefinito 1)',
-  'opt.masquerade.reason': 'Cosa è successo',
-  'opt.masquerade.value': 'Caselle segnate, da 0 a 10',
+  'cmd.masquerade.description':
+    'Il Masquerade Tracker di questo tavolo, con i pulsanti per il Narratore',
   'masquerade.title': 'Masquerade Tracker',
   'masquerade.threat.title': 'Threat test della Masquerade',
   'willpower.pick': 'Scegli fino a {max} dadi da ritirare (−1 Willpower)',
@@ -158,115 +134,47 @@ export const it: Messages = {
   'button.cancel': 'Annulla',
 
   'auth.storytellerOnly':
-    'Solo il Narratore di questo tavolo può farlo. Chi fa `/elder session new` diventa Narratore, e può passare il ruolo con `/elder session storyteller`.',
-  'session.storyteller.title': 'Narratore',
-  'session.storyteller.current': 'Narratore del tavolo: {who}.',
-  'session.storyteller.none': 'nessuno: chi fa `/elder session new` lo diventa',
-  'session.storyteller.set': '{user} è il Narratore di questo tavolo.',
-  'session.ended.title': 'Sessione chiusa',
-  'session.ended':
-    'Compiti prolungati e lingua del tavolo azzerati. Il tavolo non ha più un Narratore: il prossimo `/elder session new` ne assegna uno.',
-  'session.new.title': 'Nuova sessione',
-  'session.new':
-    "Il tavolo è pronto. Aggiungi i tuoi dadi Hunger a ogni tiro con l'opzione `hunger`.",
-  'session.language.title': 'Lingua',
-  'session.language.set': 'Lingua del tavolo: {language}.',
-  'session.language.auto': 'Il bot risponde a ciascuno nella sua lingua di Discord.',
+    'Solo il Narratore della Cronaca giocata in questo canale (o un admin del server) può farlo. Il canale si sceglie nel pannello web (`/elder panel`).',
 
   // Characters and Chronicles.
-  'cmd.character.description': 'I tuoi personaggi: scheda e tracciati',
-  'cmd.character.create.description': 'Crea un personaggio con Health, Vitae e Willpower pieni',
-  'opt.character.name': 'Nome del personaggio',
-  'opt.character.clan': 'Clan',
-  'opt.character.tier': 'Livello di gioco: decide la Vitae massima e i dadi Hunger',
-  'opt.character.stamina': 'Stamina: Health = Stamina + 5',
-  'opt.character.composure': 'Composure: Willpower = Composure + Resolve',
-  'opt.character.resolve': 'Resolve: Willpower = Composure + Resolve',
-  'opt.character.humanity': 'Grado di Humanity (predefinito 6)',
-  'cmd.character.sheet.description': 'Mostra la scheda di un personaggio con i pulsanti + e −',
-  'opt.character.pick': 'Il personaggio (predefinito: il tuo a questo tavolo)',
-  'opt.character.public': 'Mostrala a tutto il canale, senza pulsanti',
-  'cmd.character.list.description': 'I tuoi personaggi su questo server',
-  'cmd.character.set.description': 'Imposta un tracciato a un valore preciso',
-  'opt.character.track': 'Tracciato',
-  'opt.character.value': 'Nuovo valore (resta nei limiti)',
-  'cmd.character.edit.description': 'Cambia nome, clan, livello o Attributi',
-  'opt.character.newName': 'Nuovo nome',
-  'cmd.character.give.description': 'Passa uno dei tuoi personaggi a un altro giocatore',
-  'opt.character.giveTo': 'Il giocatore che lo riceve',
-  'cmd.character.delete.description': 'Cancella uno dei tuoi personaggi',
-  'cmd.chronicle.description': 'Cronache: giocatori, Masquerade Tracker e quella in onda',
-  'cmd.chronicle.create.description': 'Crea una Cronaca: ne sei il Narratore',
-  'opt.chronicle.name': 'Nome della Cronaca',
-  'opt.chronicle.sect': 'Setta mostrata sulla cornice del Narratore',
-  'cmd.chronicle.list.description': 'Le tue Cronache e i loro personaggi',
-  'cmd.chronicle.live.description': "Mette in onda una Cronaca: l'overlay mostra le sue cornici",
-  'opt.chronicle.pick': 'La Cronaca (predefinito: quella giocata in questo canale)',
-  'cmd.chronicle.invite.description': 'Invita un giocatore a portare un personaggio nella Cronaca',
-  'opt.chronicle.player': 'Il giocatore',
-  'cmd.chronicle.remove.description': 'Toglie un personaggio dalla sua Cronaca',
-  'opt.chronicle.character': 'Il personaggio',
-  'cmd.chronicle.edit.description': 'Rinomina una Cronaca o ne cambia la setta',
-  'opt.chronicle.newName': "Nuovo nome (i link dell'overlay continuano a funzionare)",
-  'cmd.chronicle.archive.description': 'Nasconde una Cronaca e libera i suoi personaggi',
-  'opt.session.chronicle': 'Cronaca giocata in questo canale: va anche in onda',
+  'cmd.sheet.description': 'Mostra la scheda di un personaggio con i pulsanti + e −',
+  'opt.sheet.character': 'Il personaggio (predefinito: il tuo a questo tavolo)',
+  'opt.sheet.public': 'Mostrala a tutto il canale, senza pulsanti',
+  'opt.invite.chronicle': 'La Cronaca (predefinito: quella giocata in questo canale)',
+  'cmd.invite.description': 'Invita un giocatore a portare un personaggio nella Cronaca',
+  'opt.invite.player': 'Il giocatore',
   'campaign.guildOnly': 'Personaggi e Cronache appartengono a un server: usa il comando lì.',
-  'character.badName':
-    'Il nome deve avere almeno una lettera o una cifra e al massimo 32 caratteri.',
-  'character.duplicate': "C'è già un personaggio con quel nome.",
-  'character.limit': 'Puoi avere al massimo {max} personaggi su questo server.',
-  'character.created': '**{name}** è pronto. Con `/elder character sheet` lo rivedi.',
-  'character.list.title': 'I tuoi personaggi',
   'character.noneYet':
-    'Non hai ancora personaggi su questo server. Creane uno con `/elder character create`.',
+    'Non hai ancora personaggi su questo server. Creane uno nel pannello web (`/elder panel`).',
   'character.notFound': 'Personaggio non trovato.',
   'character.pickOne': "Hai più personaggi: scegline uno con l'opzione `character`.",
   'character.cannotEdit':
     'Solo il proprietario, il Narratore della sua Cronaca o un admin del server possono cambiare questo personaggio.',
-  'character.ownerOnly': 'Solo il proprietario può farlo.',
-  'character.editNothing': "Niente da cambiare: compila almeno un'opzione.",
-  'character.delete.confirm': 'Cancellare **{name}** e il suo storico? Non si può annullare.',
-  'character.deleted': '**{name}** è stato cancellato.',
-  'character.give.invalid': 'Scegli un altro giocatore (non te stesso né un bot).',
-  'character.give.offer': '{from} vuole passare **{name}** a {to}.',
-  'character.give.done': '**{name}** ora appartiene a {to}.',
-  'character.give.refused': '{to} non ha accettato **{name}**.',
+  'chronicle.invite.invalid': 'Scegli un altro giocatore (non te stesso né un bot).',
   'character.hungerFromVitae':
     "{hunger} dalla Vitae di {name} ({vitae}/{max}). Per cambiarla usa l'opzione `hunger`.",
   'sheet.chronicle': 'Cronaca: {name}',
   'sheet.noChronicle': 'nessuna Cronaca',
-  'button.delete': 'Cancella',
-  'button.accept': 'Accetta',
-  'button.refuse': 'Rifiuta',
   'button.pickCharacter': 'Scegli un personaggio',
-  'chronicle.created':
-    "Cronaca creata, ne sei il Narratore. Id per l'overlay: `{slug}`. Invita i giocatori con `/elder chronicle invite` e giocala in un canale con `/elder session new chronicle:`.",
-  'chronicle.duplicate': "C'è già una Cronaca con quel nome su questo server.",
-  'chronicle.limit': 'Puoi gestire al massimo {max} Cronache insieme: prima archiviane una.',
-  'chronicle.list.title': 'Cronache',
-  'chronicle.live.badge': 'in onda',
-  'chronicle.live.set': '**{name}** è in onda.',
-  'chronicle.members': 'personaggi: {count}',
-  'chronicle.noneYet': 'Nessuna Cronaca. Creane una con `/elder chronicle create`.',
+  'opt.roll.npc': 'Tiro per un PNG: il pool dalla sua scheda, senza dadi Hunger',
+  'button.masqueradeThreat': 'Test di minaccia',
+  'button.prolongedCancel': 'Annulla compito',
+  'button.willpowerBest': 'Willpower: rilancia i fallimenti',
+  'willpower.noFailures': 'Nessun dado normale fallito da rilanciare.',
+  'chronicle.noneYet': 'Nessuna Cronaca. Creane una nel pannello web (`/elder panel`).',
   'chronicle.notFound': 'Cronaca non trovata.',
   'chronicle.pickOne': "Gestisci più Cronache: scegline una con l'opzione `chronicle`.",
   'chronicle.storytellerOnly':
     'Solo il Narratore di questa Cronaca o un admin del server può farlo.',
-  'chronicle.notMember': 'Quel personaggio non è in una Cronaca.',
-  'chronicle.removed': '**{name}** lascia {chronicle}.',
-  'chronicle.archived': '**{name}** è archiviata: il suo canale e i suoi personaggi sono liberi.',
   'chronicle.invite':
     '{user}, {storyteller} ti invita in **{chronicle}**: scegli il personaggio che porti.',
   'chronicle.noFreeCharacter':
-    'Tutti i tuoi personaggi sono già in una Cronaca. Creane uno nuovo con `/elder character create`, poi premi di nuovo il pulsante.',
+    'Tutti i tuoi personaggi sono già in una Cronaca. Creane uno nuovo nel pannello web (`/elder panel`), poi premi di nuovo il pulsante.',
   'chronicle.pickPlaceholder': 'Il tuo personaggio',
   'chronicle.busy': "**{name}** gioca già in un'altra Cronaca.",
   'chronicle.wrongTier': '**{name}** non può entrare: la Cronaca è di livello {tier}.',
-  'character.wrongTier': 'Il nuovo livello non corrisponde a quello della Cronaca.',
   'chronicle.joined.private': '**{name}** entra in {chronicle}.',
   'chronicle.joined': '**{name}** ({user}) entra in {chronicle}.',
-  'session.new.chronicle':
-    'Cronaca: **{name}**. I dadi Hunger arrivano dalla Vitae di ogni personaggio.',
   'frenzy.error.noCharacter':
     'Non hai un personaggio a questo tavolo: indica `dice` (Composure + Resolve) e `humanity`.',
   'willpower.none': '**{name}** non ha più Willpower.',

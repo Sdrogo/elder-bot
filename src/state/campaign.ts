@@ -61,8 +61,10 @@ export interface Chronicle {
   masquerade: number;
   /** Tier of play: its characters must match it. None takes any character. */
   tier?: ChronicleTier;
-  /** The Discord channel where this Chronicle is played, set by /elder session new. */
+  /** The Discord channel where this Chronicle is played, chosen on the panel. */
   channelId?: string;
+  /** The bot's language at this Chronicle's table; none follows each user's Discord. */
+  locale?: string;
   archived: boolean;
 }
 
@@ -100,6 +102,7 @@ interface ChronicleRow {
   channel_id: string | null;
   archived: number;
   tier: string | null;
+  locale: string | null;
 }
 
 const toCharacter = (r: CharacterRow): Character => ({
@@ -134,6 +137,7 @@ const toChronicle = (r: ChronicleRow): Chronicle => ({
   masquerade: r.masquerade,
   ...(isChronicleTier(r.tier) ? { tier: r.tier } : {}),
   ...(r.channel_id !== null ? { channelId: r.channel_id } : {}),
+  ...(r.locale ? { locale: r.locale } : {}),
   archived: r.archived === 1,
 });
 
@@ -195,6 +199,8 @@ export class Campaign {
     const columns = db.prepare('PRAGMA table_info(chronicles)').all() as { name: string }[];
     if (!columns.some((c) => c.name === 'tier'))
       db.exec('ALTER TABLE chronicles ADD COLUMN tier TEXT');
+    if (!columns.some((c) => c.name === 'locale'))
+      db.exec('ALTER TABLE chronicles ADD COLUMN locale TEXT');
   }
 
   // Characters.
@@ -538,7 +544,7 @@ export class Campaign {
     return row ? toChronicle(row) : undefined;
   }
 
-  /** The Chronicle played in a channel, if /elder session new bound one. */
+  /** The Chronicle played in a channel, if one was bound to it on the panel. */
   chronicleByChannel(channelId: string): Chronicle | undefined {
     const row = this.db
       .prepare('SELECT * FROM chronicles WHERE channel_id = ? AND archived = 0')
@@ -584,6 +590,39 @@ export class Campaign {
       this.db.prepare('UPDATE chronicles SET archived = 1, channel_id = NULL WHERE id = ?').run(id);
       this.db.prepare('DELETE FROM live_chronicle WHERE chronicle_id = ?').run(id);
     })();
+  }
+
+  /** Hands a Chronicle to another Storyteller. It goes off air for the one who ran it. */
+  transferChronicle(id: number, toId: string): Chronicle | undefined {
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE chronicles SET storyteller_id = ? WHERE id = ?').run(toId, id);
+      this.db.prepare('DELETE FROM live_chronicle WHERE chronicle_id = ?').run(id);
+    })();
+    return this.getChronicle(id);
+  }
+
+  /** The language of the Chronicle's table; undefined follows each user's Discord. */
+  setChronicleLocale(id: number, locale: string | undefined): void {
+    this.db.prepare('UPDATE chronicles SET locale = ? WHERE id = ?').run(locale ?? null, id);
+  }
+
+  /** Frees the Chronicle's channel: nobody plays it on Discord until a channel is chosen again. */
+  unbindChannel(id: number): void {
+    this.db.prepare('UPDATE chronicles SET channel_id = NULL WHERE id = ?').run(id);
+  }
+
+  /**
+   * Everyone the bot knows on a server: owners of characters and Storytellers of Chronicles.
+   * The panel offers them when a character or a Chronicle changes hands.
+   */
+  peopleOf(guildId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT owner_id AS id FROM characters WHERE guild_id = ?
+         UNION SELECT storyteller_id FROM chronicles WHERE guild_id = ? AND archived = 0`,
+      )
+      .all(guildId, guildId) as { id: string }[];
+    return rows.map((r) => r.id);
   }
 
   /** Plays a Chronicle in a channel; a channel holds one Chronicle at a time. */

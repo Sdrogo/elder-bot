@@ -11,20 +11,16 @@ import { rollMessage } from '../ui/format.js';
 import { rollerHunger } from './campaignShared.js';
 import type { Context } from './types.js';
 
-/** Options shared by /roll and /npc. NPCs have no Hunger dice. */
-export function addTestOptions(
-  builder: SlashCommandBuilder,
-  { npc = false }: { npc?: boolean } = {},
-): SlashCommandBuilder {
+/** Options of /roll. NPCs (the `npc` option) ignore the Hunger dice. */
+export function addTestOptions(builder: SlashCommandBuilder): SlashCommandBuilder {
   builder
     .addIntegerOption((o) =>
       described(o.setName('difficulty'), 'opt.test.difficulty').setMinValue(1).setMaxValue(15),
     )
     .addIntegerOption((o) =>
       described(o.setName('bonus'), 'opt.test.bonus').setMinValue(-10).setMaxValue(10),
-    );
-  if (!npc) builder.addIntegerOption((o) => hungerOption(o, 'opt.test.hunger'));
-  builder
+    )
+    .addIntegerOption((o) => hungerOption(o, 'opt.test.hunger'))
     .addBooleanOption((o) => described(o.setName('take_half'), 'opt.test.take_half'))
     .addStringOption((o) => described(o.setName('reason'), 'opt.test.reason').setMaxLength(100));
   return builder;
@@ -37,7 +33,7 @@ export function hungerOption(
   return described(o.setName('hunger'), key).setMinValue(0).setMaxValue(MAX_HUNGER);
 }
 
-/** Rolls a test for /roll and /npc. `title` is used when the player gives no reason. */
+/** Rolls a test for /roll, for a player or an NPC. `title` is used when the player gives no reason. */
 export async function replyWithRoll(
   interaction: ChatInputCommandInteraction,
   ctx: Context,
