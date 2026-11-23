@@ -94,7 +94,13 @@ const tr = (key, ...args) => {
   return typeof v === 'function' ? v(...args) : v;
 };
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-const dotsText = (n, max) => '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n));
+/** Dots with the number beside them, which is easier to add up (Andrea's choice). */
+function dotsText(n, max) {
+  const box = el('span', 'rating');
+  const dots = '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n));
+  box.append(el('span', 'dots', dots), el('span', 'num', String(Math.max(0, n))));
+  return box;
+}
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -114,7 +120,7 @@ function row(label, value, note) {
   const left = el('span', 'disc-title');
   left.append(el('span', '', label));
   if (note) left.append(el('span', 'quiet', note));
-  r.append(left, el('span', 'dots', value));
+  r.append(left, typeof value === 'object' ? value : el('span', 'num', value));
   return r;
 }
 

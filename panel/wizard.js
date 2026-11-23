@@ -534,6 +534,13 @@ function button(text, onClick, className = '') {
 
 const dotsText = (n, max) => '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n));
 
+/** Dots with the number beside them, which is easier to add up (Andrea's choice). */
+function rating(n, max) {
+  const box = el('span', 'rating');
+  box.append(el('span', 'dots', dotsText(n, max)), el('span', 'num', String(Math.max(0, n))));
+  return box;
+}
+
 /** − dots + : `canAdd` says whether + may go one higher. */
 /**
  * − dots + : `canAdd` says whether + may go one higher. `base` dots come from elsewhere (another
@@ -550,9 +557,12 @@ function stepper(value, { min = 0, max, canAdd = true, onChange, label, plain = 
   let shown;
   if (plain) shown = el('span', 'count', `+${value}`);
   else {
-    shown = el('span', 'dots');
-    if (base) shown.append(el('span', 'other', '●'.repeat(base)));
-    shown.append(dotsText(value, max - base));
+    shown = el('span', 'rating');
+    const dots = el('span', 'dots');
+    if (base) dots.append(el('span', 'other', '●'.repeat(base)));
+    dots.append(dotsText(value, max - base));
+    // The number beside the dots is the whole level, easier to add up than dots.
+    shown.append(dots, el('span', 'num', String(base + value)));
   }
   box.append(minus, shown, plus);
   return box;
@@ -1103,7 +1113,7 @@ const VIEWS = {
       const own = d.extraSkills[skill] ?? 0;
       const counts = el('div', 'skill-counts');
       counts.append(
-        el('span', 'dots', dotsText(total, cap)),
+        rating(total, cap),
         el(
           'span',
           'quiet',
