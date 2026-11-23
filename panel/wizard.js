@@ -180,6 +180,7 @@ const TEXT = {
     'skills.fromLifepaths': 'dai lifepath',
     'skills.extra': 'extra',
     'skills.specialty': 'Specialità',
+    'skills.specialtyExtra': 'Specialità extra (due lifepath)',
     'cat.physical': 'Fisici',
     'cat.social': 'Sociali',
     'cat.mental': 'Mentali',
@@ -379,6 +380,7 @@ const TEXT = {
     'skills.fromLifepaths': 'from lifepaths',
     'skills.extra': 'extra',
     'skills.specialty': 'Specialty',
+    'skills.specialtyExtra': 'Extra specialty (two lifepaths)',
     'cat.physical': 'Physical',
     'cat.social': 'Social',
     'cat.mental': 'Mental',
@@ -1603,11 +1605,16 @@ function specialtyInputs(skill, slots) {
   }
   wrap.append(list);
   const chosen = d.specialties[skill] ?? [];
+  // Two lifepaths investing in the same Skill give one more specialty: the last box is that one.
+  const overlap = d.lifepaths.filter((p) => (p.skills[skill] ?? 0) > 0).length >= 2;
   for (let i = 0; i < slots; i++) {
     const input = el('input');
     input.maxLength = 40;
     input.setAttribute('list', listId);
-    input.placeholder = `${tr('skills.specialty')} ${i + 1}`;
+    input.placeholder =
+      overlap && i === slots - 1
+        ? tr('skills.specialtyExtra')
+        : `${tr('skills.specialty')} ${i + 1}`;
     input.value = chosen[i] ?? '';
     input.addEventListener('input', () =>
       update((x) => {
