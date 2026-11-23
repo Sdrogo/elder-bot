@@ -329,3 +329,50 @@ ul.issues li.hint {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+.discipline {
+  margin-bottom: 12px;
+}
+
+.disc-title {
+  display: grid;
+}
+
+.powers {
+  margin-top: 10px;
+}
+
+.resource-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.resource-row select,
+.resource-row input {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.resource-row input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.resource-row .hint {
+  flex-basis: 100%;
+}
+
+.create {
+  margin-top: 20px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}

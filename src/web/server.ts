@@ -27,6 +27,7 @@ import {
   type Clan,
 } from '../game/character.js';
 import type { Character, Chronicle } from '../state/campaign.js';
+import { evaluate, trackerValues } from '../game/creation.js';
 import { parseDraft } from '../game/draft.js';
 import type { Draft } from '../state/drafts.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
@@ -215,6 +216,8 @@ export function characterView(
     chronicle: chronicle?.name ?? null,
     owned: c.ownerId === viewerId,
     editable,
+    // Tracker-only characters can get a full sheet from the creation wizard.
+    sheet: !!c.hasSheet,
     // The player's VDO.Ninja links, only for those who may change the character.
     cam: cam && editable ? camLinks(cam, c.name) : null,
     attributes: { stamina: v.stamina, composure: v.composure, resolve: v.resolve },
@@ -546,8 +549,13 @@ export function createPanelHandler(deps: PanelDeps) {
     me: WebSession,
     method: string,
     idText: string | undefined,
+    sub: string | undefined,
   ) {
     const id = idText === undefined ? undefined : Number(idText);
+    if (sub === 'create') {
+      if (method !== 'POST') return json(res, 404, { error: 'not found' });
+      return createFromDraft(req, res, me, id!);
+    }
     if (method === 'GET') {
       if (id === undefined) {
         return json(res, 200, { drafts: store.drafts.ownedBy(me.userId).map(draftView) });
@@ -582,6 +590,78 @@ export function createPanelHandler(deps: PanelDeps) {
     return updated
       ? json(res, 200, { draft: draftView(updated) })
       : json(res, 404, { error: 'not found' });
+  }
+
+  /**
+   * POST /api/drafts/:id/create {guild}: a complete draft becomes a character with its full
+   * sheet, or completes the tracker-only character it was opened from. The server runs the
+   * rules again: what the browser says is never trusted.
+   */
+  async function createFromDraft(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    id: number,
+  ) {
+    const text = await readBody(req);
+    if (text === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    const body = text.trim() ? parseObject(text) : {};
+    if (!body) return json(res, 400, { error: 'invalid body' });
+    const draft = store.drafts.get(id, me.userId);
+    if (!draft) return json(res, 404, { error: 'not found' });
+    const d = draft.data;
+    const result = evaluate(d);
+    if (!result.complete || !d.clan) return json(res, 400, { error: 'incomplete' });
+    const name = cleanName(d.name ?? '');
+    if (!name) return json(res, 400, { error: 'invalid', field: 'name' });
+    // The bot still calls the Giovanni line by its V5 name.
+    const clan: Clan = d.clan === 'giovanni' ? 'hecata' : d.clan;
+    const sheet = { data: d, approvals: result.approvals };
+    const { campaign } = store;
+    let character: Character | undefined;
+    if (d.characterId !== undefined) {
+      const old = campaign.getCharacter(d.characterId);
+      if (!old || old.ownerId !== me.userId) return json(res, 404, { error: 'not found' });
+      if (old.hasSheet) return json(res, 409, { error: 'has sheet' });
+      const { tier, stamina, composure, resolve } = trackerValues(d);
+      const updated = campaign.updateCharacter(
+        old.id,
+        { name, clan, values: { tier, stamina, composure, resolve } },
+        me.userId,
+      );
+      if (updated === 'duplicate' || updated === 'limit') return json(res, 409, { error: updated });
+      if (!updated) return json(res, 404, { error: 'not found' });
+      campaign.attachSheet(old.id, sheet);
+      character = campaign.getCharacter(old.id);
+    } else {
+      const guild = (await guildsFor(me.userId)).find((g) => g.id === body.guild);
+      if (!guild) return json(res, 400, { error: 'invalid', field: 'guild' });
+      const created = campaign.createCharacter({
+        guildId: guild.id,
+        ownerId: me.userId,
+        name,
+        clan,
+        values: newCharacter(trackerValues(d)),
+        sheet,
+      });
+      if (created === 'duplicate' || created === 'limit') return json(res, 409, { error: created });
+      character = created;
+    }
+    store.drafts.delete(id, me.userId);
+    const chronicles = new Map<number, Chronicle>();
+    const ch =
+      character?.chronicleId === undefined
+        ? undefined
+        : campaign.getChronicle(character.chronicleId);
+    if (ch) chronicles.set(ch.id, ch);
+    return json(res, 200, {
+      character: character && characterView(character, chronicles, me.userId),
+      approvals: result.approvals,
+    });
   }
 
   async function page(res: ServerResponse, file: string) {
@@ -1022,8 +1102,8 @@ export function createPanelHandler(deps: PanelDeps) {
       return json(res, 200, { key: store.overlayKeys.create(me.userId) });
     }
 
-    const draftPath = /^\/api\/drafts(?:\/(\d{1,12}))?$/.exec(path);
-    if (draftPath) return draftsApi(req, res, me, method, draftPath[1]);
+    const draftPath = /^\/api\/drafts(?:\/(\d{1,12})(?:\/(create))?)?$/.exec(path);
+    if (draftPath) return draftsApi(req, res, me, method, draftPath[1], draftPath[2]);
 
     const stagePath = /^\/api\/stage(?:\/(cam|background))?$/.exec(path);
     if (stagePath) return stageChange(req, res, me, stagePath[1]);

@@ -20,6 +20,17 @@ export interface Character {
   values: CharacterValues;
   /** The Chronicle the character plays in, if any (archived Chronicles count as none). */
   chronicleId?: number;
+  /** True once a full Alpha 2.0 sheet from the panel's wizard is attached. */
+  hasSheet?: boolean;
+}
+
+/** A full character sheet from the creation wizard, kept as JSON next to the trackers. */
+export interface StoredSheet {
+  /** The wizard's SheetDraft, as it was when the character was created. */
+  data: unknown;
+  /** Choices the Storyteller still has to approve (Brood Child, a Path). */
+  approvals: unknown[];
+  createdAt: number;
 }
 
 /** A Storyteller's Chronicle: its own players, Masquerade Tracker and sect. */
@@ -57,6 +68,7 @@ interface CharacterRow {
   humanity: number;
   violations: number;
   chronicle_id: number | null;
+  has_sheet: number;
 }
 
 interface ChronicleRow {
@@ -90,6 +102,7 @@ const toCharacter = (r: CharacterRow): Character => ({
     violations: r.violations,
   },
   ...(r.chronicle_id !== null ? { chronicleId: r.chronicle_id } : {}),
+  ...(r.has_sheet ? { hasSheet: true } : {}),
 });
 
 const toChronicle = (r: ChronicleRow): Chronicle => ({
@@ -106,7 +119,9 @@ const toChronicle = (r: ChronicleRow): Chronicle => ({
 
 // Characters joined with their current (not archived) Chronicle.
 const CHARACTER_SELECT = `
-  SELECT c.*, m.chronicle_id AS chronicle_id FROM characters c
+  SELECT c.*, m.chronicle_id AS chronicle_id,
+    EXISTS (SELECT 1 FROM character_sheets s WHERE s.character_id = c.id) AS has_sheet
+  FROM characters c
   LEFT JOIN chronicle_members m ON m.character_id = c.id
     AND m.chronicle_id IN (SELECT id FROM chronicles WHERE archived = 0)`;
 
@@ -152,6 +167,9 @@ export class Campaign {
         actor_id TEXT NOT NULL, field TEXT NOT NULL,
         before INTEGER, after INTEGER, at INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS character_changes_at ON character_changes (at);
+      CREATE TABLE IF NOT EXISTS character_sheets (
+        character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
+        data TEXT NOT NULL, approvals TEXT NOT NULL, created_at INTEGER NOT NULL);
     `);
   }
 
@@ -163,6 +181,8 @@ export class Campaign {
     name: string;
     clan: Clan;
     values: CharacterValues;
+    /** A full sheet from the panel's wizard, saved with the character. */
+    sheet?: Omit<StoredSheet, 'createdAt'>;
   }): CreateResult<Character> {
     const count = this.db
       .prepare('SELECT COUNT(*) AS n FROM characters WHERE guild_id = ? AND owner_id = ?')
@@ -170,30 +190,62 @@ export class Campaign {
     if (count.n >= LIMITS.charactersPerUser) return 'limit';
     if (this.ownCharacterByName(input.guildId, input.ownerId, input.name)) return 'duplicate';
     const v = normalize(input.values);
-    const info = this.db
-      .prepare(
-        `INSERT INTO characters (guild_id, owner_id, name, clan, tier, stamina, composure, resolve,
+    const insert = () =>
+      this.db
+        .prepare(
+          `INSERT INTO characters (guild_id, owner_id, name, clan, tier, stamina, composure, resolve,
            health, baneful, vitae, willpower, humanity, violations, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          input.guildId,
+          input.ownerId,
+          input.name,
+          input.clan,
+          v.tier,
+          v.stamina,
+          v.composure,
+          v.resolve,
+          v.health,
+          v.baneful,
+          v.vitae,
+          v.willpower,
+          v.humanity,
+          v.violations,
+          Date.now(),
+        );
+    // The character and its sheet go in together, or not at all.
+    const id = this.db.transaction(() => {
+      const created = Number(insert().lastInsertRowid);
+      if (input.sheet) this.attachSheet(created, input.sheet);
+      return created;
+    })();
+    return this.getCharacter(id)!;
+  }
+
+  /** Saves the wizard's full sheet for a character, replacing any earlier one. */
+  attachSheet(characterId: number, sheet: Omit<StoredSheet, 'createdAt'>): void {
+    this.db
+      .prepare(
+        `INSERT INTO character_sheets (character_id, data, approvals, created_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT (character_id) DO UPDATE SET data = excluded.data,
+           approvals = excluded.approvals, created_at = excluded.created_at`,
       )
-      .run(
-        input.guildId,
-        input.ownerId,
-        input.name,
-        input.clan,
-        v.tier,
-        v.stamina,
-        v.composure,
-        v.resolve,
-        v.health,
-        v.baneful,
-        v.vitae,
-        v.willpower,
-        v.humanity,
-        v.violations,
-        Date.now(),
-      );
-    return this.getCharacter(Number(info.lastInsertRowid))!;
+      .run(characterId, JSON.stringify(sheet.data), JSON.stringify(sheet.approvals), Date.now());
+  }
+
+  getSheet(characterId: number): StoredSheet | undefined {
+    const row = this.db
+      .prepare('SELECT data, approvals, created_at FROM character_sheets WHERE character_id = ?')
+      .get(characterId) as { data: string; approvals: string; created_at: number } | undefined;
+    return row
+      ? {
+          data: JSON.parse(row.data) as unknown,
+          approvals: JSON.parse(row.approvals) as unknown[],
+          createdAt: row.created_at,
+        }
+      : undefined;
   }
 
   getCharacter(id: number): Character | undefined {
