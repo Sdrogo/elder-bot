@@ -16,11 +16,13 @@ export const en = {
   'opt.test.reason': 'What you are attempting',
 
   'cmd.contest.description': 'Contested test: the most successes wins',
-  'opt.contest.dice': 'Your pool',
-  'opt.contest.opponent_dice': "Opponent's pool",
+  'opt.contest.dice': 'Your pool as a number (or attribute + with from your sheet)',
+  'opt.contest.opponent_dice':
+    "Opponent's pool as a number (or opponent_attribute + opponent_with)",
   'opt.contest.opponent': 'Opposing player',
-  'opt.contest.attribute': 'Your Attribute, for ties',
-  'opt.contest.opponent_attribute': "Opponent's Attribute, for ties (an NPC: half its pool)",
+  'opt.contest.attribute': 'Attribute from your sheet, or its number for ties when you use dice',
+  'opt.contest.opponent_attribute':
+    "Opposing player's Attribute, or a number for ties (an NPC: half its pool)",
   'opt.contest.hunger': 'Your Hunger dice (0-5)',
   'opt.contest.opponent_hunger': "Opponent's Hunger dice (a vampire PC)",
   'opt.contest.reason': "What's at stake",
@@ -190,6 +192,15 @@ export const en = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} on the sheet, {tracker} on the trackers. The roll uses the sheet.',
   'button.surgeEnd': 'End Blood Surge',
+  'sheetRoll.contest.needOpponent': 'Choose the `opponent` to roll from their sheet.',
+  'sheetRoll.contest.needOpponentPool':
+    "Give the opponent's pool: `opponent_dice`, or `opponent_attribute` + `opponent_with` from the opposing player's sheet.",
+  'sheetRoll.contest.needPool': 'Give your pool: `dice`, or `attribute` + `with` from your sheet.',
+  'sheetRoll.hint.pickOpponent': 'Choose the opponent first',
+  'opt.contest.opponent_with': "What goes with the opposing player's Attribute, from their sheet",
+  'opt.contest.surge': 'Blood Surge: spend Vitae to raise an Attribute or Discipline for the scene',
+  'opt.contest.with':
+    'What goes with your Attribute: Skill, specialty, Discipline, power, lifepath',
   'button.masqueradeThreat': 'Threat test',
   'button.prolongedCancel': 'Cancel task',
   'button.willpowerBest': 'Willpower: reroll failures',

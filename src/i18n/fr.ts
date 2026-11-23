@@ -19,12 +19,14 @@ export const fr: Messages = {
   'opt.test.reason': 'Ce que tu tentes',
 
   'cmd.contest.description': "Test en opposition : celui qui a le plus de réussites l'emporte",
-  'opt.contest.dice': 'Ta réserve',
-  'opt.contest.opponent_dice': "Réserve de l'adversaire",
+  'opt.contest.dice': 'Ta réserve en nombre (ou attribute + with depuis ta fiche)',
+  'opt.contest.opponent_dice':
+    "Réserve de l'adversaire en nombre (ou opponent_attribute + opponent_with)",
   'opt.contest.opponent': 'Joueur adverse',
-  'opt.contest.attribute': 'Ton Attribut, pour les égalités',
+  'opt.contest.attribute':
+    'Attribut de ta fiche, ou sa valeur pour les égalités si tu utilises dice',
   'opt.contest.opponent_attribute':
-    "Attribut de l'adversaire, pour les égalités (un PNJ : la moitié de sa réserve)",
+    'Attribut du joueur adverse, ou un nombre pour les égalités (PNJ : moitié de la réserve)',
   'opt.contest.hunger': 'Tes dés de Hunger (0-5)',
   'opt.contest.opponent_hunger': "Dés de Hunger de l'adversaire (un PJ vampire)",
   'opt.contest.reason': "L'enjeu",
@@ -200,6 +202,17 @@ export const fr: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute} : {sheet} sur la fiche, {tracker} sur les jauges. Le jet utilise la fiche.',
   'button.surgeEnd': 'Fin du Blood Surge',
+  'sheetRoll.contest.needOpponent': "Choisis l'`opponent` pour lancer depuis sa fiche.",
+  'sheetRoll.contest.needOpponentPool':
+    "Indique la réserve de l'adversaire : `opponent_dice`, ou `opponent_attribute` + `opponent_with` depuis la fiche du joueur adverse.",
+  'sheetRoll.contest.needPool':
+    'Indique ta réserve : `dice`, ou `attribute` + `with` depuis ta fiche.',
+  'sheetRoll.hint.pickOpponent': "Choisis d'abord l'adversaire",
+  'opt.contest.opponent_with': "Ce qui va avec l'Attribut du joueur adverse, depuis sa fiche",
+  'opt.contest.surge':
+    'Blood Surge : dépense de la Vitae pour hausser un Attribut ou une Discipline',
+  'opt.contest.with':
+    'Ce qui va avec ton Attribut : Compétence, spécialité, Discipline, pouvoir, lifepath',
   'button.masqueradeThreat': 'Test de menace',
   'button.prolongedCancel': 'Annuler la tâche',
   'button.willpowerBest': 'Willpower : relancer les échecs',

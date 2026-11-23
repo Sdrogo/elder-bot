@@ -19,12 +19,13 @@ export const es: Messages = {
   'opt.test.reason': 'Qué intentas hacer',
 
   'cmd.contest.description': 'Test enfrentado: gana quien saque más éxitos',
-  'opt.contest.dice': 'Tu pool',
-  'opt.contest.opponent_dice': 'Reserva del oponente',
+  'opt.contest.dice': 'Tu reserva como número (o attribute + with de tu ficha)',
+  'opt.contest.opponent_dice':
+    'Reserva del rival como número (o opponent_attribute + opponent_with)',
   'opt.contest.opponent': 'Jugador oponente',
-  'opt.contest.attribute': 'Tu Atributo, para los empates',
+  'opt.contest.attribute': 'Atributo de tu ficha, o su valor para empates si usas dice',
   'opt.contest.opponent_attribute':
-    'Atributo del oponente, para empates (un PNJ: la mitad de su reserva)',
+    'Atributo del jugador rival, o un número para empates (PNJ: la mitad de su reserva)',
   'opt.contest.hunger': 'Tus dados de Hunger (0-5)',
   'opt.contest.opponent_hunger': 'Dados de Hunger del oponente (un PJ vampiro)',
   'opt.contest.reason': 'Qué está en juego',
@@ -198,6 +199,16 @@ export const es: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} en la ficha, {tracker} en los contadores. La tirada usa la ficha.',
   'button.surgeEnd': 'Terminar Blood Surge',
+  'sheetRoll.contest.needOpponent': 'Elige el `opponent` para tirar desde su ficha.',
+  'sheetRoll.contest.needOpponentPool':
+    'Indica la reserva del rival: `opponent_dice`, o `opponent_attribute` + `opponent_with` de la ficha del jugador rival.',
+  'sheetRoll.contest.needPool': 'Indica tu reserva: `dice`, o `attribute` + `with` de tu ficha.',
+  'sheetRoll.hint.pickOpponent': 'Elige primero al rival',
+  'opt.contest.opponent_with': 'Qué va con el Atributo del jugador rival, de su ficha',
+  'opt.contest.surge':
+    'Blood Surge: gasta Vitae para subir un Atributo o una Disciplina durante la escena',
+  'opt.contest.with':
+    'Qué va con tu Atributo: Habilidad, especialidad, Disciplina, poder, lifepath',
   'button.masqueradeThreat': 'Prueba de amenaza',
   'button.prolongedCancel': 'Cancelar tarea',
   'button.willpowerBest': 'Willpower: repetir fallos',

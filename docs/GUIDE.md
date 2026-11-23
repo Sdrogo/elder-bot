@@ -131,9 +131,11 @@ A character with a full sheet (made with the panel's wizard) can roll without co
 
 A contested test: both sides roll, the most successes wins.
 
-`/elder contest dice opponent_dice [opponent] [attribute] [opponent_attribute] [hunger] [opponent_hunger] [reason]`
+`/elder contest dice | attribute with [surge] [opponent] opponent_dice | opponent_attribute opponent_with [hunger] [opponent_hunger] [reason]`
 
-- **Ties** go to the higher Attribute, so fill in `attribute` and `opponent_attribute`. For a minor or standard NPC, its Attribute is half its pool. With equal or unknown Attributes, whoever started the contest wins.
+Each side's pool is a number (`dice`, `opponent_dice`) or comes from a character sheet, like `/elder roll`: `attribute` + `with` for you (with an optional `surge`), `opponent_attribute` + `opponent_with` for the opposing player picked in `opponent`. Their lists are read from that player's sheet. The opposing player's Blood Surges already running count too.
+
+- **Ties** go to the higher Attribute. A pool from a sheet uses its Attribute (Blood Surge included); with `dice`, type the Attribute as a number in `attribute` and `opponent_attribute`. For a minor or standard NPC, its Attribute is half its pool. With equal or unknown Attributes, whoever started the contest wins.
 - The winner's margin is shown: the loser's margin of failure.
 - `hunger` and `opponent_hunger`: each side's Hunger dice. Losing with a 1 on a Hunger die is a Bestial Failure.
 - `opponent`: the opposing player, shown by name.
