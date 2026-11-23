@@ -11,6 +11,7 @@ export type RollAction =
   | 'retry'
   | 'retry-modal'
   | 'wp'
+  | 'wp-auto'
   | 'wp-pick'
   | 'wp-cancel';
 
