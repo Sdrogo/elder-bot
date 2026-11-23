@@ -466,3 +466,36 @@ ul.issues li.hint {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
+
+/* Longer explanations, folded under a card or a row. */
+.choice-wrap {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+details.more {
+  font-size: 13px;
+  color: var(--text);
+}
+
+details.more summary {
+  cursor: pointer;
+  color: var(--quiet);
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+details.more p {
+  margin: 6px 0;
+  line-height: 1.45;
+}
+
+.choice-wrap details.more {
+  padding: 0 12px;
+}
+
+.discipline > details.more,
+.lifepath > details.more {
+  margin: 4px 0 8px;
+}

@@ -13,6 +13,12 @@ import {
 import { LIFEPATHS_BY_ID, MERITS_BY_ID, PATHS, SIRES_BY_ID } from '/game/alpha2/background.js';
 import { CLAN_INFO, CLAN_TRAITS_BY_ID } from '/game/alpha2/clans.js';
 import {
+  DISCIPLINE_DETAILS,
+  LIFEPATH_DETAILS,
+  MERIT_DETAILS,
+  POWER_DETAILS,
+} from '/game/alpha2/details.js';
+import {
   ATTRIBUTE_CATEGORIES,
   ATTRIBUTE_NAMES,
   ATTRIBUTES_BY_CATEGORY,
@@ -41,6 +47,7 @@ const TEXT = {
     coterieHaven: 'Haven di coterie',
     flaws: 'Flaws',
     trackers: 'Tracciati',
+    more: 'Dettagli',
     approvals: 'Approvazioni del Narratore',
     'status.pending': 'da approvare',
     'status.approved': 'approvato',
@@ -72,6 +79,7 @@ const TEXT = {
     coterieHaven: 'Coterie haven',
     flaws: 'Flaws',
     trackers: 'Trackers',
+    more: 'Details',
     approvals: 'Storyteller approvals',
     'status.pending': 'waiting',
     'status.approved': 'approved',
@@ -107,6 +115,14 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = String(text);
   return node;
+}
+
+/** A folded box with a longer explanation; paragraphs are separated by blank lines. */
+function more(text) {
+  const box = el('details', 'more');
+  box.append(el('summary', '', tr('more')));
+  for (const para of text.split('\n\n')) box.append(el('p', '', para));
+  return box;
 }
 
 function section(title, ...children) {
@@ -227,6 +243,7 @@ function draw({ character, sheet, canApprove }) {
     const n = d.disciplines[disc] ?? 0;
     if (!n) continue;
     discs.append(row(DISCIPLINE_NAMES[disc], dotsText(n, t.startDiscipline)));
+    if (DISCIPLINE_DETAILS[disc]) discs.append(more(DISCIPLINE_DETAILS[disc]));
     const powers = d.powers
       .map((p) => POWERS_BY_ID.get(p))
       .filter((p) => p?.discipline === disc)
@@ -238,24 +255,26 @@ function draw({ character, sheet, canApprove }) {
         el('span', 'quiet', ` · ${DISCIPLINE_NAMES[disc]} + ${ATTRIBUTE_NAMES[p.attribute]}`),
         el('p', 'quiet', p.it),
       );
+      if (POWER_DETAILS[p.id]) line.append(more(POWER_DETAILS[p.id]));
       discs.append(line);
     }
   }
   grid.append(section(tr('disciplines'), discs.childElementCount ? discs : empty()));
 
-  const named = (ids, map) => {
+  const named = (ids, map, details = {}) => {
     const box = el('div');
     for (const x of ids) {
       const item = map.get(x);
       if (!item) continue;
       const line = el('div', 'power');
       line.append(el('strong', '', item.name), el('p', 'quiet', item.it));
+      if (details[x]) line.append(more(details[x]));
       box.append(line);
     }
     return box.childElementCount ? box : empty();
   };
   grid.append(section(tr('traits'), named(d.clanTraits, CLAN_TRAITS_BY_ID)));
-  grid.append(section(tr('merits'), named(d.merits, MERITS_BY_ID)));
+  grid.append(section(tr('merits'), named(d.merits, MERITS_BY_ID, MERIT_DETAILS)));
 
   const path = PATHS.find((p) => p.id === d.path);
   grid.append(
@@ -298,7 +317,9 @@ function draw({ character, sheet, canApprove }) {
   const lps = el('div');
   for (const pick of d.lifepaths) {
     const lp = LIFEPATHS_BY_ID.get(pick.id);
-    if (lp) lps.append(row(lp.name, '', lp.it));
+    if (!lp) continue;
+    lps.append(row(lp.name, '', lp.it));
+    if (LIFEPATH_DETAILS[lp.id]) lps.append(more(LIFEPATH_DETAILS[lp.id]));
   }
   grid.append(section(tr('lifepaths'), lps));
 

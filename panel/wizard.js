@@ -43,6 +43,13 @@ import {
   SKILLS,
 } from '/game/alpha2/core.js';
 import { DISCIPLINE_NAMES, POWERS_BY_ID } from '/game/alpha2/disciplines.js';
+import {
+  DISCIPLINE_DETAILS,
+  DISCIPLINE_RULES,
+  LIFEPATH_DETAILS,
+  MERIT_DETAILS,
+  POWER_DETAILS,
+} from '/game/alpha2/details.js';
 import { CREATION_TIERS } from '/game/alpha2/prereq.js';
 import {
   LIFEPATH_RESOURCE_DOTS,
@@ -83,6 +90,8 @@ const TEXT = {
     'disc.outClan': 'fuori clan',
     'disc.sire': 'punto del Sire',
     'disc.noPowers': 'Nel playtest questa Disciplina non ha ancora poteri.',
+    more: 'Dettagli',
+    'disc.rules': 'Come funzionano i poteri',
     'traits.title': (n) => (n === 1 ? 'Scegli 1 tratto di clan' : `Scegli ${n} tratti di clan`),
     'traits.note': 'Alcuni tratti chiedono punti in una Disciplina o un livello più alto.',
     'traits.noClan': 'Scegli prima un clan.',
@@ -294,6 +303,8 @@ const TEXT = {
     'disc.outClan': 'out of clan',
     'disc.sire': "Sire's dot",
     'disc.noPowers': 'This Discipline has no powers in the playtest yet.',
+    more: 'Details',
+    'disc.rules': 'How powers work',
     'traits.title': (n) => (n === 1 ? 'Choose 1 clan trait' : `Choose ${n} clan traits`),
     'traits.note': 'Some traits need dots in a Discipline or a higher tier.',
     'traits.noClan': 'Choose a clan first.',
@@ -569,7 +580,24 @@ function stepper(value, { min = 0, max, canAdd = true, onChange, label, plain = 
 }
 
 /** A clickable card; locked ones show why instead of acting. */
-function choiceCard({ title, lines = [], selected, available = true, reasons = [], onPick }) {
+/** A folded box with a longer explanation; paragraphs are separated by blank lines. */
+function more(text, label = tr('more')) {
+  const box = el('details', 'more');
+  box.append(el('summary', '', label));
+  for (const para of text.split('\n\n')) box.append(el('p', '', para));
+  return box;
+}
+
+/** A choice card, with its longer explanation folded underneath when there is one. */
+function choiceCard({ more: text, ...card }) {
+  const pick = choiceButton(card);
+  if (!text) return pick;
+  const wrap = el('div', 'choice-wrap');
+  wrap.append(pick, more(text));
+  return wrap;
+}
+
+function choiceButton({ title, lines = [], selected, available = true, reasons = [], onPick }) {
   const card = el(
     'button',
     'choice' + (selected ? ' selected' : '') + (available ? '' : ' locked'),
@@ -1037,6 +1065,7 @@ const VIEWS = {
             ],
             available: o.available && !full,
             reasons: o.available ? [{ kind: 'full' }] : o.reasons,
+            more: LIFEPATH_DETAILS[lp.id],
             onPick: () =>
               update((x) => {
                 x.lifepaths.push({ id: lp.id, skills: {}, resources: lp.resources.map(() => 0) });
@@ -1144,7 +1173,7 @@ const VIEWS = {
     const box = el('div');
     const t = TIER_RULES[d.tier];
     box.append(stepHead(tr('disc.title'), tr('disc.note', t)));
-    box.append(hints('disciplines'));
+    box.append(more(DISCIPLINE_RULES, tr('disc.rules')), hints('disciplines'));
     for (const room of disciplineRoom(d)) {
       const disc = room.discipline;
       const card = el('div', 'card discipline');
@@ -1164,6 +1193,7 @@ const VIEWS = {
         }),
       );
       card.append(head);
+      if (DISCIPLINE_DETAILS[disc]) card.append(more(DISCIPLINE_DETAILS[disc]));
       if (!room.hasPowers) card.append(el('p', 'quiet', tr('disc.noPowers')));
       else if (room.dots > 0) {
         const grid = el('div', 'choices powers');
@@ -1177,6 +1207,7 @@ const VIEWS = {
                 p.it,
               ],
               selected: d.powers.includes(p.id),
+              more: POWER_DETAILS[p.id],
               available: o.available,
               reasons: o.reasons,
               onPick: () => update((x) => toggle(x.powers, p.id)),
@@ -1225,6 +1256,7 @@ const VIEWS = {
           title: merit.name,
           lines: [merit.it],
           selected: d.merits.includes(o.id),
+          more: MERIT_DETAILS[o.id],
           available: o.available,
           reasons: o.reasons,
           onPick: () => update((x) => toggle(x.merits, o.id)),
@@ -1587,6 +1619,7 @@ function chosenLifepath(pick, n) {
   );
   card.append(head);
   if (!lp) return card;
+  if (LIFEPATH_DETAILS[lp.id]) card.append(more(LIFEPATH_DETAILS[lp.id]));
   const sp = current.pools.lifepathSkills[n];
   const rp = current.pools.lifepathResources[n];
   const cap = skillCap();
