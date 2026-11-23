@@ -5,8 +5,10 @@ import { ALPHA2_CLANS, CLAN_INFO, CLAN_TRAITS } from '../src/game/alpha2/clans.j
 import { DISCIPLINES, POWERS } from '../src/game/alpha2/disciplines.js';
 import { unmet } from '../src/game/alpha2/prereq.js';
 import { TIER_RULES } from '../src/game/alpha2/tiers.js';
+import { parseDraft } from '../src/game/draft.js';
 import {
   clanOptions,
+  coterieHavenDots,
   clanTraitOptions,
   disciplineRoom,
   emptyDraft,
@@ -254,6 +256,32 @@ describe('evaluate', () => {
     d.lifepaths[0]!.resources = [1, 1, 1];
     d.lifepaths[1]!.resources = [0, 0, 3];
     expect(codes(d)).toContain('resource-max');
+  });
+
+  it('raises a lifepath Resource with extra dots', () => {
+    const d = brujah();
+    const before = resourceTotals(d).get('mask:') ?? 0;
+    d.extraResources = [{ kind: 'mask', detail: '', dots: 3 }];
+    expect(resourceTotals(d).get('mask:')).toBe(before + 3);
+    expect(codes(d)).not.toContain('extra-resources-left');
+    expect(codes(d)).not.toContain('resource-detail-missing');
+  });
+
+  it('keeps the coterie haven apart from the character’s own Resources', () => {
+    const d = brujah();
+    d.extraResources = [{ kind: 'haven', detail: '', dots: 3, coterie: true }];
+    expect(coterieHavenDots(d)).toBe(3);
+    expect([...resourceTotals(d).keys()]).not.toContain('haven:');
+    // A coterie haven needs no name, and still spends the extra dots.
+    expect(codes(d)).not.toContain('resource-detail-missing');
+    expect(codes(d)).not.toContain('extra-resources-left');
+    // Only a Haven can be shared.
+    const parsed = parseDraft({
+      ...d,
+      extraResources: [{ kind: 'vehicle', dots: 1, coterie: true }],
+    });
+    expect(parsed?.extraResources[0]?.coterie).toBeUndefined();
+    expect(parseDraft(d)?.extraResources[0]?.coterie).toBe(true);
   });
 
   it('flags choices that need the Storyteller', () => {

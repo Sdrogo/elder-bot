@@ -58,7 +58,16 @@ export interface ResourcePick {
   /** The specific subject, e.g. "Contact: Mechanic". */
   detail: string;
   dots: number;
+  /** A Haven shared by the coterie: the dots are this character's contribution (p. 62). */
+  coterie?: boolean;
 }
+
+/** Only a Haven can be pooled with the coterie. */
+export const isCoterieHaven = (r: ResourcePick) => r.coterie === true && r.kind === 'haven';
+
+/** Dots this character puts into the coterie's haven. */
+export const coterieHavenDots = (d: SheetDraft) =>
+  sum(d.extraResources.filter(isCoterieHaven).map((r) => r.dots));
 
 export interface FlawPick {
   /** An example flaw id, or absent for one the player wrote. */
@@ -547,9 +556,18 @@ export function evaluate(d: SheetDraft): Evaluation {
     budget: t.extraResources,
   };
   poolIssues(add, 'resources', 'extra-resources', extraResources);
+  // Extra dots raising a lifepath Resource need no subject of their own: the lifepath has it.
+  const fromLifepaths = new Set(
+    d.lifepaths.flatMap((pick) =>
+      (LIFEPATHS_BY_ID.get(pick.id)?.resources ?? []).map((r, i) =>
+        resourceKey(r.kind, pick.resourceDetails?.[i] || r.detail),
+      ),
+    ),
+  );
   for (const r of d.extraResources) {
     if (r.dots < 0) add({ step: 'resources', severity: 'error', code: 'negative', target: r.kind });
-    if (r.kind !== 'wealth' && !r.detail.trim())
+    const named = isCoterieHaven(r) || fromLifepaths.has(resourceKey(r.kind, r.detail));
+    if (r.kind !== 'wealth' && !named && !r.detail.trim())
       add({ step: 'resources', severity: 'todo', code: 'resource-detail-missing', target: r.kind });
   }
   for (const [key, dots] of resourceTotals(d)) {
@@ -563,6 +581,16 @@ export function evaluate(d: SheetDraft): Evaluation {
         limit: t.maxDots,
       });
   }
+  const coterie = coterieHavenDots(d);
+  if (coterie > t.maxDots)
+    add({
+      step: 'resources',
+      severity: 'error',
+      code: 'resource-max',
+      target: 'coterie-haven',
+      value: coterie,
+      limit: t.maxDots,
+    });
 
   // Step 9: flaws and name.
   const flaws = {
@@ -649,12 +677,19 @@ function checkPicks(
   }
 }
 
-/** Resource dots summed by type and subject, so the same Resource from two sources counts once. */
+/** The key resourceTotals uses for a Resource: type plus subject, ignoring case. */
+export const resourceKey = (kind: ResourceKind, detail: string | undefined) =>
+  `${kind}:${(detail ?? '').trim().toLowerCase()}`;
+
+/**
+ * The character's own Resource dots summed by type and subject, so the same Resource from two
+ * sources counts once. The coterie haven is not the character's own: see coterieHavenDots.
+ */
 export function resourceTotals(d: SheetDraft): Map<string, number> {
   const totals = new Map<string, number>();
   const put = (kind: ResourceKind, detail: string | undefined, dots: number) => {
     if (dots <= 0) return;
-    const key = `${kind}:${(detail ?? '').trim().toLowerCase()}`;
+    const key = resourceKey(kind, detail);
     totals.set(key, (totals.get(key) ?? 0) + dots);
   };
   for (const pick of d.lifepaths) {
@@ -663,7 +698,7 @@ export function resourceTotals(d: SheetDraft): Map<string, number> {
       put(r.kind, pick.resourceDetails?.[i] || r.detail, pick.resources[i] ?? 0),
     );
   }
-  for (const r of d.extraResources) put(r.kind, r.detail, r.dots);
+  for (const r of d.extraResources) if (!isCoterieHaven(r)) put(r.kind, r.detail, r.dots);
   return totals;
 }
 

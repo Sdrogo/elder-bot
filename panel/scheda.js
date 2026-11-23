@@ -3,9 +3,21 @@
 // Storyteller of its Chronicle can read it; the Storyteller also answers the choices that need
 // their approval. Every text goes in with textContent: names come from users.
 
-import { evaluate, resourceTotals, skillDots } from '/game/creation.js';
+import {
+  coterieHavenDots,
+  evaluate,
+  isCoterieHaven,
+  resourceTotals,
+  skillDots,
+} from '/game/creation.js';
 import { LIFEPATHS_BY_ID, MERITS_BY_ID, PATHS, SIRES_BY_ID } from '/game/alpha2/background.js';
 import { CLAN_INFO, CLAN_TRAITS_BY_ID } from '/game/alpha2/clans.js';
+import {
+  DISCIPLINE_DETAILS,
+  LIFEPATH_DETAILS,
+  MERIT_DETAILS,
+  POWER_DETAILS,
+} from '/game/alpha2/details.js';
 import {
   ATTRIBUTE_CATEGORIES,
   ATTRIBUTE_NAMES,
@@ -32,8 +44,10 @@ const TEXT = {
     merits: 'Merit',
     morality: 'Humanity o Path',
     resources: 'Resources',
+    coterieHaven: 'Haven di coterie',
     flaws: 'Flaws',
     trackers: 'Tracciati',
+    more: 'Dettagli',
     approvals: 'Approvazioni del Narratore',
     'status.pending': 'da approvare',
     'status.approved': 'approvato',
@@ -62,8 +76,10 @@ const TEXT = {
     merits: 'Merits',
     morality: 'Humanity or Path',
     resources: 'Resources',
+    coterieHaven: 'Coterie haven',
     flaws: 'Flaws',
     trackers: 'Trackers',
+    more: 'Details',
     approvals: 'Storyteller approvals',
     'status.pending': 'waiting',
     'status.approved': 'approved',
@@ -86,13 +102,27 @@ const tr = (key, ...args) => {
   return typeof v === 'function' ? v(...args) : v;
 };
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-const dotsText = (n, max) => '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n));
+/** Dots with the number beside them, which is easier to add up (Andrea's choice). */
+function dotsText(n, max) {
+  const box = el('span', 'rating');
+  const dots = '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n));
+  box.append(el('span', 'dots', dots), el('span', 'num', String(Math.max(0, n))));
+  return box;
+}
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = String(text);
   return node;
+}
+
+/** A folded box with a longer explanation; paragraphs are separated by blank lines. */
+function more(text) {
+  const box = el('details', 'more');
+  box.append(el('summary', '', tr('more')));
+  for (const para of text.split('\n\n')) box.append(el('p', '', para));
+  return box;
 }
 
 function section(title, ...children) {
@@ -106,7 +136,7 @@ function row(label, value, note) {
   const left = el('span', 'disc-title');
   left.append(el('span', '', label));
   if (note) left.append(el('span', 'quiet', note));
-  r.append(left, el('span', 'dots', value));
+  r.append(left, typeof value === 'object' ? value : el('span', 'num', value));
   return r;
 }
 
@@ -195,7 +225,9 @@ function draw({ character, sheet, canApprove }) {
     }
     attrs.append(col);
   }
-  grid.append(section(tr('attributes'), attrs));
+  const attrSection = section(tr('attributes'), attrs);
+  attrSection.classList.add('wide');
+  grid.append(attrSection);
 
   const skills = el('div');
   for (const skill of SKILLS) {
@@ -211,6 +243,7 @@ function draw({ character, sheet, canApprove }) {
     const n = d.disciplines[disc] ?? 0;
     if (!n) continue;
     discs.append(row(DISCIPLINE_NAMES[disc], dotsText(n, t.startDiscipline)));
+    if (DISCIPLINE_DETAILS[disc]) discs.append(more(DISCIPLINE_DETAILS[disc]));
     const powers = d.powers
       .map((p) => POWERS_BY_ID.get(p))
       .filter((p) => p?.discipline === disc)
@@ -222,24 +255,26 @@ function draw({ character, sheet, canApprove }) {
         el('span', 'quiet', ` · ${DISCIPLINE_NAMES[disc]} + ${ATTRIBUTE_NAMES[p.attribute]}`),
         el('p', 'quiet', p.it),
       );
+      if (POWER_DETAILS[p.id]) line.append(more(POWER_DETAILS[p.id]));
       discs.append(line);
     }
   }
   grid.append(section(tr('disciplines'), discs.childElementCount ? discs : empty()));
 
-  const named = (ids, map) => {
+  const named = (ids, map, details = {}) => {
     const box = el('div');
     for (const x of ids) {
       const item = map.get(x);
       if (!item) continue;
       const line = el('div', 'power');
       line.append(el('strong', '', item.name), el('p', 'quiet', item.it));
+      if (details[x]) line.append(more(details[x]));
       box.append(line);
     }
     return box.childElementCount ? box : empty();
   };
   grid.append(section(tr('traits'), named(d.clanTraits, CLAN_TRAITS_BY_ID)));
-  grid.append(section(tr('merits'), named(d.merits, MERITS_BY_ID)));
+  grid.append(section(tr('merits'), named(d.merits, MERITS_BY_ID, MERIT_DETAILS)));
 
   const path = PATHS.find((p) => p.id === d.path);
   grid.append(
@@ -267,6 +302,12 @@ function draw({ character, sheet, canApprove }) {
     const name = RESOURCE_INFO[kind]?.name ?? kind;
     res.append(row(subject ? `${name}: ${subject}` : name, dotsText(n, t.maxDots)));
   }
+  const coterie = coterieHavenDots(d);
+  if (coterie) {
+    const subject = d.extraResources.find((r) => isCoterieHaven(r) && r.detail.trim())?.detail;
+    const label = subject ? `${tr('coterieHaven')}: ${subject.trim()}` : tr('coterieHaven');
+    res.append(row(label, dotsText(coterie, t.maxDots)));
+  }
   grid.append(section(tr('resources'), res.childElementCount ? res : empty()));
 
   const flaws = el('div');
@@ -276,7 +317,9 @@ function draw({ character, sheet, canApprove }) {
   const lps = el('div');
   for (const pick of d.lifepaths) {
     const lp = LIFEPATHS_BY_ID.get(pick.id);
-    if (lp) lps.append(row(lp.name, '', lp.it));
+    if (!lp) continue;
+    lps.append(row(lp.name, '', lp.it));
+    if (LIFEPATH_DETAILS[lp.id]) lps.append(more(LIFEPATH_DETAILS[lp.id]));
   }
   grid.append(section(tr('lifepaths'), lps));
 
