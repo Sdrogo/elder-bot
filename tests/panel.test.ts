@@ -712,6 +712,74 @@ describe('overlay pages for OBS', () => {
   });
 });
 
+describe('character portraits', () => {
+  const PNG = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from('fake png body'),
+  ]);
+
+  it('are uploaded by the owner and shown on the overlay of the Chronicle on air', async () => {
+    const ch = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '999',
+      name: 'Testament',
+      sect: 'anarch',
+    });
+    const pc = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Lucrezia',
+      clan: 'toreador',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 4, resolve: 2 }),
+    });
+    const other = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altro',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 4, resolve: 2 }),
+    });
+    if (typeof ch !== 'object' || typeof pc !== 'object' || typeof other !== 'object') {
+      throw new Error('setup');
+    }
+    store.campaign.setLive(ch.id);
+    store.campaign.join(ch.id, pc.id);
+
+    const cookie = await login();
+    const me = (await (await get('/api/me', cookie)).json()) as { csrf: string };
+    const put = (id: number, body: Buffer) =>
+      fetch(`${base}/api/characters/${id}/portrait`, {
+        method: 'PUT',
+        headers: { cookie, 'x-csrf-token': me.csrf, origin: PUBLIC },
+        body,
+      });
+
+    expect((await put(pc.id, Buffer.from('not an image'))).status).toBe(415);
+    expect((await put(other.id, PNG)).status).toBe(404);
+    const ok = await put(pc.id, PNG);
+    expect(ok.status).toBe(200);
+    const { portrait } = (await ok.json()) as { portrait: string };
+    expect(portrait).toMatch(/^[\w-]{12}$/);
+
+    const mine = await get(`/api/characters/${pc.id}/portrait`, cookie);
+    expect(mine.headers.get('content-type')).toBe('image/png');
+    expect(Buffer.from(await mine.arrayBuffer())).toEqual(PNG);
+    expect((await get(`/api/characters/${other.id}/portrait`, cookie)).status).toBe(404);
+
+    const v = store.viewKeys.get('999');
+    expect((await get(`/overlay/portraits/lucrezia?v=${v}`)).status).toBe(200);
+    expect((await get(`/overlay/portraits/altro?v=${v}`)).status).toBe(404);
+    expect((await get('/overlay/portraits/lucrezia')).status).toBe(401);
+
+    const del = await fetch(`${base}/api/characters/${pc.id}/portrait`, {
+      method: 'DELETE',
+      headers: { cookie, 'x-csrf-token': me.csrf, origin: PUBLIC },
+    });
+    expect(del.status).toBe(200);
+    expect(store.stage.portraitTag(pc.id)).toBeUndefined();
+  });
+});
+
 describe('overlay keys', () => {
   it('keep only a hash and replace the old key', async () => {
     const { default: Database } = await import('better-sqlite3');

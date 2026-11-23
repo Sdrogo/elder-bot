@@ -115,6 +115,77 @@ window.ELDER = {
       h: Math.round(h * k),
     };
   },
+  /**
+   * The bands of a frame around its webcam, in px of the scene (1 cqw = width / 100): the
+   * name above (2.3 cqw), the trackers below (3.7 cqw), a thin edge on the sides.
+   */
+  frameBands(width = 1920) {
+    const cqw = width / 100;
+    return { top: 2.3 * cqw, side: 0.55 * cqw, bottom: 3.7 * cqw };
+  },
+  /**
+   * A saved layout (cells of a cols × rows grid, each box the whole frame) as webcam
+   * rectangles in px, like sceneLayout: players in Chronicle order (those without a box, or
+   * hidden, get null), then the Storyteller; and the roll box (null when hidden).
+   */
+  customSlots(items, players, { width = 1920, height = 1080, cols = 32, rows = 18 } = {}) {
+    const cw = width / cols;
+    const ch = height / rows;
+    const b = window.ELDER.frameBands(width);
+    // A thin gap inside each box, so frames in neighbouring cells don't touch.
+    const gap = (0.3 * width) / 100;
+    const outer = (box) => ({
+      x: Math.round(box.x * cw + gap),
+      y: Math.round(box.y * ch + gap),
+      w: Math.round(box.w * cw - 2 * gap),
+      h: Math.round(box.h * ch - 2 * gap),
+    });
+    const cam = (box) => {
+      if (!box || box.hidden) return null;
+      const r = outer(box);
+      return {
+        x: Math.round(r.x + b.side),
+        y: Math.round(r.y + b.top),
+        w: Math.max(1, Math.round(r.w - 2 * b.side)),
+        h: Math.max(1, Math.round(r.h - b.top - b.bottom)),
+      };
+    };
+    const frames = Array.from({ length: players }, (_, i) => cam(items.players[i]));
+    frames.push(cam(items.storyteller));
+    return { frames, roll: items.roll.hidden ? null : outer(items.roll) };
+  },
+  /**
+   * One of the automatic layouts as a starting point for the editor: each frame's whole box
+   * (webcam plus bands) snapped to the cells of the grid, on a 1920×1080 scene.
+   */
+  presetItems(players, layout, { cols = 32, rows = 18 } = {}) {
+    const E = window.ELDER;
+    const W = 1920;
+    const H = 1080;
+    const cw = W / cols;
+    const ch = H / rows;
+    const b = E.frameBands(W);
+    const slots = E.sceneLayout(players + 1, { layout, width: W, rollBox: true });
+    // Edges snap to the nearest grid line, so neighbours share a line instead of overlapping.
+    const snap = (r) => {
+      const x = Math.max(0, Math.min(cols - 2, Math.round(r.x / cw)));
+      const y = Math.max(0, Math.min(rows - 2, Math.round(r.y / ch)));
+      const right = Math.min(cols, Math.round((r.x + r.w) / cw));
+      const bottom = Math.min(rows, Math.round((r.y + r.h) / ch));
+      return { x, y, w: Math.max(2, right - x), h: Math.max(2, bottom - y) };
+    };
+    const outer = (s) => ({
+      x: s.x - b.side,
+      y: s.y - b.top,
+      w: s.w + 2 * b.side,
+      h: s.h + b.top + b.bottom,
+    });
+    return {
+      players: slots.slice(0, players).map((s) => snap(outer(s))),
+      storyteller: snap(outer(slots[players])),
+      roll: snap(E.rollBoxRect(W)),
+    };
+  },
   /** OBS's view of a VDO.Ninja webcam: no buttons, no sound (voices stay on Discord). */
   camUrl(id) {
     return `https://vdo.ninja/?view=${encodeURIComponent(id)}&cleanoutput&cover&noaudio&transparent`;

@@ -6,7 +6,7 @@
 // (https://<panel>/overlay/scena?v=<view key>), so every address here is relative.
 'use strict';
 
-const { CLANS, SECTS, el, sceneLayout, rollBoxRect, camUrl, trackerIcon, diceArt, die } =
+const { CLANS, SECTS, el, sceneLayout, customSlots, rollBoxRect, camUrl, trackerIcon, die } =
   window.ELDER;
 const sceneMode = window.location.pathname.endsWith('/scena');
 const params = new URLSearchParams(window.location.search);
@@ -28,6 +28,14 @@ const cams = document.getElementById('cams');
 const bg = document.getElementById('bg');
 /** One iframe per webcam, never moved in the page: moving an iframe reloads the video. */
 const camFrames = new Map();
+/** The portraits behind the webcams, by address: they show when a webcam is off or missing. */
+const portraitImgs = new Map();
+
+/** The address of a character's portrait on the bot, new whenever the image changes. */
+const portraitUrl = (c) => {
+  const query = view ? `${view}&t=${c.portrait}` : `?t=${c.portrait}`;
+  return new URL(`portraits/${encodeURIComponent(c.id)}${query}`, window.location.href).href;
+};
 
 let prev = null;
 const symbolOk = new Map();
@@ -87,12 +95,11 @@ function numberCell(kind, label, current, max, note, hot) {
   );
 }
 
-/** The Hunger die that sits beside Vitae: a red ankh with the number of Hunger dice. */
+/** The Hunger beside Vitae: just its number, faded at 0. */
 function hungerDie(c, before) {
-  const icon = el('span', `die hunger success${c.hunger > 0 ? '' : ' none'}`, diceArt('success'));
-  icon.append(el('b', '', String(c.hunger)));
-  if (before && before.hunger !== c.hunger) icon.classList.add('hot');
-  const wrap = el('span', 'nx hunger', icon);
+  const value = el('b', c.hunger > 0 ? 'hn' : 'hn none', String(c.hunger));
+  if (before && before.hunger !== c.hunger) value.classList.add('hot');
+  const wrap = el('span', 'nx hunger', value);
   wrap.title = `Hunger ${c.hunger}`;
   return wrap;
 }
@@ -170,13 +177,21 @@ function toast(frame, text) {
 function renderCharacter(c, before) {
   const frame = el('div', 'frame');
   if (c.cam) frame.dataset.cam = c.cam;
+  if (c.portrait) frame.dataset.portrait = portraitUrl(c);
   frame.style.setProperty('--clan', (CLANS[c.clan] || CLANS.caitiff).hue);
   const now = boxClasses(c);
   const old = before ? boxClasses(before) : null;
+  // The portrait, round, takes the place of the clan symbol on the plate.
+  let badge;
+  if (c.portrait) {
+    badge = el('img', 'face');
+    badge.alt = '';
+    badge.src = portraitUrl(c);
+  } else badge = symbol(c.clan, frame);
   const plate = el(
     'div',
     'plate',
-    symbol(c.clan, frame),
+    badge,
     el('span', 'nm', c.name),
     el('span', 'cl', (CLANS[c.clan] || CLANS.caitiff).name),
   );
@@ -294,23 +309,72 @@ function renderScene(state) {
     renderCharacter(c, prev && prev.characters.find((x) => x.id === c.id)),
   );
   frames.push(renderStoryteller(state.chronicle, prev && prev.chronicle, stage.cam));
-  const slots = sceneLayout(frames.length, stage);
   const k = stage.width / 1920;
-  const nodes = frames.map((frame, i) => {
+  let slots;
+  let rollRect = stage.rollBox ? rollBoxRect(stage.width) : null;
+  if (stage.custom) {
+    // A saved layout: each frame where the Storyteller put it; players without a box stay out.
+    const grid = stage.grid || {};
+    const custom = customSlots(stage.custom.items, state.characters.length, {
+      width: stage.width,
+      height: stage.height,
+      cols: grid.cols,
+      rows: grid.rows,
+    });
+    slots = custom.frames;
+    rollRect = custom.roll;
+  } else slots = sceneLayout(frames.length, stage);
+  const nodes = [];
+  frames.forEach((frame, i) => {
+    if (!slots[i]) return;
     const slot = place(el('div', 'slot', frame), slots[i]);
     if (slots[i].w / k < 540) slot.classList.add('compact');
-    return slot;
+    nodes.push(slot);
   });
-  if (stage.rollBox) {
-    const box = renderRoll(state.roll, prev && prev.roll);
-    nodes.push(place(el('div', 'slot roll-slot', box), rollBoxRect(stage.width)));
+  if (rollRect) {
+    const slot = el('div', 'slot roll-slot');
+    if (stage.custom) {
+      // A box taller than a strip shows the last rolls one under the other.
+      slot.classList.add('custom');
+      if (rollRect.w / k < 620) slot.classList.add('narrow');
+      const tall = rollRect.h > rollRect.w * 0.3;
+      if (tall && state.rolls && state.rolls.length) {
+        const list = el('div', 'roll-history');
+        state.rolls.forEach((r, i) => list.append(renderRoll(r, i === 0 ? prev && prev.roll : r)));
+        slot.append(list);
+      } else slot.append(renderRoll(state.roll, prev && prev.roll));
+    } else slot.append(renderRoll(state.roll, prev && prev.roll));
+    nodes.push(place(slot, rollRect));
   }
   root.replaceChildren(...nodes);
 }
 
-/** Puts each webcam under its frame; webcams no longer on air are closed. */
+const frameRect = (frame) => {
+  const r = frame.getBoundingClientRect();
+  return { x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height };
+};
+
+/**
+ * Puts each webcam under its frame, and each portrait under its webcam: VDO.Ninja is
+ * transparent while a webcam is off, so the portrait shows through. Webcams and portraits
+ * no longer on air are closed.
+ */
 function placeCams() {
   const seen = new Set();
+  const seenPortraits = new Set();
+  for (const frame of root.querySelectorAll('.frame[data-portrait]')) {
+    const src = frame.dataset.portrait;
+    seenPortraits.add(src);
+    let img = portraitImgs.get(src);
+    if (!img) {
+      img = el('img', 'portrait');
+      img.alt = '';
+      img.src = src;
+      portraitImgs.set(src, img);
+      cams.prepend(img);
+    }
+    place(img, frameRect(frame));
+  }
   if (showCams) {
     for (const frame of root.querySelectorAll('.frame[data-cam]')) {
       const id = frame.dataset.cam;
@@ -324,19 +388,19 @@ function placeCams() {
         camFrames.set(id, iframe);
         cams.append(iframe);
       }
-      const r = frame.getBoundingClientRect();
-      place(iframe, {
-        x: r.left + window.scrollX,
-        y: r.top + window.scrollY,
-        w: r.width,
-        h: r.height,
-      });
+      place(iframe, frameRect(frame));
     }
   }
   for (const [id, iframe] of camFrames) {
     if (!seen.has(id)) {
       iframe.remove();
       camFrames.delete(id);
+    }
+  }
+  for (const [src, img] of portraitImgs) {
+    if (!seenPortraits.has(src)) {
+      img.remove();
+      portraitImgs.delete(src);
     }
   }
 }
