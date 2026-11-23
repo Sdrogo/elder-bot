@@ -269,6 +269,8 @@ export const de: Messages = {
     'Alle deine Charaktere sind schon in einer Chronik. Erstelle einen neuen mit `/elder character create` und drücke den Knopf erneut.',
   'chronicle.pickPlaceholder': 'Dein Charakter',
   'chronicle.busy': '**{name}** spielt schon in einer anderen Chronik.',
+  'chronicle.wrongTier': '**{name}** kann nicht beitreten: Die Chronik ist auf Stufe {tier}.',
+  'character.wrongTier': 'Die neue Stufe passt nicht zur Chronik.',
   'chronicle.joined.private': '**{name}** tritt {chronicle} bei.',
   'chronicle.joined': '**{name}** ({user}) tritt {chronicle} bei.',
   'session.new.chronicle':

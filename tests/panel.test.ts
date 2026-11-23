@@ -780,4 +780,142 @@ describe('character creation wizard', () => {
     const againId = ((await again.json()) as { draft: { id: number } }).draft.id;
     expect((await send('POST', `/api/drafts/${againId}/create`, {})).status).toBe(409);
   });
+
+  it('keeps a Chronicle and its characters on the same tier of play', async () => {
+    const send = await asUser();
+    expect(
+      (
+        await send('POST', '/api/chronicles', {
+          guild: 'g',
+          name: 'Roma',
+          sect: 'camarilla',
+          tier: 'mortal',
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await send('POST', '/api/chronicles', {
+          guild: 'g',
+          name: 'Roma',
+          sect: 'camarilla',
+          tier: 'ancilla',
+        })
+      ).status,
+    ).toBe(200);
+    const rome = store.campaign.chroniclesRunBy('111')[0]!;
+    expect(rome.tier).toBe('ancilla');
+    const neonate = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Giovane',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+    });
+    const dusk = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Crepuscolo',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'duskborn', stamina: 2, composure: 2, resolve: 2 }),
+    });
+    if (typeof neonate !== 'object' || typeof dusk !== 'object') throw new Error('setup');
+    expect(store.campaign.join(rome.id, neonate.id)).toBe('tier');
+
+    // Back to "any tier", both join; a Neonate tier then fits both (Duskborn play as Neonates).
+    expect((await send('POST', `/api/chronicles/${rome.id}`, { tier: '' })).status).toBe(200);
+    expect(store.campaign.join(rome.id, neonate.id)).toBe('ok');
+    expect(store.campaign.join(rome.id, dusk.id)).toBe('ok');
+    const refused = await send('POST', `/api/chronicles/${rome.id}`, {
+      name: 'Nuova',
+      tier: 'elder',
+    });
+    expect(refused.status).toBe(409);
+    expect(store.campaign.getChronicle(rome.id)).toMatchObject({ name: 'Roma' });
+    expect((await send('POST', `/api/chronicles/${rome.id}`, { tier: 'neonate' })).status).toBe(
+      200,
+    );
+
+    // A member can't move to another tier while the Chronicle has one.
+    const moved = await send('POST', `/api/characters/${neonate.id}`, { tier: 'ancilla' });
+    expect(moved.status).toBe(409);
+    expect(((await moved.json()) as { error: string }).error).toBe('tier');
+  });
+
+  it('shows the full sheet to owner and Storyteller, and lets only the Storyteller approve', async () => {
+    const send = await asUser();
+    const saved = await send('POST', '/api/drafts', {
+      data: {
+        ...brujah(),
+        sire: 'brood-child',
+        sireDiscipline: 'presence',
+        broodmate: 'Ada',
+        path: 'honor',
+      },
+    });
+    const draftId = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    const made = await send('POST', `/api/drafts/${draftId}/create`, { guild: 'g' });
+    expect(made.status).toBe(200);
+    const id = ((await made.json()) as { character: { id: number } }).character.id;
+
+    const sheet = (await (await send('GET', `/api/characters/${id}/sheet`)).json()) as {
+      character: { pending: number };
+      sheet: { approvals: { code: string; status: string }[] };
+      canApprove: boolean;
+    };
+    expect(sheet.character.pending).toBe(2);
+    expect(sheet.sheet.approvals.map((a) => [a.code, a.status])).toEqual([
+      ['brood-child', 'pending'],
+      ['path', 'pending'],
+    ]);
+    // Not in a Chronicle: nobody can approve yet, not even the owner.
+    expect(sheet.canApprove).toBe(false);
+    expect(
+      (await send('POST', `/api/characters/${id}/approval`, { index: 0, approved: true })).status,
+    ).toBe(403);
+
+    const ch = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '222',
+      name: 'Altrui',
+      sect: 'anarch',
+    });
+    if (typeof ch !== 'object') throw new Error('setup');
+    expect(store.campaign.join(ch.id, id)).toBe('ok');
+    // The owner still can't approve their own choices; the other Storyteller can.
+    expect(
+      (await send('POST', `/api/characters/${id}/approval`, { index: 0, approved: true })).status,
+    ).toBe(403);
+    const own = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Mia',
+      sect: 'anarch',
+    });
+    if (typeof own !== 'object') throw new Error('setup');
+    store.campaign.leave(id);
+    store.campaign.join(own.id, id);
+    const ok = await send('POST', `/api/characters/${id}/approval`, { index: 1, approved: false });
+    expect(ok.status).toBe(200);
+    expect(store.campaign.getSheet(id)?.approvals).toMatchObject([
+      { code: 'brood-child', status: 'pending' },
+      { code: 'path', status: 'rejected' },
+    ]);
+    expect(
+      (await send('POST', `/api/characters/${id}/approval`, { index: 5, approved: true })).status,
+    ).toBe(400);
+
+    // Someone else's character is not found.
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altro',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 2, composure: 2, resolve: 2 }),
+      sheet: { data: brujah(), approvals: [] },
+    });
+    if (typeof theirs !== 'object') throw new Error('setup');
+    expect((await send('GET', `/api/characters/${theirs.id}/sheet`)).status).toBe(404);
+    expect((await get('/scheda')).status).toBe(302);
+  });
 });
