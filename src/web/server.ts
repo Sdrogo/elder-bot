@@ -42,8 +42,11 @@ import {
   BACKGROUND_TYPES,
   LAYOUTS,
   MAX_BACKGROUND,
+  GRID,
   MAX_PORTRAIT,
   RESOLUTIONS,
+  cleanLayoutName,
+  parseLayoutItems,
   camLinks,
   imageType,
   isLayout,
@@ -266,6 +269,7 @@ export function overlayView(store: Store, userId: string) {
   const characters = live ? overlayCharacters(campaign.members(live.id)) : [];
   const stage = store.stage.settings(userId);
   const [width, height] = RESOLUTIONS[stage.resolution];
+  const custom = store.stage.activeLayout(userId);
   return {
     // The /scena page: its size, where the frames go, the background and the roll box.
     stage: {
@@ -275,8 +279,13 @@ export function overlayView(store: Store, userId: string) {
       rollBox: stage.rollBox,
       background: stage.background ?? null,
       cam: stage.cam ?? null,
+      // A saved layout from the editor, in cells of the grid; null for the automatic one.
+      grid: GRID,
+      custom: custom ? { name: custom.name, items: custom.items } : null,
     },
     roll: (live && store.stage.lastRoll(live.id)) ?? null,
+    // The last rolls, newest first, for a roll box taller than it is wide.
+    rolls: custom && live ? store.stage.recentRolls(live.id) : [],
     chronicle: live
       ? { slug: live.slug, name: live.name, sect: live.sect, masquerade: live.masquerade }
       : null,
@@ -833,9 +842,13 @@ export function createPanelHandler(deps: PanelDeps) {
     res: ServerResponse,
     me: WebSession,
     action: string | undefined,
+    idText?: string,
   ) {
     const method = req.method ?? 'GET';
     const isBackground = action === 'background';
+    if (idText !== undefined && action !== 'layouts') {
+      return json(res, 404, { error: 'not found' });
+    }
     const data = await readBytes(req, isBackground ? MAX_BACKGROUND : MAX_BODY);
     if (data === undefined) return json(res, 413, { error: 'body too large' });
     if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
@@ -866,9 +879,42 @@ export function createPanelHandler(deps: PanelDeps) {
       else return json(res, 404, { error: 'not found' });
       return ok();
     }
-    if (method !== 'POST' || action !== undefined) return json(res, 404, { error: 'not found' });
+    if (action === 'layouts' && method === 'DELETE' && idText !== undefined) {
+      return stage.deleteLayout(me.userId, Number(idText))
+        ? ok()
+        : json(res, 404, { error: 'not found' });
+    }
+    if (method !== 'POST' || idText !== undefined) return json(res, 404, { error: 'not found' });
     const body = parseObject(data.toString('utf8'));
     if (!body) return json(res, 400, { error: 'invalid body' });
+    if (action === 'layouts') {
+      // POST /api/stage/layouts {id?, name, items}: a new layout, or changes to one.
+      const name = cleanLayoutName(body.name);
+      const items = parseLayoutItems(body.items);
+      if (!name) return json(res, 400, { error: 'invalid', field: 'name' });
+      if (!items) return json(res, 400, { error: 'invalid', field: 'items' });
+      if (body.id !== undefined && !isInt(body.id, 1, Number.MAX_SAFE_INTEGER)) {
+        return json(res, 400, { error: 'invalid', field: 'id' });
+      }
+      const saved = stage.saveLayout(me.userId, {
+        ...(body.id !== undefined ? { id: body.id } : {}),
+        name,
+        items,
+      });
+      if (saved === 'missing') return json(res, 404, { error: 'not found' });
+      if (typeof saved === 'string') return json(res, 409, { error: saved });
+      return json(res, 200, { layout: saved });
+    }
+    if (action === 'layout') {
+      // POST /api/stage/layout {id}: that saved layout on the scene; {id: null} the automatic one.
+      if (body.id !== null && !isInt(body.id, 1, Number.MAX_SAFE_INTEGER)) {
+        return json(res, 400, { error: 'invalid', field: 'id' });
+      }
+      return stage.useLayout(me.userId, body.id ?? undefined)
+        ? ok()
+        : json(res, 404, { error: 'not found' });
+    }
+    if (action !== undefined) return json(res, 404, { error: 'not found' });
     const patch: Parameters<typeof stage.update>[1] = {};
     if (body.resolution !== undefined) {
       if (!isResolution(body.resolution))
@@ -1055,7 +1101,10 @@ export function createPanelHandler(deps: PanelDeps) {
       });
     }
 
-    if (method !== 'POST' || !['/api/overlay/adjust', '/api/overlay/live'].includes(path)) {
+    if (
+      method !== 'POST' ||
+      !['/api/overlay/adjust', '/api/overlay/live', '/api/overlay/layout'].includes(path)
+    ) {
       return json(res, 404, { error: 'not found' });
     }
     if (!limiter.allow(`change:${userId}`, RATE_LIMIT)) {
@@ -1077,6 +1126,36 @@ export function createPanelHandler(deps: PanelDeps) {
       if (!target) return json(res, 404, { error: 'no Chronicle with that id' });
       campaign.setLive(target.id);
       return json(res, 200, { ok: true });
+    }
+
+    if (path === '/api/overlay/layout') {
+      // Stream Deck: ?name=Combattimento puts that saved layout on the scene, ?step=1 (or -1)
+      // goes to the next (or previous) one, ?auto=1 back to the automatic layout.
+      const saved = store.stage.layouts(userId);
+      let target: (typeof saved)[number] | undefined;
+      if (body.auto !== undefined && body.auto !== '0' && body.auto !== false) {
+        store.stage.useLayout(userId, undefined);
+        return json(res, 200, { ok: true, layout: null });
+      }
+      if (typeof body.name === 'string') {
+        const wanted = body.name.trim().toLowerCase();
+        target = saved.find((l) => l.name.toLowerCase() === wanted);
+        if (!target) return json(res, 404, { error: 'no layout with that name' });
+      } else if (body.step !== undefined) {
+        const step = Number(body.step);
+        if (!Number.isInteger(step) || !saved.length) {
+          return json(res, 400, { error: 'bad step, or no saved layouts' });
+        }
+        const current = saved.findIndex((l) => l.id === store.stage.settings(userId).activeLayout);
+        // From the automatic layout, +1 goes to the first saved one and -1 to the last.
+        const from = current === -1 ? (step > 0 ? -1 : saved.length) : current;
+        const n = saved.length;
+        target = saved[(((from + step) % n) + n) % n];
+      } else {
+        return json(res, 400, { error: 'name, step or auto needed' });
+      }
+      store.stage.useLayout(userId, target!.id);
+      return json(res, 200, { ok: true, layout: target!.name });
     }
 
     // POST /api/overlay/adjust {pg, track, field?, delta}: the overlay's Stream Deck keys.
@@ -1242,6 +1321,9 @@ export function createPanelHandler(deps: PanelDeps) {
                 cam: stage.cam ? camLinks(stage.cam, 'Storyteller') : null,
               },
               layouts: LAYOUTS,
+              saved: store.stage.layouts(me.userId),
+              activeLayout: stage.activeLayout ?? null,
+              grid: GRID,
               resolutions: Object.keys(RESOLUTIONS),
               backgroundTypes: BACKGROUND_TYPES,
             }
@@ -1279,8 +1361,10 @@ export function createPanelHandler(deps: PanelDeps) {
     const draftPath = /^\/api\/drafts(?:\/(\d{1,12})(?:\/(create))?)?$/.exec(path);
     if (draftPath) return draftsApi(req, res, me, method, draftPath[1], draftPath[2]);
 
-    const stagePath = /^\/api\/stage(?:\/(cam|background))?$/.exec(path);
-    if (stagePath) return stageChange(req, res, me, stagePath[1]);
+    const stagePath = /^\/api\/stage(?:\/(cam|background|layouts|layout))?(?:\/(\d{1,12}))?$/.exec(
+      path,
+    );
+    if (stagePath) return stageChange(req, res, me, stagePath[1], stagePath[2]);
 
     const portraitPath = /^\/api\/characters\/(\d{1,12})\/portrait$/.exec(path);
     if (portraitPath) return portraitApi(req, res, me, method, Number(portraitPath[1]));

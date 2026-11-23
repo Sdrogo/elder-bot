@@ -6,7 +6,7 @@
 // (https://<panel>/overlay/scena?v=<view key>), so every address here is relative.
 'use strict';
 
-const { CLANS, SECTS, el, sceneLayout, rollBoxRect, camUrl, trackerIcon, diceArt, die } =
+const { CLANS, SECTS, el, sceneLayout, customSlots, rollBoxRect, camUrl, trackerIcon, die } =
   window.ELDER;
 const sceneMode = window.location.pathname.endsWith('/scena');
 const params = new URLSearchParams(window.location.search);
@@ -95,12 +95,11 @@ function numberCell(kind, label, current, max, note, hot) {
   );
 }
 
-/** The Hunger die that sits beside Vitae: a red ankh with the number of Hunger dice. */
+/** The Hunger beside Vitae: just its number, faded at 0. */
 function hungerDie(c, before) {
-  const icon = el('span', `die hunger success${c.hunger > 0 ? '' : ' none'}`, diceArt('success'));
-  icon.append(el('b', '', String(c.hunger)));
-  if (before && before.hunger !== c.hunger) icon.classList.add('hot');
-  const wrap = el('span', 'nx hunger', icon);
+  const value = el('b', c.hunger > 0 ? 'hn' : 'hn none', String(c.hunger));
+  if (before && before.hunger !== c.hunger) value.classList.add('hot');
+  const wrap = el('span', 'nx hunger', value);
   wrap.title = `Hunger ${c.hunger}`;
   return wrap;
 }
@@ -310,16 +309,42 @@ function renderScene(state) {
     renderCharacter(c, prev && prev.characters.find((x) => x.id === c.id)),
   );
   frames.push(renderStoryteller(state.chronicle, prev && prev.chronicle, stage.cam));
-  const slots = sceneLayout(frames.length, stage);
   const k = stage.width / 1920;
-  const nodes = frames.map((frame, i) => {
+  let slots;
+  let rollRect = stage.rollBox ? rollBoxRect(stage.width) : null;
+  if (stage.custom) {
+    // A saved layout: each frame where the Storyteller put it; players without a box stay out.
+    const grid = stage.grid || {};
+    const custom = customSlots(stage.custom.items, state.characters.length, {
+      width: stage.width,
+      height: stage.height,
+      cols: grid.cols,
+      rows: grid.rows,
+    });
+    slots = custom.frames;
+    rollRect = custom.roll;
+  } else slots = sceneLayout(frames.length, stage);
+  const nodes = [];
+  frames.forEach((frame, i) => {
+    if (!slots[i]) return;
     const slot = place(el('div', 'slot', frame), slots[i]);
     if (slots[i].w / k < 540) slot.classList.add('compact');
-    return slot;
+    nodes.push(slot);
   });
-  if (stage.rollBox) {
-    const box = renderRoll(state.roll, prev && prev.roll);
-    nodes.push(place(el('div', 'slot roll-slot', box), rollBoxRect(stage.width)));
+  if (rollRect) {
+    const slot = el('div', 'slot roll-slot');
+    if (stage.custom) {
+      // A box taller than a strip shows the last rolls one under the other.
+      slot.classList.add('custom');
+      if (rollRect.w / k < 620) slot.classList.add('narrow');
+      const tall = rollRect.h > rollRect.w * 0.3;
+      if (tall && state.rolls && state.rolls.length) {
+        const list = el('div', 'roll-history');
+        state.rolls.forEach((r, i) => list.append(renderRoll(r, i === 0 ? prev && prev.roll : r)));
+        slot.append(list);
+      } else slot.append(renderRoll(state.roll, prev && prev.roll));
+    } else slot.append(renderRoll(state.roll, prev && prev.roll));
+    nodes.push(place(slot, rollRect));
   }
   root.replaceChildren(...nodes);
 }

@@ -128,6 +128,7 @@ button,
 
 .track .label {
   min-width: 78px;
+  white-space: nowrap;
 }
 
 .track .value {
@@ -412,4 +413,63 @@ a.button.primary {
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid var(--line);
+}
+
+/* Layout editor: the scene in small, 16:9, with its 32 × 18 grid. */
+.layout-editor .editor summary {
+  cursor: pointer;
+  color: var(--quiet);
+  margin: 0.5rem 0;
+}
+.grid-canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 0.5rem 0;
+  background-color: #0b090c;
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+  border: 1px solid var(--line);
+  touch-action: none;
+  user-select: none;
+}
+.cell-box {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  font-size: 12px;
+  overflow: hidden;
+  cursor: move;
+  background: #b3122e55;
+  border: 1px solid #e0454b;
+  border-radius: 4px;
+}
+.cell-box.st {
+  background: #c9a45c44;
+  border-color: #c9a45c;
+}
+.cell-box.roll {
+  background: #3fae4a33;
+  border-color: #3fae4a;
+}
+.cell-box.overlap {
+  outline: 2px dashed #ff6b70;
+  outline-offset: -3px;
+}
+.cell-box .resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--text) 50%);
+}
+.layout-editor .toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
 }

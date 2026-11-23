@@ -85,6 +85,26 @@ const TEXT = {
     'layout.grid': 'Griglia: tutte le cornici uguali',
     'layout.stage': 'Palco: Narratore grande in alto, giocatori sotto',
     'layout.sides': 'Ai lati: giocatori a sinistra e a destra, Narratore al centro',
+    'editor.title': 'Layout personalizzati',
+    'editor.onAir': 'Layout in scena',
+    'editor.auto': 'Automatico (la disposizione qui sopra)',
+    'editor.edit': 'Editor del layout',
+    'editor.which': 'Layout da modificare',
+    'editor.new': 'Nuovo layout',
+    'editor.name': 'Nome',
+    'editor.players': 'Cornici dei giocatori',
+    'editor.startFrom': 'Parti da',
+    'editor.note':
+      'Trascina un riquadro per spostarlo e l’angolo in basso a destra per ridimensionarlo: tutto si aggancia alla griglia di 32 × 18 caselle. Le cornici dei giocatori seguono l’ordine della Cronaca; il riquadro dei tiri, se è più alto che largo, mostra gli ultimi tiri uno sotto l’altro. I riquadri rossi si sovrappongono.',
+    'editor.storyteller': 'Narratore',
+    'editor.player': 'Giocatore',
+    'editor.roll': 'Tiri',
+    'editor.hide': 'nascosto',
+    'editor.save': 'Salva',
+    'editor.saveUse': 'Salva e metti in scena',
+    'editor.delete': 'Elimina layout',
+    'editor.streamDeck':
+      'Stream Deck: con la chiave di modifica (header X-Elder-Token), POST a {url}?name=<nome> mette in scena quel layout, ?step=1 passa al successivo, ?step=-1 al precedente, ?auto=1 torna a quello automatico.',
     'overlay.roll': 'Solo il riquadro dei tiri',
     'overlay.title': 'Overlay di OBS',
     'overlay.pages':
@@ -190,6 +210,26 @@ const TEXT = {
     'layout.grid': 'Grid: all frames alike',
     'layout.stage': 'Stage: Storyteller large on top, players below',
     'layout.sides': 'Sides: players left and right, Storyteller in the middle',
+    'editor.title': 'Custom layouts',
+    'editor.onAir': 'Layout on the scene',
+    'editor.auto': 'Automatic (the layout above)',
+    'editor.edit': 'Layout editor',
+    'editor.which': 'Layout to edit',
+    'editor.new': 'New layout',
+    'editor.name': 'Name',
+    'editor.players': 'Player frames',
+    'editor.startFrom': 'Start from',
+    'editor.note':
+      'Drag a box to move it and its bottom-right corner to resize it: everything snaps to the 32 × 18 grid. Player frames follow the Chronicle order; a roll box taller than it is wide shows the last rolls one under the other. Red boxes overlap.',
+    'editor.storyteller': 'Storyteller',
+    'editor.player': 'Player',
+    'editor.roll': 'Rolls',
+    'editor.hide': 'hidden',
+    'editor.save': 'Save',
+    'editor.saveUse': 'Save and put on the scene',
+    'editor.delete': 'Delete layout',
+    'editor.streamDeck':
+      'Stream Deck: with the edit key (X-Elder-Token header), POST to {url}?name=<name> puts that layout on the scene, ?step=1 goes to the next, ?step=-1 to the previous, ?auto=1 back to the automatic one.',
     'overlay.roll': 'Roll box only',
     'overlay.title': 'OBS overlay',
     'overlay.pages':
@@ -665,6 +705,234 @@ function copyField(label, value) {
   return field(label, row);
 }
 
+/**
+ * The layout being edited: kept here, outside the page, so a reload of the panel (any change
+ * anywhere) doesn't lose unsaved moves. `id` is undefined for a new layout.
+ */
+let layoutDraft = null;
+
+const boxesOverlap = (a, b) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Saved layouts for OBS: the one on the scene, and an editor on a 32 × 18 grid. */
+function layoutEditor(pages) {
+  const E = window.ELDER;
+  const grid = pages.grid ?? { cols: 32, rows: 18 };
+  const saved = pages.saved ?? [];
+  const box = el('div', 'stage-box layout-editor');
+  box.append(el('h4', '', tr('editor.title')));
+
+  // Which layout is on the scene; the Stream Deck changes the same setting.
+  const onAir = select(
+    'active',
+    [
+      { id: '', name: tr('editor.auto') },
+      ...saved.map((l) => ({ id: String(l.id), name: l.name })),
+    ],
+    pages.activeLayout ? String(pages.activeLayout) : '',
+  );
+  onAir.addEventListener('change', () =>
+    change('POST', '/api/stage/layout', { id: onAir.value ? Number(onAir.value) : null }),
+  );
+  box.append(
+    field(tr('editor.onAir'), onAir),
+    el(
+      'p',
+      'note',
+      tr('editor.streamDeck').replace('{url}', `${location.origin}/api/overlay/layout`),
+    ),
+  );
+  if (!E?.presetItems) return box;
+
+  const defaultPlayers = Math.max(1, Math.min(12, pages.characters.length || 4));
+  const fresh = (players = defaultPlayers) => ({
+    id: undefined,
+    name: '',
+    items: E.presetItems(players, 'grid', grid),
+  });
+  // A draft of a layout that was deleted meanwhile starts again from scratch.
+  if (layoutDraft && layoutDraft.id !== undefined && !saved.some((l) => l.id === layoutDraft.id)) {
+    layoutDraft = null;
+  }
+  layoutDraft ??= fresh();
+  const draft = layoutDraft;
+
+  const details = el('details', 'editor');
+  details.open = true;
+  details.append(el('summary', '', tr('editor.edit')));
+
+  const which = select(
+    'which',
+    [{ id: '', name: tr('editor.new') }, ...saved.map((l) => ({ id: String(l.id), name: l.name }))],
+    draft.id === undefined ? '' : String(draft.id),
+  );
+  which.addEventListener('change', () => {
+    const found = saved.find((l) => String(l.id) === which.value);
+    layoutDraft = found
+      ? { id: found.id, name: found.name, items: JSON.parse(JSON.stringify(found.items)) }
+      : fresh();
+    loadPanel();
+  });
+  const name = el('input');
+  name.maxLength = 32;
+  name.value = draft.name;
+  name.addEventListener('input', () => (draft.name = name.value));
+  const players = el('input');
+  players.type = 'number';
+  players.min = '0';
+  players.max = '12';
+  players.value = String(draft.items.players.length);
+  players.addEventListener('change', () => {
+    const n = Math.max(0, Math.min(12, Number(players.value) || 0));
+    const list = draft.items.players;
+    // New frames start in the top-left corner, small, ready to be dragged into place.
+    while (list.length < n) list.push({ x: 0, y: 0, w: 6, h: 4 });
+    list.length = n;
+    draw();
+  });
+  details.append(
+    field(tr('editor.which'), which),
+    field(tr('editor.name'), name),
+    field(tr('editor.players'), players),
+  );
+
+  const presets = el('div', 'actions');
+  presets.append(el('span', 'note', tr('editor.startFrom')));
+  for (const id of pages.layouts) {
+    presets.append(
+      button(tr(`layout.${id}`).split(':')[0], () => {
+        draft.items = E.presetItems(draft.items.players.length, id, grid);
+        draw();
+      }),
+    );
+  }
+  details.append(presets, el('p', 'note', tr('editor.note')));
+
+  // The scene in small: a 16:9 box with the grid drawn on it, the frames as boxes.
+  const canvas = el('div', 'grid-canvas');
+  canvas.style.setProperty('--cols', String(grid.cols));
+  canvas.style.setProperty('--rows', String(grid.rows));
+  const toggles = el('div', 'toggles');
+  details.append(canvas, toggles);
+
+  const entries = () => [
+    ...draft.items.players.map((b, i) => ({ b, label: `${tr('editor.player')} ${i + 1}` })),
+    { b: draft.items.storyteller, label: tr('editor.storyteller'), cls: 'st' },
+    { b: draft.items.roll, label: tr('editor.roll'), cls: 'roll' },
+  ];
+
+  function draw() {
+    canvas.replaceChildren();
+    toggles.replaceChildren();
+    const list = entries();
+    for (const entry of list) {
+      const { b } = entry;
+      const hide = el('input');
+      hide.type = 'checkbox';
+      hide.checked = !!b.hidden;
+      hide.addEventListener('change', () => {
+        if (hide.checked) b.hidden = true;
+        else delete b.hidden;
+        draw();
+      });
+      const t = el('label', 'check');
+      t.append(hide, el('span', '', `${entry.label} · ${tr('editor.hide')}`));
+      toggles.append(t);
+      if (b.hidden) continue;
+      const node = el('div', `cell-box ${entry.cls ?? ''}`, entry.label);
+      const overlap = list.some((o) => o !== entry && !o.b.hidden && boxesOverlap(o.b, b));
+      if (overlap) node.classList.add('overlap');
+      position(node, b);
+      const handle = el('span', 'resize');
+      node.append(handle);
+      drag(node, node, b, false);
+      drag(handle, node, b, true);
+      canvas.append(node);
+    }
+  }
+
+  function position(node, b) {
+    node.style.left = `${(b.x / grid.cols) * 100}%`;
+    node.style.top = `${(b.y / grid.rows) * 100}%`;
+    node.style.width = `${(b.w / grid.cols) * 100}%`;
+    node.style.height = `${(b.h / grid.rows) * 100}%`;
+  }
+
+  /**
+   * Moves (or with `resize`, stretches) a box cell by cell while the pointer is down; the
+   * overlaps are worked out again when it is let go.
+   */
+  function drag(target, node, b, resize) {
+    target.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      target.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      const cw = rect.width / grid.cols;
+      const ch = rect.height / grid.rows;
+      const start = { ...b, px: e.clientX, py: e.clientY };
+      const move = (ev) => {
+        const dx = Math.round((ev.clientX - start.px) / cw);
+        const dy = Math.round((ev.clientY - start.py) / ch);
+        if (resize) {
+          b.w = Math.max(2, Math.min(grid.cols - b.x, start.w + dx));
+          b.h = Math.max(2, Math.min(grid.rows - b.y, start.h + dy));
+        } else {
+          b.x = Math.max(0, Math.min(grid.cols - b.w, start.x + dx));
+          b.y = Math.max(0, Math.min(grid.rows - b.h, start.y + dy));
+        }
+        position(node, b);
+      };
+      const up = () => {
+        draw();
+        target.removeEventListener('pointermove', move);
+        target.removeEventListener('pointerup', up);
+        target.removeEventListener('pointercancel', up);
+      };
+      target.addEventListener('pointermove', move);
+      target.addEventListener('pointerup', up);
+      target.addEventListener('pointercancel', up);
+    });
+  }
+  draw();
+
+  const save = async (use) => {
+    const body = { name: draft.name.trim(), items: draft.items };
+    if (draft.id !== undefined) body.id = draft.id;
+    const response = await fetch('/api/stage/layouts', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': me.csrf },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const key = { duplicate: 'error.duplicate', limit: 'error.limit', invalid: 'error.invalid' };
+      return notify(tr(key[data.error] ?? 'error.change'));
+    }
+    draft.id = data.layout.id;
+    if (use) return change('POST', '/api/stage/layout', { id: data.layout.id });
+    return loadPanel();
+  };
+  const actions = el('div', 'actions');
+  actions.append(
+    button(tr('editor.save'), () => save(false)),
+    button(tr('editor.saveUse'), () => save(true)),
+  );
+  if (draft.id !== undefined) {
+    actions.append(
+      confirmButton(tr('editor.delete'), () => {
+        const id = draft.id;
+        layoutDraft = null;
+        return change('DELETE', `/api/stage/layouts/${id}`);
+      }),
+    );
+  }
+  details.append(actions);
+  box.append(details);
+  return box;
+}
+
 /** The scene's settings: size, layout, roll box, background and the Storyteller's webcam. */
 function stageBox(pages) {
   const st = pages.stage;
@@ -769,7 +1037,7 @@ function overlayBox(newKey) {
       copyField(tr('overlay.roll'), `${base}/frame?pg=tiro&${v}`),
       ...pages.characters.map((c) => copyField(c.name, `${base}/frame?pg=${c.id}&${v}`)),
     );
-    box.append(stageBox(pages));
+    box.append(stageBox(pages), layoutEditor(pages));
     const layout = window.ELDER?.sceneLayout;
     if (layout) {
       const names = [...pages.characters.map((c) => c.name), 'Storyteller'];

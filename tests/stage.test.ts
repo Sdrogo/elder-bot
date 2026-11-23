@@ -236,3 +236,87 @@ describe('roll box', () => {
     expect(overlayView(store, '111').roll!.label).toBe('NPC');
   });
 });
+
+describe('saved layouts', () => {
+  const items = {
+    players: [
+      { x: 20, y: 0, w: 8, h: 6 },
+      { x: 20, y: 6, w: 8, h: 6, hidden: true },
+    ],
+    storyteller: { x: 0, y: 0, w: 20, h: 13 },
+    roll: { x: 28, y: 0, w: 4, h: 18 },
+  };
+
+  it('are saved on the grid, put on the scene and reach the overlay', async () => {
+    const ch = chronicle();
+    store.campaign.join(ch.id, character('222', 'Lucrezia').id);
+    const { send } = await panel();
+    const bad = { ...items, roll: { x: 30, y: 0, w: 4, h: 18 } };
+    expect((await send('POST', '/api/stage/layouts', { name: 'Fuori', items: bad })).status).toBe(
+      400,
+    );
+    expect((await send('POST', '/api/stage/layouts', { name: '', items })).status).toBe(400);
+    const res = await send('POST', '/api/stage/layouts', { name: 'Combattimento', items });
+    expect(res.status).toBe(200);
+    const { layout } = (await res.json()) as { layout: { id: number } };
+    expect(
+      (await send('POST', '/api/stage/layouts', { name: 'combattimento', items })).status,
+    ).toBe(409);
+
+    expect(overlayView(store, '111').stage.custom).toBeNull();
+    expect((await send('POST', '/api/stage/layout', { id: layout.id })).status).toBe(200);
+    expect(overlayView(store, '111').stage.custom).toEqual({ name: 'Combattimento', items });
+
+    expect((await send('DELETE', `/api/stage/layouts/${layout.id}`)).status).toBe(200);
+    expect(overlayView(store, '111').stage.custom).toBeNull();
+  });
+
+  it('are only for Storytellers and at most ten each', async () => {
+    const { send } = await panel();
+    expect((await send('POST', '/api/stage/layouts', { name: 'X', items })).status).toBe(403);
+    chronicle();
+    for (let i = 0; i < 10; i++) {
+      expect((await send('POST', '/api/stage/layouts', { name: `L${i}`, items })).status).toBe(200);
+    }
+    expect((await send('POST', '/api/stage/layouts', { name: 'L10', items })).status).toBe(409);
+  });
+
+  it('switch from the Stream Deck by name, in turn, or back to automatic', async () => {
+    chronicle();
+    const a = store.stage.saveLayout('111', { name: 'Dialogo', items });
+    const b = store.stage.saveLayout('111', { name: 'Combattimento', items });
+    if (typeof a !== 'object' || typeof b !== 'object') throw new Error('setup');
+    const key = store.overlayKeys.create('111');
+    const deck = (query: string) =>
+      fetch(`${base}/api/overlay/layout?${query}`, {
+        method: 'POST',
+        headers: { 'x-elder-token': key },
+      });
+    expect((await deck('name=COMBATTIMENTO')).status).toBe(200);
+    expect(store.stage.settings('111').activeLayout).toBe(b.id);
+    await deck('step=1');
+    expect(store.stage.settings('111').activeLayout).toBe(a.id);
+    await deck('step=-1');
+    expect(store.stage.settings('111').activeLayout).toBe(b.id);
+    await deck('auto=1');
+    expect(store.stage.settings('111').activeLayout).toBeUndefined();
+    expect((await deck('name=Nessuno')).status).toBe(404);
+    expect((await deck('')).status).toBe(400);
+  });
+
+  it('keep the last ten rolls of a Chronicle, newest first', () => {
+    const ch = chronicle();
+    for (let i = 0; i < 12; i++) {
+      store.stage.recordRoll(ch.id, {
+        label: `Tiro ${i}`,
+        sides: [],
+        outcome: '',
+        tone: 'neutral',
+      });
+    }
+    const rolls = store.stage.recentRolls(ch.id);
+    expect(rolls).toHaveLength(10);
+    expect(rolls[0]!.label).toBe('Tiro 11');
+    expect(rolls[9]!.label).toBe('Tiro 2');
+  });
+});

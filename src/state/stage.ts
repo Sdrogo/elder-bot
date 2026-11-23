@@ -20,6 +20,70 @@ export const MAX_BACKGROUND = 8 * 1024 * 1024;
 export const MAX_PORTRAIT = 2 * 1024 * 1024;
 
 export const isLayout = (v: unknown): v is Layout => LAYOUTS.includes(v as Layout);
+
+/** The scene editor's grid: 32×18 cells, 60 px each at 1080p and 80 px at 1440p. */
+export const GRID = { cols: 32, rows: 18 } as const;
+/** Saved layouts per Storyteller, player frames per layout, and rolls kept per Chronicle. */
+export const MAX_LAYOUTS = 10;
+export const MAX_LAYOUT_PLAYERS = 12;
+export const ROLL_HISTORY = 10;
+
+/** One component of a saved layout, in grid cells: the whole frame, bands included. */
+export interface LayoutBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  hidden?: boolean;
+}
+
+/** Where everything goes: the players' frames in their Chronicle order, the Storyteller, the rolls. */
+export interface LayoutItems {
+  players: LayoutBox[];
+  storyteller: LayoutBox;
+  roll: LayoutBox;
+}
+
+export interface SavedLayout {
+  id: number;
+  name: string;
+  items: LayoutItems;
+}
+
+function parseBox(v: unknown): LayoutBox | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const b = v as Record<string, unknown>;
+  const int = (n: unknown, min: number, max: number) =>
+    Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
+  if (!int(b.x, 0, GRID.cols - 1) || !int(b.y, 0, GRID.rows - 1)) return undefined;
+  if (!int(b.w, 2, GRID.cols) || !int(b.h, 2, GRID.rows)) return undefined;
+  const box = { x: b.x as number, y: b.y as number, w: b.w as number, h: b.h as number };
+  if (box.x + box.w > GRID.cols || box.y + box.h > GRID.rows) return undefined;
+  if (b.hidden !== undefined && typeof b.hidden !== 'boolean') return undefined;
+  return b.hidden ? { ...box, hidden: true } : box;
+}
+
+/** A layout from the panel, checked cell by cell; undefined if anything is off the grid. */
+export function parseLayoutItems(v: unknown): LayoutItems | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  if (!Array.isArray(o.players) || o.players.length > MAX_LAYOUT_PLAYERS) return undefined;
+  const players = o.players.map(parseBox);
+  const storyteller = parseBox(o.storyteller);
+  const roll = parseBox(o.roll);
+  if (!storyteller || !roll || players.some((p) => !p)) return undefined;
+  return { players: players as LayoutBox[], storyteller, roll };
+}
+
+/** Layout names: what the Stream Deck key sends, 1–32 visible characters. */
+export function cleanLayoutName(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const name = [...v]
+    .filter((ch) => ch.charCodeAt(0) >= 32 && ch !== '\u007f')
+    .join('')
+    .trim();
+  return name.length >= 1 && name.length <= 32 ? name : undefined;
+}
 export const isResolution = (v: unknown): v is Resolution =>
   typeof v === 'string' && Object.hasOwn(RESOLUTIONS, v);
 
@@ -32,6 +96,8 @@ export interface StageSettings {
   cam?: string;
   /** A short hash of the background image, which changes with it; none without one. */
   background?: string;
+  /** The saved layout in use; none for the automatic one (`layout`). */
+  activeLayout?: number;
 }
 
 /** One side of a roll as the overlay shows it: dice faces and successes. */
@@ -91,7 +157,21 @@ export class Stage {
       CREATE TABLE IF NOT EXISTS chronicle_rolls (
         chronicle_id INTEGER PRIMARY KEY REFERENCES chronicles (id) ON DELETE CASCADE,
         roll TEXT NOT NULL, at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS roll_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chronicle_id INTEGER NOT NULL REFERENCES chronicles (id) ON DELETE CASCADE,
+        roll TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS roll_history_chronicle ON roll_history (chronicle_id, id);
+      CREATE TABLE IF NOT EXISTS stage_layouts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, name TEXT NOT NULL, items TEXT NOT NULL,
+        UNIQUE (user_id, name));
     `);
+    // Added with the saved layouts: older databases get the column here.
+    const columns = db.prepare('PRAGMA table_info(stage_settings)').all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'active_layout')) {
+      db.exec('ALTER TABLE stage_settings ADD COLUMN active_layout INTEGER');
+    }
   }
 
   // Webcams of the characters.
@@ -154,8 +234,8 @@ export class Stage {
   settings(userId: string): StageSettings {
     const row = this.db
       .prepare(
-        `SELECT resolution, layout, roll_box, cam, background_tag FROM stage_settings
-         WHERE user_id = ?`,
+        `SELECT resolution, layout, roll_box, cam, background_tag, active_layout
+         FROM stage_settings WHERE user_id = ?`,
       )
       .get(userId) as
       | {
@@ -164,6 +244,7 @@ export class Stage {
           roll_box: number;
           cam: string | null;
           background_tag: string | null;
+          active_layout: number | null;
         }
       | undefined;
     if (!row) return { ...DEFAULTS };
@@ -173,6 +254,7 @@ export class Stage {
       rollBox: row.roll_box === 1,
       ...(row.cam ? { cam: row.cam } : {}),
       ...(row.background_tag ? { background: row.background_tag } : {}),
+      ...(row.active_layout !== null ? { activeLayout: row.active_layout } : {}),
     };
   }
 
@@ -240,6 +322,73 @@ export class Stage {
       .run(userId);
   }
 
+  // The Storyteller's saved layouts.
+
+  layouts(userId: string): SavedLayout[] {
+    const rows = this.db
+      .prepare('SELECT id, name, items FROM stage_layouts WHERE user_id = ? ORDER BY id')
+      .all(userId) as { id: number; name: string; items: string }[];
+    return rows.flatMap((r) => {
+      const items = parseLayoutItems(JSON.parse(r.items));
+      return items ? [{ id: r.id, name: r.name, items }] : [];
+    });
+  }
+
+  /** Saves a new layout (no `id`) or replaces one; the name must be the user's only one. */
+  saveLayout(
+    userId: string,
+    layout: { id?: number; name: string; items: LayoutItems },
+  ): SavedLayout | 'limit' | 'duplicate' | 'missing' {
+    const mine = this.layouts(userId);
+    const clash = mine.find(
+      (l) => l.name.toLowerCase() === layout.name.toLowerCase() && l.id !== layout.id,
+    );
+    if (clash) return 'duplicate';
+    const items = JSON.stringify(layout.items);
+    if (layout.id !== undefined) {
+      const info = this.db
+        .prepare('UPDATE stage_layouts SET name = ?, items = ? WHERE id = ? AND user_id = ?')
+        .run(layout.name, items, layout.id, userId);
+      if (!info.changes) return 'missing';
+      return { id: layout.id, name: layout.name, items: layout.items };
+    }
+    if (mine.length >= MAX_LAYOUTS) return 'limit';
+    const info = this.db
+      .prepare('INSERT INTO stage_layouts (user_id, name, items) VALUES (?, ?, ?)')
+      .run(userId, layout.name, items);
+    return { id: Number(info.lastInsertRowid), name: layout.name, items: layout.items };
+  }
+
+  deleteLayout(userId: string, id: number): boolean {
+    const info = this.db
+      .prepare('DELETE FROM stage_layouts WHERE id = ? AND user_id = ?')
+      .run(id, userId);
+    if (info.changes) {
+      this.db
+        .prepare(
+          'UPDATE stage_settings SET active_layout = NULL WHERE user_id = ? AND active_layout = ?',
+        )
+        .run(userId, id);
+    }
+    return info.changes > 0;
+  }
+
+  /** Puts a saved layout on the scene, or the automatic one with `undefined`. */
+  useLayout(userId: string, id: number | undefined): boolean {
+    if (id !== undefined && !this.layouts(userId).some((l) => l.id === id)) return false;
+    this.ensure(userId);
+    this.db
+      .prepare('UPDATE stage_settings SET active_layout = ? WHERE user_id = ?')
+      .run(id ?? null, userId);
+    return true;
+  }
+
+  /** The saved layout on the scene, if any. */
+  activeLayout(userId: string): SavedLayout | undefined {
+    const id = this.settings(userId).activeLayout;
+    return id === undefined ? undefined : this.layouts(userId).find((l) => l.id === id);
+  }
+
   // The last roll of each Chronicle.
 
   recordRoll(chronicleId: number, roll: Omit<ShownRoll, 'at'>): void {
@@ -250,6 +399,24 @@ export class Stage {
          ON CONFLICT (chronicle_id) DO UPDATE SET roll = excluded.roll, at = excluded.at`,
       )
       .run(chronicleId, JSON.stringify({ ...roll, at }), at);
+    // The history for tall roll boxes: the last few rolls, oldest dropped.
+    this.db
+      .prepare('INSERT INTO roll_history (chronicle_id, roll) VALUES (?, ?)')
+      .run(chronicleId, JSON.stringify({ ...roll, at }));
+    this.db
+      .prepare(
+        `DELETE FROM roll_history WHERE chronicle_id = ? AND id NOT IN (
+           SELECT id FROM roll_history WHERE chronicle_id = ? ORDER BY id DESC LIMIT ?)`,
+      )
+      .run(chronicleId, chronicleId, ROLL_HISTORY);
+  }
+
+  /** The last rolls of a Chronicle, newest first. */
+  recentRolls(chronicleId: number): ShownRoll[] {
+    const rows = this.db
+      .prepare('SELECT roll FROM roll_history WHERE chronicle_id = ? ORDER BY id DESC LIMIT ?')
+      .all(chronicleId, ROLL_HISTORY) as { roll: string }[];
+    return rows.map((r) => JSON.parse(r.roll) as ShownRoll);
   }
 
   lastRoll(chronicleId: number): ShownRoll | undefined {
