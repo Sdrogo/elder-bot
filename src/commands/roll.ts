@@ -6,11 +6,11 @@ import { respondSheetChoices, rollFromSheet, shortTitle, surgeEndButton } from '
 import type { Command } from './types.js';
 
 // /elder roll takes the pool as a number (`dice`) or from the character's sheet:
-// an `attribute` plus what goes `with` it (Skill, specialty, Discipline, power, Attribute,
-// lifepath), with an optional [Blood Surge] (`surge`) bought with Vitae for the scene.
+// an `attribute` plus what goes `with` it (Skill, Discipline, power, Attribute, lifepath),
+// a `specialization` of that Skill (+1), with an optional [Blood Surge] (`surge`) bought with Vitae for the scene.
 
-const SHEET_OPTIONS = ['attribute', 'with', 'surge'] as const;
-const NAMES = { attribute: 'attribute', with: 'with', surge: 'surge' };
+const SHEET_OPTIONS = ['attribute', 'with', 'specialization', 'surge'] as const;
+const NAMES = { attribute: 'attribute', with: 'with', specialty: 'specialization', surge: 'surge' };
 
 const data = addTestOptions(
   described(new SlashCommandBuilder().setName('roll'), 'cmd.roll.description')
@@ -21,6 +21,9 @@ const data = addTestOptions(
       described(o.setName('attribute'), 'opt.roll.attribute').setAutocomplete(true),
     )
     .addStringOption((o) => described(o.setName('with'), 'opt.roll.with').setAutocomplete(true))
+    .addStringOption((o) =>
+      described(o.setName('specialization'), 'opt.roll.specialization').setAutocomplete(true),
+    )
     .addStringOption((o) =>
       described(o.setName('surge'), 'opt.roll.surge').setAutocomplete(true),
     ) as SlashCommandBuilder,
@@ -61,6 +64,7 @@ export const roll: Command = {
       {
         attribute: interaction.options.getString('attribute'),
         with: interaction.options.getString('with'),
+        specialty: interaction.options.getString('specialization'),
         surge: interaction.options.getString('surge'),
       },
       NAMES,

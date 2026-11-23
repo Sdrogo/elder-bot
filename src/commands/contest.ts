@@ -24,8 +24,17 @@ import { showRoll } from '../game/shownRoll.js';
 import { hungerOption, where } from './shared.js';
 import type { Command } from './types.js';
 
-const NAMES: SheetOptionNames = { attribute: 'attribute', with: 'with', surge: 'surge' };
-const OPPONENT: SheetOptionNames = { attribute: 'opponent_attribute', with: 'opponent_with' };
+const NAMES: SheetOptionNames = {
+  attribute: 'attribute',
+  with: 'with',
+  specialty: 'specialization',
+  surge: 'surge',
+};
+const OPPONENT: SheetOptionNames = {
+  attribute: 'opponent_attribute',
+  with: 'opponent_with',
+  specialty: 'opponent_specialization',
+};
 
 const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contest.description')
   .addIntegerOption((o) =>
@@ -37,6 +46,9 @@ const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contes
       .setMaxLength(40),
   )
   .addStringOption((o) => described(o.setName('with'), 'opt.contest.with').setAutocomplete(true))
+  .addStringOption((o) =>
+    described(o.setName('specialization'), 'opt.contest.specialization').setAutocomplete(true),
+  )
   .addStringOption((o) => described(o.setName('surge'), 'opt.contest.surge').setAutocomplete(true))
   .addUserOption((o) => described(o.setName('opponent'), 'opt.contest.opponent'))
   .addIntegerOption((o) =>
@@ -52,7 +64,12 @@ const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contes
   .addStringOption((o) =>
     described(o.setName('opponent_with'), 'opt.contest.opponent_with').setAutocomplete(true),
   )
-  .addIntegerOption((o) => hungerOption(o, 'opt.contest.hunger'))
+  .addStringOption((o) =>
+    described(
+      o.setName('opponent_specialization'),
+      'opt.contest.opponent_specialization',
+    ).setAutocomplete(true),
+  )
   .addIntegerOption((o) =>
     hungerOption(o, 'opt.contest.opponent_hunger').setName('opponent_hunger'),
   )
@@ -121,7 +138,7 @@ export const contest: Command = {
     // My pool: a number, or Attribute + trait from my sheet (with a Blood Surge if I buy one).
     const myDiceOption = interaction.options.getInteger('dice');
     let mySheet: SheetSide | undefined;
-    if (wantsSheet(opt('attribute'), opt('with'), opt('surge'))) {
+    if (wantsSheet(opt('attribute'), opt('with'), opt('surge') ?? opt('specialization'))) {
       if (myDiceOption !== null) return void (await refuse('sheetRoll.mixed'));
       const side = rollFromSheet(
         ctx,
@@ -132,6 +149,7 @@ export const contest: Command = {
         {
           attribute: opt('attribute'),
           with: opt('with'),
+          specialty: opt('specialization'),
           surge: opt('surge'),
         },
         NAMES,
@@ -145,7 +163,9 @@ export const contest: Command = {
     // The opponent's pool: a number, or Attribute + trait from the opposing player's sheet.
     const theirDiceOption = interaction.options.getInteger('opponent_dice');
     let theirSheet: SheetSide | undefined;
-    if (wantsSheet(opt('opponent_attribute'), opt('opponent_with'))) {
+    if (
+      wantsSheet(opt('opponent_attribute'), opt('opponent_with'), opt('opponent_specialization'))
+    ) {
       if (theirDiceOption !== null) return void (await refuse('sheetRoll.mixed'));
       if (!opponentUser) return void (await refuse('sheetRoll.contest.needOpponent'));
       const side = rollFromSheet(
@@ -157,6 +177,7 @@ export const contest: Command = {
         {
           attribute: opt('opponent_attribute'),
           with: opt('opponent_with'),
+          specialty: opt('opponent_specialization'),
         },
         OPPONENT,
       );

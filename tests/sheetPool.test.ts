@@ -9,6 +9,8 @@ import {
   encodeTrait,
   recipe,
   secondChoices,
+  specialtyChoices,
+  decodeSpecialty,
   surgeChoices,
   type SheetPool,
 } from '../src/game/sheetPool.js';
@@ -169,12 +171,23 @@ describe('choices', () => {
     const attrs = attributeChoices(sheet(), { health: 0, willpower: 5 });
     expect(attrs[0]).toEqual({ name: 'Strength 4 (−2 Impaired)', value: 'attr:strength' });
     const names = secondChoices(sheet(), fine).map((c) => c.name);
-    expect(names).toContain('Fighting 2 · Hand-to-Hand +1');
+    expect(names).toContain('Fighting 2 (Hand-to-Hand)');
+    expect(names.filter((n) => n.startsWith('Fighting'))).toHaveLength(1);
     expect(names).toContain('Bull Rush (Strength + Potence = 6)');
     expect(names).toContain('Lifepath: Criminal 2');
     expect(secondChoices(sheet(), fine, {}, 'wits').some((c) => c.value === 'attr:wits')).toBe(
       false,
     );
+  });
+
+  it('list the specialties of the Skill in with, and nothing else', () => {
+    expect(specialtyChoices(sheet(), { kind: 'skill', id: 'fighting' })).toEqual([
+      { name: 'Hand-to-Hand +1', value: '0' },
+    ]);
+    expect(specialtyChoices(sheet(), { kind: 'skill', id: 'craft' })).toEqual([]);
+    expect(specialtyChoices(sheet(), { kind: 'disc', id: 'potence' })).toEqual([]);
+    expect(decodeSpecialty('0')).toBe(0);
+    expect(decodeSpecialty('Hand')).toBeUndefined();
   });
 
   it('round-trip their values', () => {

@@ -23,8 +23,6 @@ export function addTestOptions(builder: SlashCommandBuilder): SlashCommandBuilde
     .addIntegerOption((o) =>
       described(o.setName('bonus'), 'opt.test.bonus').setMinValue(-10).setMaxValue(10),
     )
-    .addIntegerOption((o) => hungerOption(o, 'opt.test.hunger'))
-    .addBooleanOption((o) => described(o.setName('take_half'), 'opt.test.take_half'))
     .addStringOption((o) => described(o.setName('reason'), 'opt.test.reason').setMaxLength(100));
   return builder;
 }
@@ -63,7 +61,7 @@ export async function replyWithRoll(
     difficulty: interaction.options.getInteger('difficulty') ?? 0,
     modifier: interaction.options.getInteger('bonus') ?? 0,
     hunger: fromCharacter.hunger,
-    takeHalf: interaction.options.getBoolean('take_half') ?? false,
+    takeHalf: false,
     retry: false,
   };
   const response = performRoll(request, { roller: ctx.roller, npc });

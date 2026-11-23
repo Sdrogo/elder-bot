@@ -9,6 +9,8 @@ import {
   decodeTrait,
   recipe,
   secondChoices,
+  specialtyChoices,
+  decodeSpecialty,
   surgeChoices,
   surgeKeysOf,
   surgeLabel,
@@ -55,6 +57,7 @@ function matching(choices: TraitChoice[], typed: string) {
 export interface SheetOptionNames {
   attribute: string;
   with: string;
+  specialty: string;
   surge?: string;
 }
 
@@ -92,6 +95,14 @@ export async function respondSheetChoices(
   } else if (focused.name === names.with) {
     const a = attribute?.kind === 'attr' ? attribute.id : undefined;
     choices = secondChoices(sheet, character.values, surges, a);
+  } else if (focused.name === names.specialty) {
+    choices = specialtyChoices(sheet, second);
+    if (!choices.length) {
+      const locale = localeFor(interaction, ctx.store);
+      return interaction.respond([
+        { name: t(locale, 'sheetRoll.hint.noSpecialties').slice(0, 100), value: 'none' },
+      ]);
+    }
   } else if (focused.name === names.surge) {
     choices = surgeChoices(sheet, character.values, surges, surgeKeysOf(attribute, second));
   }
@@ -119,7 +130,12 @@ export function rollFromSheet(
   where: { guildId: string | null; channelId: string | null },
   userId: string,
   actorId: string,
-  values: { attribute: string | null; with: string | null; surge?: string | null },
+  values: {
+    attribute: string | null;
+    with: string | null;
+    specialty: string | null;
+    surge?: string | null;
+  },
   names: SheetOptionNames,
 ): SheetSide | SheetRefusal {
   const found = sheetCharacter(ctx, { ...where, userId });
@@ -135,10 +151,12 @@ export function rollFromSheet(
   const attribute = decodeTrait(values.attribute);
   const second = decodeTrait(values.with);
   const surge = decodeSurge(values.surge);
+  const specialty = decodeSpecialty(values.specialty);
   // A value typed by hand instead of picked from the list.
   for (const [name, text, decoded] of [
     [names.attribute, values.attribute, attribute],
     [names.with, values.with, second],
+    [names.specialty, values.specialty, specialty],
     [names.surge ?? '', values.surge, surge],
   ] as const) {
     if (text != null && !decoded) {
@@ -146,11 +164,18 @@ export function rollFromSheet(
     }
   }
 
+  // A specialty adds a die to the Skill picked in `with`, and to nothing else.
+  if (specialty !== undefined && second?.kind !== 'skill') {
+    return { refuse: 'sheetRoll.issue.specialtyNeedsSkill' };
+  }
+  const withSpecialty =
+    second?.kind === 'skill' && specialty !== undefined ? { ...second, specialty } : second;
+
   let surges = campaign.getSurges(character.id);
   const input = {
     sheet,
     ...(attribute ? { attribute } : {}),
-    ...(second ? { second } : {}),
+    ...(withSpecialty ? { second: withSpecialty } : {}),
   };
   // Check the pool before spending any Vitae.
   const trial = buildSheetPool({ ...input, values: character.values, surges });

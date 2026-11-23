@@ -13,9 +13,6 @@ export const es: Messages = {
 
   'opt.test.difficulty': 'Dificultad: éxitos necesarios para ganar',
   'opt.test.bonus': 'Dados de bonificación (positivos) o penalización (negativos)',
-  'opt.test.hunger': 'Tus dados de Hunger (0-5): sustituyen dados normales de la reserva',
-  'opt.test.take_half':
-    'Taking Half: sin tirar, la mitad de la reserva (redondeando arriba) como éxitos',
   'opt.test.reason': 'Qué intentas hacer',
 
   'cmd.contest.description': 'Test enfrentado: gana quien saque más éxitos',
@@ -26,7 +23,6 @@ export const es: Messages = {
   'opt.contest.attribute': 'Atributo de tu ficha, o su valor para empates si usas dice',
   'opt.contest.opponent_attribute':
     'Atributo del jugador rival, o un número para empates (PNJ: la mitad de su reserva)',
-  'opt.contest.hunger': 'Tus dados de Hunger (0-5)',
   'opt.contest.opponent_hunger': 'Dados de Hunger del oponente (un PJ vampiro)',
   'opt.contest.reason': 'Qué está en juego',
 
@@ -40,7 +36,6 @@ export const es: Messages = {
   'cmd.prolonged.roll.description': 'Tira para tu tarea prolongada',
   'opt.prolonged.dice': 'Atributo + Habilidad',
   'opt.prolonged.bonus': 'Dados de bonificación o penalización',
-  'opt.prolonged.hunger': 'Tus dados de Hunger (0-5)',
 
   // Shared roll output.
   'roll.title': 'Test',
@@ -162,7 +157,7 @@ export const es: Messages = {
   'button.pickCharacter': 'Elegir personaje',
   'opt.roll.npc': 'Tirada de un PNJ: la reserva de su ficha, sin dados de Hunger',
   'opt.roll.attribute': 'Atributo de la ficha de tu personaje',
-  'opt.roll.with': 'Qué va con él: Habilidad, especialidad, Disciplina, poder, Atributo o lifepath',
+  'opt.roll.with': 'Qué va con él: Habilidad, Disciplina, poder, Atributo o lifepath',
   'opt.roll.surge':
     'Blood Surge: gasta Vitae para subir un Atributo o una Disciplina durante la escena',
   'sheetRoll.pool': 'Reserva',
@@ -199,6 +194,13 @@ export const es: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} en la ficha, {tracker} en los contadores. La tirada usa la ficha.',
   'button.surgeEnd': 'Terminar Blood Surge',
+  'opt.roll.specialization': 'Especialidad de la Habilidad elegida en with (+1 dado)',
+  'opt.contest.specialization': 'Especialidad de la Habilidad elegida en with (+1 dado)',
+  'opt.contest.opponent_specialization':
+    'Especialidad de la Habilidad elegida en opponent_with (+1 dado)',
+  'sheetRoll.hint.noSpecialties': 'Elige primero en with una Habilidad con especialidades',
+  'sheetRoll.issue.specialtyNeedsSkill':
+    'La especialidad va con una Habilidad: elige primero la Habilidad en `with`.',
   'sheetRoll.contest.needOpponent': 'Elige el `opponent` para tirar desde su ficha.',
   'sheetRoll.contest.needOpponentPool':
     'Indica la reserva del rival: `opponent_dice`, o `opponent_attribute` + `opponent_with` de la ficha del jugador rival.',
@@ -207,8 +209,7 @@ export const es: Messages = {
   'opt.contest.opponent_with': 'Qué va con el Atributo del jugador rival, de su ficha',
   'opt.contest.surge':
     'Blood Surge: gasta Vitae para subir un Atributo o una Disciplina durante la escena',
-  'opt.contest.with':
-    'Qué va con tu Atributo: Habilidad, especialidad, Disciplina, poder, lifepath',
+  'opt.contest.with': 'Qué va con tu Atributo: Habilidad, Disciplina, poder, lifepath',
   'button.masqueradeThreat': 'Prueba de amenaza',
   'button.prolongedCancel': 'Cancelar tarea',
   'button.willpowerBest': 'Willpower: repetir fallos',

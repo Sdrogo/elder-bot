@@ -47,7 +47,7 @@ The owner, the Storyteller of the character's Chronicle and server admins can ch
 
 Once the Storyteller has chosen the Chronicle's table channel on the panel, in that channel:
 
-- every roll without `hunger` takes your Hunger dice from your character's Vitae, and says so under the roll; typing `hunger` still wins;
+- every roll takes your Hunger dice from your character's Vitae, and says so under the roll (`/elder frenzy` still lets you type them);
 - the **Willpower** buttons take 1 Willpower from your character, and are refused at 0;
 - `/elder frenzy` takes Composure + Resolve and Humanity from your character if you leave them out;
 - `/elder masquerade` works on the Chronicle's tracker, which follows the Chronicle to any channel.
@@ -57,7 +57,7 @@ When you pick a `character` or `chronicle`, Discord suggests names as you type. 
 ## How a roll works
 
 1. **Pool** = Attribute + Skill (or Discipline, or Composure + Resolve), plus or minus any bonus or penalty dice: assist, focus, story assets, Impairment.
-2. **Hunger dice**: if your character has any (0–5), give them with `hunger`, or let the bot take them from your saved character (see above). They replace normal dice one for one; they are not extra dice.
+2. **Hunger dice**: the bot takes them (0–5) from your saved character's Vitae (see above). They replace normal dice one for one; they are not extra dice.
 3. Roll d10s:
    - every die showing **6 or more** is a success, and a **10** counts as **two**;
    - successes equal to or above the **Difficulty** win. Winning with at least one 10 is a **Critical Win**;
@@ -98,24 +98,23 @@ Options in `[brackets]` are optional.
 
 A standard, Power or Self-Control test.
 
-`/elder roll dice [difficulty] [bonus] [hunger] [take_half] [reason] [npc]`
+`/elder roll dice [difficulty] [bonus] [reason] [npc]`
 
-`/elder roll attribute with [surge] [difficulty] [bonus] [hunger] [take_half] [reason]`
+`/elder roll attribute with [specialization] [surge] [difficulty] [bonus] [reason]`
 
-| Option       | What it does                                                                                                        |
-| ------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `dice`       | The pool as a number (0–30). Leave it out to roll from the character sheet                                          |
-| `attribute`  | An Attribute from your sheet, picked from the list with its dots                                                    |
-| `with`       | What goes with it: a Skill or one of its specialties (+1), a Discipline, a power, another Attribute, a lifepath (2) |
-| `surge`      | **Blood Surge**: spend Vitae to raise an Attribute (1 Vitae a dot) or a Discipline (2 Vitae a dot) for the scene    |
-| `difficulty` | Successes needed to win (1–15)                                                                                      |
-| `bonus`      | Bonus (positive) or penalty (negative) dice, −10 to +10                                                             |
-| `hunger`     | Your Hunger dice (0–5)                                                                                              |
-| `take_half`  | **Taking Half**: no roll, half your pool (rounded up) counts as successes. Only when you are not under stress       |
-| `reason`     | What you are attempting, shown in the title                                                                         |
-| `npc`        | A test for an NPC (see below)                                                                                       |
+| Option           | What it does                                                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `dice`           | The pool as a number (0–30). Leave it out to roll from the character sheet                                             |
+| `attribute`      | An Attribute from your sheet, picked from the list with its dots                                                       |
+| `with`           | What goes with it: a Skill (its specializations in brackets), a Discipline, a power, another Attribute, a lifepath (2) |
+| `specialization` | A specialization of the Skill in `with`: +1 die. The list shows only that Skill's specializations                      |
+| `surge`          | **Blood Surge**: spend Vitae to raise an Attribute (1 Vitae a dot) or a Discipline (2 Vitae a dot) for the scene       |
+| `difficulty`     | Successes needed to win (1–15)                                                                                         |
+| `bonus`          | Bonus (positive) or penalty (negative) dice, −10 to +10                                                                |
+| `reason`         | What you are attempting, shown in the title                                                                            |
+| `npc`            | A test for an NPC (see below)                                                                                          |
 
-Example: `/elder roll dice:7 difficulty:2 hunger:1 reason:Climb the wall`
+Example: `/elder roll dice:7 difficulty:2 reason:Climb the wall`
 
 #### Rolling from the sheet
 
@@ -125,24 +124,24 @@ A character with a full sheet (made with the panel's wizard) can roll without co
 - **Two Attributes** (a task everyone knows, like driving) or a **lifepath** (2 dots, when no Skill fits) are in the same list.
 - **Impairment**: at 0 Health the Physical Attributes lose 2 dice, at 0 Willpower the Social and Mental ones do. The bot takes them off and says why.
 - **Blood Surge**: `surge` lists what your Vitae and your tier allow (an Attribute up to +2 for neonates, +4 ancillae, +6 elders; a Discipline up to the tier maximum). The Vitae are spent before the roll, so Hunger dice already count them. The surge stays on the character for the rest of the scene and is added to the next rolls from the sheet. It ends with the **End Blood Surge** button, when the session ends on the panel, or after 3 hours.
-- Hunger dice come from the character's Vitae, as always; the `hunger` option still overrides them.
+- Hunger dice come from the character's Vitae, as always.
 
 ### `/elder contest`
 
 A contested test: both sides roll, the most successes wins.
 
-`/elder contest dice | attribute with [surge] [opponent] opponent_dice | opponent_attribute opponent_with [hunger] [opponent_hunger] [reason]`
+`/elder contest dice | attribute with [specialization] [surge] [opponent] opponent_dice | opponent_attribute opponent_with [opponent_specialization] [opponent_hunger] [reason]`
 
 Each side's pool is a number (`dice`, `opponent_dice`) or comes from a character sheet, like `/elder roll`: `attribute` + `with` for you (with an optional `surge`), `opponent_attribute` + `opponent_with` for the opposing player picked in `opponent`. Their lists are read from that player's sheet. The opposing player's Blood Surges already running count too.
 
 - **Ties** go to the higher Attribute. A pool from a sheet uses its Attribute (Blood Surge included); with `dice`, type the Attribute as a number in `attribute` and `opponent_attribute`. For a minor or standard NPC, its Attribute is half its pool. With equal or unknown Attributes, whoever started the contest wins.
 - The winner's margin is shown: the loser's margin of failure.
-- `hunger` and `opponent_hunger`: each side's Hunger dice. Losing with a 1 on a Hunger die is a Bestial Failure.
+- Hunger dice come from each player's character; `opponent_hunger` gives them for an opponent without a saved character. Losing with a 1 on a Hunger die is a Bestial Failure.
 - `opponent`: the opposing player, shown by name.
 
 #### NPCs
 
-`/elder roll dice npc:true [difficulty] [bonus] [take_half] [reason]`: a test for an NPC. Roll the pool from its stat block: its Physical, Social or Mental pool, or a Skill pool.
+`/elder roll dice npc:true [difficulty] [bonus] [reason]`: a test for an NPC. Roll the pool from its stat block: its Physical, Social or Mental pool, or a Skill pool.
 
 NPCs don't use the players' mechanics: no Hunger dice, Willpower, Beast's Bargain, complications or Try again. An NPC with no successes simply fails.
 
@@ -164,7 +163,7 @@ To **ride the wave** instead, don't roll: you suffer the frenzy and regain 1 Wil
 A task that needs several rolls to complete.
 
 - `/elder prolonged start name target tests`: start it. `target` is the successes needed (3, 5, 7 or 10), `tests` the rolls available (3, 5 or 7).
-- `/elder prolonged roll dice [bonus] [hunger]`: roll for it. The bot adds up the successes and shows your progress, and tells you when the task is done or failed. A roll with no successes (a Painful or Bestial Failure) fails the task at once.
+- `/elder prolonged roll dice [bonus]`: roll for it. The bot adds up the successes and shows your progress, and tells you when the task is done or failed. A roll with no successes (a Painful or Bestial Failure) fails the task at once.
 - **Cancel task**: the button under the task drops it.
 
 Each player can have one prolonged task open per channel.

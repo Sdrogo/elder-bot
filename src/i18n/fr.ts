@@ -13,9 +13,6 @@ export const fr: Messages = {
 
   'opt.test.difficulty': 'Difficulté : réussites nécessaires pour gagner',
   'opt.test.bonus': 'Dés bonus (positif) ou dés de malus (négatif)',
-  'opt.test.hunger': 'Tes dés de Hunger (0-5) : ils remplacent des dés normaux de la réserve',
-  'opt.test.take_half':
-    'Taking Half : pas de jet, la moitié de la réserve (arrondie au supérieur) en réussites',
   'opt.test.reason': 'Ce que tu tentes',
 
   'cmd.contest.description': "Test en opposition : celui qui a le plus de réussites l'emporte",
@@ -27,7 +24,6 @@ export const fr: Messages = {
     'Attribut de ta fiche, ou sa valeur pour les égalités si tu utilises dice',
   'opt.contest.opponent_attribute':
     'Attribut du joueur adverse, ou un nombre pour les égalités (PNJ : moitié de la réserve)',
-  'opt.contest.hunger': 'Tes dés de Hunger (0-5)',
   'opt.contest.opponent_hunger': "Dés de Hunger de l'adversaire (un PJ vampire)",
   'opt.contest.reason': "L'enjeu",
 
@@ -41,7 +37,6 @@ export const fr: Messages = {
   'cmd.prolonged.roll.description': 'Lance pour ta tâche prolongée',
   'opt.prolonged.dice': 'Attribut + Compétence',
   'opt.prolonged.bonus': 'Dés bonus ou de malus',
-  'opt.prolonged.hunger': 'Tes dés de Hunger (0-5)',
 
   // Shared roll output.
   'roll.title': 'Test',
@@ -163,8 +158,7 @@ export const fr: Messages = {
   'button.pickCharacter': 'Choisir un personnage',
   'opt.roll.npc': 'Jet pour un PNJ : la réserve de sa fiche, sans dés de Hunger',
   'opt.roll.attribute': 'Attribut de la fiche de ton personnage',
-  'opt.roll.with':
-    'Ce qui va avec : Compétence, spécialité, Discipline, pouvoir, Attribut ou lifepath',
+  'opt.roll.with': 'Ce qui va avec : Compétence, Discipline, pouvoir, Attribut ou lifepath',
   'opt.roll.surge': 'Blood Surge : dépense de la Vitae pour hausser un Attribut ou une Discipline',
   'sheetRoll.pool': 'Réserve',
   'sheetRoll.mixed':
@@ -202,6 +196,13 @@ export const fr: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute} : {sheet} sur la fiche, {tracker} sur les jauges. Le jet utilise la fiche.',
   'button.surgeEnd': 'Fin du Blood Surge',
+  'opt.roll.specialization': 'Spécialité de la Compétence choisie dans with (+1 dé)',
+  'opt.contest.specialization': 'Spécialité de la Compétence choisie dans with (+1 dé)',
+  'opt.contest.opponent_specialization':
+    'Spécialité de la Compétence choisie dans opponent_with (+1 dé)',
+  'sheetRoll.hint.noSpecialties': "Choisis d'abord dans with une Compétence avec spécialités",
+  'sheetRoll.issue.specialtyNeedsSkill':
+    "La spécialité va avec une Compétence : choisis d'abord la Compétence dans `with`.",
   'sheetRoll.contest.needOpponent': "Choisis l'`opponent` pour lancer depuis sa fiche.",
   'sheetRoll.contest.needOpponentPool':
     "Indique la réserve de l'adversaire : `opponent_dice`, ou `opponent_attribute` + `opponent_with` depuis la fiche du joueur adverse.",
@@ -211,8 +212,7 @@ export const fr: Messages = {
   'opt.contest.opponent_with': "Ce qui va avec l'Attribut du joueur adverse, depuis sa fiche",
   'opt.contest.surge':
     'Blood Surge : dépense de la Vitae pour hausser un Attribut ou une Discipline',
-  'opt.contest.with':
-    'Ce qui va avec ton Attribut : Compétence, spécialité, Discipline, pouvoir, lifepath',
+  'opt.contest.with': 'Ce qui va avec ton Attribut : Compétence, Discipline, pouvoir, lifepath',
   'button.masqueradeThreat': 'Test de menace',
   'button.prolongedCancel': 'Annuler la tâche',
   'button.willpowerBest': 'Willpower : relancer les échecs',

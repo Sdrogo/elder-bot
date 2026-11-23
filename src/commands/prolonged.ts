@@ -27,7 +27,7 @@ import {
   outcomeLine,
 } from '../ui/format.js';
 import { rollerHunger } from './campaignShared.js';
-import { hungerOption, where } from './shared.js';
+import { where } from './shared.js';
 import type { Command, Context } from './types.js';
 
 const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prolonged.description')
@@ -61,8 +61,7 @@ const data = described(new SlashCommandBuilder().setName('prolonged'), 'cmd.prol
       )
       .addIntegerOption((o) =>
         described(o.setName('bonus'), 'opt.prolonged.bonus').setMinValue(-10).setMaxValue(10),
-      )
-      .addIntegerOption((o) => hungerOption(o, 'opt.prolonged.hunger')),
+      ),
   );
 
 export const prolonged: Command = {

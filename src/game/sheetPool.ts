@@ -336,7 +336,7 @@ export function attributeChoices(
 }
 
 /**
- * Everything that can go with an Attribute, for the `with` option: Skills (and each specialty),
+ * Everything that can go with an Attribute, for the `with` option: Skills (their specialties in brackets),
  * Disciplines, known powers with their whole Power test, the other Attributes and the lifepaths.
  * Skills with dots come first; with an Attribute chosen, it is left out of the list.
  */
@@ -351,13 +351,10 @@ export function secondChoices(
   for (const skill of skills) {
     const dots = skillDots(sheet, skill);
     const name = SKILL_INFO[skill].name;
-    out.push({ name: `${name} ${dots}`, value: encodeTrait({ kind: 'skill', id: skill }) });
-    specialtiesOf(sheet, skill).forEach((spec, i) =>
-      out.push({
-        name: `${name} ${dots} · ${spec} +${SPECIALTY_BONUS}`,
-        value: encodeTrait({ kind: 'skill', id: skill, specialty: i }),
-      }),
-    );
+    // One line per Skill: its specialties are picked in the separate `specialization` option.
+    const specs = specialtiesOf(sheet, skill);
+    const hint = specs.length ? ` (${specs.join(', ')})` : '';
+    out.push({ name: `${name} ${dots}${hint}`, value: encodeTrait({ kind: 'skill', id: skill }) });
   }
   for (const disc of DISCIPLINES) {
     const dots = disciplineDots(sheet, disc);
@@ -400,6 +397,24 @@ export function secondChoices(
     });
   }
   return out;
+}
+
+/**
+ * The specialties of the Skill picked in `with`, for the `specialization` option (+1 die, p. 39).
+ * Empty when `with` is not a Skill or the Skill has none.
+ */
+export function specialtyChoices(sheet: SheetDraft, second?: TraitRef): TraitChoice[] {
+  if (second?.kind !== 'skill') return [];
+  return specialtiesOf(sheet, second.id).map((spec, i) => ({
+    name: `${spec} +${SPECIALTY_BONUS}`,
+    value: String(i),
+  }));
+}
+
+/** The index a `specialization` choice carries, or undefined for anything typed by hand. */
+export function decodeSpecialty(value: string | null | undefined): number | undefined {
+  if (!value || !/^\d{1,2}$/.test(value)) return undefined;
+  return Number(value);
 }
 
 /**
