@@ -16,6 +16,8 @@ export const BACKGROUND_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as con
 export type BackgroundType = (typeof BACKGROUND_TYPES)[number];
 /** Background images up to 8 MB: a 2560×1440 JPEG or WebP is far smaller. */
 export const MAX_BACKGROUND = 8 * 1024 * 1024;
+/** Character portraits up to 2 MB: a 1000×1000 JPEG or WebP is far smaller. */
+export const MAX_PORTRAIT = 2 * 1024 * 1024;
 
 export const isLayout = (v: unknown): v is Layout => LAYOUTS.includes(v as Layout);
 export const isResolution = (v: unknown): v is Resolution =>
@@ -83,6 +85,9 @@ export class Stage {
         user_id TEXT PRIMARY KEY,
         resolution TEXT NOT NULL, layout TEXT NOT NULL, roll_box INTEGER NOT NULL,
         cam TEXT, background BLOB, background_type TEXT, background_tag TEXT);
+      CREATE TABLE IF NOT EXISTS character_portraits (
+        character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
+        image BLOB NOT NULL, type TEXT NOT NULL, tag TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS chronicle_rolls (
         chronicle_id INTEGER PRIMARY KEY REFERENCES chronicles (id) ON DELETE CASCADE,
         roll TEXT NOT NULL, at INTEGER NOT NULL);
@@ -112,6 +117,36 @@ export class Stage {
 
   removeCam(characterId: number): void {
     this.db.prepare('DELETE FROM character_cams WHERE character_id = ?').run(characterId);
+  }
+
+  // Portraits of the characters, shown on the overlay.
+
+  setPortrait(characterId: number, image: Buffer, type: BackgroundType): void {
+    this.db
+      .prepare(
+        `INSERT INTO character_portraits (character_id, image, type, tag) VALUES (?, ?, ?, ?)
+         ON CONFLICT (character_id) DO UPDATE SET
+           image = excluded.image, type = excluded.type, tag = excluded.tag`,
+      )
+      .run(characterId, image, type, imageTag(image));
+  }
+
+  /** A short hash of the portrait, which changes with it; undefined without one. */
+  portraitTag(characterId: number): string | undefined {
+    const row = this.db
+      .prepare('SELECT tag FROM character_portraits WHERE character_id = ?')
+      .get(characterId) as { tag: string } | undefined;
+    return row?.tag;
+  }
+
+  portrait(characterId: number): { image: Buffer; type: string } | undefined {
+    return this.db
+      .prepare('SELECT image, type FROM character_portraits WHERE character_id = ?')
+      .get(characterId) as { image: Buffer; type: string } | undefined;
+  }
+
+  removePortrait(characterId: number): void {
+    this.db.prepare('DELETE FROM character_portraits WHERE character_id = ?').run(characterId);
   }
 
   // The Storyteller's scene.
@@ -178,7 +213,7 @@ export class Stage {
 
   setBackground(userId: string, image: Buffer, type: BackgroundType): void {
     this.ensure(userId);
-    const tag = createHash('sha256').update(image).digest('base64url').slice(0, 12);
+    const tag = imageTag(image);
     this.db
       .prepare(
         `UPDATE stage_settings SET background = ?, background_type = ?, background_tag = ?
@@ -223,6 +258,11 @@ export class Stage {
       .get(chronicleId) as { roll: string } | undefined;
     return row ? (JSON.parse(row.roll) as ShownRoll) : undefined;
   }
+}
+
+/** A short hash of an image for cache-busting URLs: it changes when the image does. */
+export function imageTag(image: Buffer): string {
+  return createHash('sha256').update(image).digest('base64url').slice(0, 12);
 }
 
 /** The image type from its first bytes; the browser's own Content-Type is not trusted. */

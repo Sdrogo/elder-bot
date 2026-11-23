@@ -1,4 +1,4 @@
-/* global document, window, fetch, FormData, location, navigator, setTimeout, URLSearchParams */
+/* global document, window, fetch, FormData, location, navigator, setTimeout, URLSearchParams, createImageBitmap */
 // ElderBot web panel. No framework: the page asks /api/me and draws the cards.
 // Names come from users, so every text goes in with textContent, never as HTML.
 
@@ -61,6 +61,14 @@ const TEXT = {
     'cam.mine': 'La tua webcam (Narratore)',
     'cam.on': 'attiva',
     'cam.myLink': 'Il tuo link',
+    'portrait.title': 'Ritratto',
+    'portrait.on': 'caricato',
+    'portrait.note':
+      'Compare nella targhetta dell’overlay al posto del simbolo del clan, e riempie la cornice quando la webcam è spenta o assente. PNG, JPEG o WebP: le foto grandi vengono rimpicciolite.',
+    'portrait.upload': 'Carica ritratto',
+    'portrait.change': 'Cambia ritratto',
+    'portrait.remove': 'Togli il ritratto',
+    'portrait.bad': 'Immagine non valida: usa PNG, JPEG o WebP.',
     'stage.title': 'Scena',
     'stage.resolution': 'Risoluzione',
     'stage.layout': 'Disposizione',
@@ -159,6 +167,14 @@ const TEXT = {
     'cam.mine': 'Your webcam (Storyteller)',
     'cam.on': 'on',
     'cam.myLink': 'Your link',
+    'portrait.title': 'Portrait',
+    'portrait.on': 'uploaded',
+    'portrait.note':
+      'Shown on the overlay plate instead of the clan symbol, and filling the frame while the webcam is off or missing. PNG, JPEG or WebP: large photos are scaled down.',
+    'portrait.upload': 'Upload portrait',
+    'portrait.change': 'Change portrait',
+    'portrait.remove': 'Remove the portrait',
+    'portrait.bad': 'Invalid image: use PNG, JPEG or WebP.',
     'stage.title': 'Scene',
     'stage.resolution': 'Resolution',
     'stage.layout': 'Layout',
@@ -430,7 +446,7 @@ function characterCard(c, chronicle) {
     track(c, 'Violations', '', String(hu.violations), 'violations'),
   );
 
-  if (c.editable) card.append(camBox(c));
+  if (c.editable) card.append(camBox(c), portraitBox(c));
 
   const actions = el('div', 'actions');
   if (c.editable) {
@@ -491,6 +507,70 @@ function camBox(c) {
   } else {
     actions.append(button(tr('cam.create'), () => change('POST', path)));
   }
+  box.append(actions);
+  return box;
+}
+
+/** Scales a photo down to at most 1600 px on its longest side, as WebP (PNG where unsupported). */
+async function shrinkImage(file) {
+  const MAX = 1600;
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return undefined;
+  }
+  const k = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * k);
+  canvas.height = Math.round(bitmap.height * k);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.88));
+}
+
+/** The character's portrait for the overlay: a thumbnail, upload and remove. */
+function portraitBox(c) {
+  const box = el('details', 'portrait-box');
+  box.append(
+    el(
+      'summary',
+      '',
+      c.portrait ? `${tr('portrait.title')} · ${tr('portrait.on')}` : tr('portrait.title'),
+    ),
+  );
+  const path = `/api/characters/${c.id}/portrait`;
+  if (c.portrait) {
+    const img = el('img', 'portrait-thumb');
+    img.alt = '';
+    img.src = `${path}?t=${c.portrait}`;
+    box.append(img);
+  }
+  box.append(el('p', 'note', tr('portrait.note')));
+  const file = el('input');
+  file.type = 'file';
+  file.accept = 'image/png,image/jpeg,image/webp';
+  file.hidden = true;
+  file.addEventListener('change', async () => {
+    const picked = file.files?.[0];
+    if (!picked) return;
+    const image = await shrinkImage(picked);
+    if (!image) return notify(tr('portrait.bad'));
+    const response = await fetch(path, {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': image.type, 'X-CSRF-Token': me.csrf },
+      body: image,
+    });
+    if (!response.ok) return notify(tr(response.status === 415 ? 'portrait.bad' : 'error.change'));
+    await loadPanel();
+  });
+  const actions = el('div', 'actions');
+  actions.append(
+    button(tr(c.portrait ? 'portrait.change' : 'portrait.upload'), () => file.click()),
+    file,
+  );
+  if (c.portrait)
+    actions.append(confirmButton(tr('portrait.remove'), () => change('DELETE', path)));
   box.append(actions);
   return box;
 }

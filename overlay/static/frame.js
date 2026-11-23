@@ -28,6 +28,14 @@ const cams = document.getElementById('cams');
 const bg = document.getElementById('bg');
 /** One iframe per webcam, never moved in the page: moving an iframe reloads the video. */
 const camFrames = new Map();
+/** The portraits behind the webcams, by address: they show when a webcam is off or missing. */
+const portraitImgs = new Map();
+
+/** The address of a character's portrait on the bot, new whenever the image changes. */
+const portraitUrl = (c) => {
+  const query = view ? `${view}&t=${c.portrait}` : `?t=${c.portrait}`;
+  return new URL(`portraits/${encodeURIComponent(c.id)}${query}`, window.location.href).href;
+};
 
 let prev = null;
 const symbolOk = new Map();
@@ -170,13 +178,21 @@ function toast(frame, text) {
 function renderCharacter(c, before) {
   const frame = el('div', 'frame');
   if (c.cam) frame.dataset.cam = c.cam;
+  if (c.portrait) frame.dataset.portrait = portraitUrl(c);
   frame.style.setProperty('--clan', (CLANS[c.clan] || CLANS.caitiff).hue);
   const now = boxClasses(c);
   const old = before ? boxClasses(before) : null;
+  // The portrait, round, takes the place of the clan symbol on the plate.
+  let badge;
+  if (c.portrait) {
+    badge = el('img', 'face');
+    badge.alt = '';
+    badge.src = portraitUrl(c);
+  } else badge = symbol(c.clan, frame);
   const plate = el(
     'div',
     'plate',
-    symbol(c.clan, frame),
+    badge,
     el('span', 'nm', c.name),
     el('span', 'cl', (CLANS[c.clan] || CLANS.caitiff).name),
   );
@@ -308,9 +324,32 @@ function renderScene(state) {
   root.replaceChildren(...nodes);
 }
 
-/** Puts each webcam under its frame; webcams no longer on air are closed. */
+const frameRect = (frame) => {
+  const r = frame.getBoundingClientRect();
+  return { x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height };
+};
+
+/**
+ * Puts each webcam under its frame, and each portrait under its webcam: VDO.Ninja is
+ * transparent while a webcam is off, so the portrait shows through. Webcams and portraits
+ * no longer on air are closed.
+ */
 function placeCams() {
   const seen = new Set();
+  const seenPortraits = new Set();
+  for (const frame of root.querySelectorAll('.frame[data-portrait]')) {
+    const src = frame.dataset.portrait;
+    seenPortraits.add(src);
+    let img = portraitImgs.get(src);
+    if (!img) {
+      img = el('img', 'portrait');
+      img.alt = '';
+      img.src = src;
+      portraitImgs.set(src, img);
+      cams.prepend(img);
+    }
+    place(img, frameRect(frame));
+  }
   if (showCams) {
     for (const frame of root.querySelectorAll('.frame[data-cam]')) {
       const id = frame.dataset.cam;
@@ -324,19 +363,19 @@ function placeCams() {
         camFrames.set(id, iframe);
         cams.append(iframe);
       }
-      const r = frame.getBoundingClientRect();
-      place(iframe, {
-        x: r.left + window.scrollX,
-        y: r.top + window.scrollY,
-        w: r.width,
-        h: r.height,
-      });
+      place(iframe, frameRect(frame));
     }
   }
   for (const [id, iframe] of camFrames) {
     if (!seen.has(id)) {
       iframe.remove();
       camFrames.delete(id);
+    }
+  }
+  for (const [src, img] of portraitImgs) {
+    if (!seenPortraits.has(src)) {
+      img.remove();
+      portraitImgs.delete(src);
     }
   }
 }

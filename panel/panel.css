@@ -322,12 +322,14 @@ button:disabled {
 }
 
 /* A character's webcam link (VDO.Ninja) */
-.cam-box {
+.cam-box,
+.portrait-box {
   margin-top: 0.75rem;
   border-top: 1px solid var(--line);
   padding-top: 0.5rem;
 }
-.cam-box summary {
+.cam-box summary,
+.portrait-box summary {
   cursor: pointer;
   color: var(--quiet);
 }
@@ -401,4 +403,13 @@ a.button.primary {
 }
 .ico-humanity {
   color: #3fae4a;
+}
+.portrait-thumb {
+  display: block;
+  width: 96px;
+  height: 96px;
+  margin: 0.5rem 0;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
 }

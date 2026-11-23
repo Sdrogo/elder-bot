@@ -42,6 +42,7 @@ import {
   BACKGROUND_TYPES,
   LAYOUTS,
   MAX_BACKGROUND,
+  MAX_PORTRAIT,
   RESOLUTIONS,
   camLinks,
   imageType,
@@ -219,6 +220,7 @@ export function characterView(
   viewerId = '',
   cam?: string,
   pending = 0,
+  portrait?: string,
 ) {
   const v = c.values;
   const chronicle = c.chronicleId !== undefined ? chronicles.get(c.chronicleId) : undefined;
@@ -239,6 +241,8 @@ export function characterView(
     pending,
     // The player's VDO.Ninja links, only for those who may change the character.
     cam: cam && editable ? camLinks(cam, c.name) : null,
+    // A short hash of the portrait, for its URL; null without one.
+    portrait: portrait ?? null,
     attributes: { stamina: v.stamina, composure: v.composure, resolve: v.resolve },
     health: { current: v.health, max: healthMax(v), baneful: v.baneful },
     vitae: { current: v.vitae, max: vitaeMax(v) },
@@ -289,6 +293,7 @@ export function overlayView(store: Store, userId: string) {
         humanity: { rank: v.humanity, violations: v.violations },
         hunger: hungerDice(v),
         cam: store.stage.camOf(c.id) ?? null,
+        portrait: store.stage.portraitTag(c.id) ?? null,
       };
     }),
   };
@@ -423,6 +428,20 @@ export function createPanelHandler(deps: PanelDeps) {
       const body = await readFile(join(symbolsDir, `${key}.png`)).catch(() => undefined);
       if (!body) return json(res, 404, { error: 'no symbol' });
       return sendFile(req, res, body, 'image/png', headers);
+    }
+    const portrait = /^portraits\/([a-z0-9-]{1,80})$/.exec(name);
+    if (portrait) {
+      // Only the characters of the Storyteller's Chronicle on air, by their overlay id.
+      const { campaign } = store;
+      const live = campaign
+        .chroniclesRunBy(userId)
+        .find((c) => campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id);
+      const member = live
+        ? overlayCharacters(campaign.members(live.id)).find((m) => m.id === portrait[1])
+        : undefined;
+      const image = member && store.stage.portrait(member.c.id);
+      if (!image) return json(res, 404, { error: 'no portrait' });
+      return sendFile(req, res, image.image, image.type, headers);
     }
     if (name === 'background') {
       const found = store.stage.background(userId);
@@ -768,6 +787,44 @@ export function createPanelHandler(deps: PanelDeps) {
       chunks.push(chunk as Buffer);
     }
     return Buffer.concat(chunks);
+  }
+
+  /**
+   * A character's portrait: GET shows it in the panel, PUT (the image itself) replaces it,
+   * DELETE removes it. Owner and the Chronicle's Storyteller only, like the trackers.
+   */
+  async function portraitApi(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    method: string,
+    id: number,
+  ) {
+    const character = store.campaign.getCharacter(id);
+    const allowed =
+      !!character && canEditOnPanel(me.userId, character, (c) => store.campaign.getChronicle(c));
+    if (method === 'GET') {
+      const found = allowed ? store.stage.portrait(id) : undefined;
+      if (!found) return json(res, 404, { error: 'not found' });
+      return sendFile(req, res, found.image, found.type);
+    }
+    if (method !== 'PUT' && method !== 'DELETE') return json(res, 404, { error: 'not found' });
+    const data = await readBytes(req, MAX_PORTRAIT);
+    if (data === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    // The same answer for "not there" and "not yours": ids can't be probed.
+    if (!allowed) return json(res, 404, { error: 'not found' });
+    if (method === 'DELETE') {
+      store.stage.removePortrait(id);
+      return json(res, 200, { ok: true });
+    }
+    const type = imageType(data);
+    if (!type) return json(res, 415, { error: 'PNG, JPEG or WebP only' });
+    store.stage.setPortrait(id, data, type);
+    return json(res, 200, { ok: true, portrait: store.stage.portraitTag(id) });
   }
 
   /** The Storyteller's scene: size, layout, roll box, their webcam and the background. */
@@ -1141,7 +1198,14 @@ export function createPanelHandler(deps: PanelDeps) {
         if (c) chronicles.set(id, c);
       }
       const view = (c: Character) =>
-        characterView(c, chronicles, me.userId, store.stage.camOf(c.id), pendingOf(c));
+        characterView(
+          c,
+          chronicles,
+          me.userId,
+          store.stage.camOf(c.id),
+          pendingOf(c),
+          store.stage.portraitTag(c.id),
+        );
       const stage = store.stage.settings(me.userId);
       return json(res, 200, {
         user: { id: me.userId, name: me.name },
@@ -1218,6 +1282,9 @@ export function createPanelHandler(deps: PanelDeps) {
     const stagePath = /^\/api\/stage(?:\/(cam|background))?$/.exec(path);
     if (stagePath) return stageChange(req, res, me, stagePath[1]);
 
+    const portraitPath = /^\/api\/characters\/(\d{1,12})\/portrait$/.exec(path);
+    if (portraitPath) return portraitApi(req, res, me, method, Number(portraitPath[1]));
+
     const sheetPath = /^\/api\/characters\/(\d{1,12})\/(sheet|approval)$/.exec(path);
     if (sheetPath) return sheetApi(req, res, me, method, Number(sheetPath[1]), sheetPath[2]!);
 
@@ -1244,7 +1311,14 @@ export function createPanelHandler(deps: PanelDeps) {
       const ch = c.chronicleId === undefined ? undefined : getChronicle(c.chronicleId);
       if (ch) chronicles.set(ch.id, ch);
       return json(res, 200, {
-        character: characterView(c, chronicles, me.userId, store.stage.camOf(c.id)),
+        character: characterView(
+          c,
+          chronicles,
+          me.userId,
+          store.stage.camOf(c.id),
+          0,
+          store.stage.portraitTag(c.id),
+        ),
       });
     };
 
