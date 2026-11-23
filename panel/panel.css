@@ -372,3 +372,33 @@ a.button.primary {
 #drafts-section {
   margin-bottom: 16px;
 }
+
+/* Tracker icons (overlay/static/icons.js) beside Health, Vitae, Willpower and Humanity. */
+.track .label .ico {
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 5px;
+  vertical-align: -0.18em;
+  fill: currentColor;
+}
+.ico .shine {
+  fill: rgba(255, 255, 255, 0.35);
+}
+.ico .fold {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+.ico-health {
+  color: #e2585f;
+}
+.ico-vitae {
+  color: #d0303a;
+}
+.ico-willpower {
+  color: #9fb4e6;
+}
+.ico-humanity {
+  color: #3fae4a;
+}

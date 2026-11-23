@@ -6,7 +6,8 @@
 // (https://<panel>/overlay/scena?v=<view key>), so every address here is relative.
 'use strict';
 
-const { CLANS, SECTS, el, sceneLayout, rollBoxRect, camUrl } = window.ELDER;
+const { CLANS, SECTS, el, sceneLayout, rollBoxRect, camUrl, trackerIcon, diceArt, die } =
+  window.ELDER;
 const sceneMode = window.location.pathname.endsWith('/scena');
 const params = new URLSearchParams(window.location.search);
 // The bot's view key; the overlay program needs none.
@@ -27,7 +28,6 @@ const cams = document.getElementById('cams');
 const bg = document.getElementById('bg');
 /** One iframe per webcam, never moved in the page: moving an iframe reloads the video. */
 const camFrames = new Map();
-const SVG = 'http://www.w3.org/2000/svg';
 
 let prev = null;
 const symbolOk = new Map();
@@ -51,34 +51,6 @@ function symbol(key, frame) {
   return i;
 }
 
-function d10(on, number) {
-  const svg = document.createElementNS(SVG, 'svg');
-  svg.setAttribute('viewBox', '0 0 40 46');
-  svg.setAttribute('class', on ? 'hd on' : 'hd');
-  const shapes = [
-    ['polygon', 'o', 'points', '20,1.5 38.5,18 20,44.5 1.5,18'],
-    ['polygon', 'i', 'points', '20,1.5 29,22 20,32 11,22'],
-    ['path', 'l', 'd', 'M1.5,18 L11,22 M38.5,18 L29,22 M20,44.5 L20,32'],
-  ];
-  for (const [tag, cls, attr, value] of shapes) {
-    const s = document.createElementNS(SVG, tag);
-    s.setAttribute('class', cls);
-    s.setAttribute(attr, value);
-    svg.append(s);
-  }
-  if (number !== undefined) {
-    const t = document.createElementNS(SVG, 'text');
-    t.setAttribute('x', '20');
-    t.setAttribute('y', '26');
-    t.setAttribute('text-anchor', 'middle');
-    t.setAttribute('dominant-baseline', 'middle');
-    t.textContent = String(number);
-    svg.append(t);
-    svg.classList.add('big');
-  }
-  return svg;
-}
-
 /** Box classes for each tracker, left to right. */
 function boxClasses(c) {
   const health = [];
@@ -100,7 +72,7 @@ function track(kind, label, classes, before) {
     const hot = before && before[i] !== cls ? ' hot' : '';
     boxes.append(el('i', `b ${cls}${hot}`));
   });
-  return el('div', `trk ${kind}`, el('span', '', label), boxes);
+  return el('div', `trk ${kind}`, el('span', '', trackerIcon(kind), label), boxes);
 }
 
 function numberCell(kind, label, current, max, note, hot) {
@@ -109,20 +81,19 @@ function numberCell(kind, label, current, max, note, hot) {
   return el(
     'div',
     `nb ${kind}${hot ? ' hot' : ''}`,
-    el('span', 'nl', label),
+    el('span', 'nl', trackerIcon(kind), label),
     value,
     typeof note === 'string' ? el('span', 'nx', note) : note,
   );
 }
 
-/** The Hunger die that sits beside Vitae: a small d10 with the number of Hunger dice. */
+/** The Hunger die that sits beside Vitae: a red ankh with the number of Hunger dice. */
 function hungerDie(c, before) {
-  const die = d10(c.hunger > 0, c.hunger);
-  die.classList.add('hg');
-  if (before && before.hunger !== c.hunger) die.classList.add('hot');
-  const wrap = el('span', 'nx hunger');
+  const icon = el('span', `die hunger success${c.hunger > 0 ? '' : ' none'}`, diceArt('success'));
+  icon.append(el('b', '', String(c.hunger)));
+  if (before && before.hunger !== c.hunger) icon.classList.add('hot');
+  const wrap = el('span', 'nx hunger', icon);
   wrap.title = `Hunger ${c.hunger}`;
-  wrap.append(die);
   return wrap;
 }
 
@@ -267,18 +238,8 @@ function renderRoll(roll, before) {
   const sides = el('div', `sides${many ? ' many' : ''}`);
   for (const side of roll.sides) {
     const dice = el('div', 'dice');
-    for (const face of side.normal) {
-      const die = d10(face >= 6, face);
-      if (face === 10) die.classList.add('ten');
-      dice.append(die);
-    }
-    for (const face of side.hunger) {
-      const die = d10(face >= 6, face);
-      die.classList.add('hdie');
-      if (face === 1) die.classList.add('one');
-      if (face === 10) die.classList.add('ten');
-      dice.append(die);
-    }
+    for (const face of side.normal) dice.append(die(face));
+    for (const face of side.hunger) dice.append(die(face, { hunger: true }));
     sides.append(
       el(
         'div',

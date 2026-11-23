@@ -34,6 +34,7 @@ const STATIC_FILES: Record<string, string> = {
   'overlay.css': 'text/css; charset=utf-8',
   'dock.css': 'text/css; charset=utf-8',
   'common.js': 'text/javascript; charset=utf-8',
+  'icons.js': 'text/javascript; charset=utf-8',
   'frame.js': 'text/javascript; charset=utf-8',
   'dock.js': 'text/javascript; charset=utf-8',
 };
