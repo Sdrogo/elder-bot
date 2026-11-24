@@ -1,6 +1,8 @@
 // Experience points for the Alpha 2.0 playtest (Player Packet ch. 2, "Advancement", pp. 64-66).
 // Pure rules: the store keeps the log, these functions say what an award is worth.
 
+import type { Advance } from './advancement.js';
+
 /** The five reasons that earn 1 XP at the end of a session. */
 export const AWARD_CONDITIONS = ['ambition', 'beast', 'flaw', 'loss', 'survival'] as const;
 export type AwardCondition = (typeof AWARD_CONDITIONS)[number];
@@ -26,6 +28,14 @@ export interface XpEntry {
   advance?: unknown;
   /** For a refund: the purchase it undoes. */
   ref?: number;
+}
+
+/** A purchase waiting for the Storyteller. */
+export interface XpRequest {
+  id: number;
+  advance: Advance;
+  cost: number;
+  at: number;
 }
 
 /** The award a Storyteller asked for: 1 XP per condition, or a free amount (outside the cap). */
@@ -70,5 +80,5 @@ export function advanceNote(a: {
   skill?: string;
   name?: string;
 }): string {
-  return a.kind === 'specialty' ? `specialty:${a.skill}:${a.name}` : `${a.kind}:${a.id}`;
+  return a.kind === 'specialty' ? `specialty:${a.skill}:${a.name}` : `${a.kind}:${a.id ?? ''}`;
 }

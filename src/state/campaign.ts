@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { Advance } from '../game/advancement.js';
-import type { XpEntry } from '../game/xp.js';
+import type { XpEntry, XpRequest } from '../game/xp.js';
 import { SURGE_TTL_MS, parseSurges, type Surges } from '../game/sheetPool.js';
 import {
   LIMITS,
@@ -203,6 +203,12 @@ export class Campaign {
         actor_id TEXT NOT NULL, amount INTEGER NOT NULL, kind TEXT NOT NULL,
         note TEXT NOT NULL, at INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS character_xp_character ON character_xp (character_id);
+      CREATE TABLE IF NOT EXISTS character_xp_requests (
+        id INTEGER PRIMARY KEY,
+        character_id INTEGER NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+        advance TEXT NOT NULL, cost INTEGER NOT NULL, status TEXT NOT NULL, at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS character_xp_requests_character
+        ON character_xp_requests (character_id);
       CREATE TABLE IF NOT EXISTS character_surges (
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         data TEXT NOT NULL, at INTEGER NOT NULL);
@@ -378,13 +384,81 @@ export class Campaign {
     })();
   }
 
+  /** A purchase the Storyteller must approve. 'duplicate': the same one is already waiting. */
+  requestXp(
+    characterId: number,
+    advance: Advance,
+    cost: number,
+    now = Date.now(),
+  ): number | 'duplicate' {
+    const key = JSON.stringify(advance);
+    if (this.xpRequests(characterId).some((r) => JSON.stringify(r.advance) === key)) {
+      return 'duplicate';
+    }
+    const info = this.db
+      .prepare(
+        `INSERT INTO character_xp_requests (character_id, advance, cost, status, at)
+         VALUES (?, ?, ?, 'pending', ?)`,
+      )
+      .run(characterId, key, cost, now);
+    return Number(info.lastInsertRowid);
+  }
+
+  xpRequests(characterId: number): XpRequest[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT id, advance, cost, at FROM character_xp_requests
+           WHERE character_id = ? AND status = 'pending' ORDER BY id`,
+        )
+        .all(characterId) as { id: number; advance: string; cost: number; at: number }[]
+    ).map((r) => ({
+      id: r.id,
+      advance: JSON.parse(r.advance) as Advance,
+      cost: r.cost,
+      at: r.at,
+    }));
+  }
+
+  /** Closes a pending request ('done' or 'refused'); false when it was not pending. */
+  closeXpRequest(characterId: number, id: number, status: 'done' | 'refused'): boolean {
+    return (
+      this.db
+        .prepare(
+          `UPDATE character_xp_requests SET status = ?
+           WHERE id = ? AND character_id = ? AND status = 'pending'`,
+        )
+        .run(status, id, characterId).changes > 0
+    );
+  }
+
+  /** Gives back the XP of a purchase still in force. False when there is no such purchase. */
+  refundXp(characterId: number, actorId: string, entryId: number, now = Date.now()): boolean {
+    return this.db.transaction(() => {
+      const log = this.xpLog(characterId);
+      const entry = log.find((e) => e.id === entryId && e.kind === 'spend');
+      if (!entry || log.some((e) => e.ref === entryId)) return false;
+      this.db
+        .prepare(
+          `INSERT INTO character_xp (character_id, actor_id, amount, kind, note, at, ref)
+           VALUES (?, ?, ?, 'refund', ?, ?, ?)`,
+        )
+        .run(characterId, actorId, -entry.amount, entry.note, now, entryId);
+      return true;
+    })();
+  }
+
   /** Purchases still in force, oldest first (refunded ones, with a later `ref`, are gone). */
-  advancesOf(characterId: number): Advance[] {
+  activeSpends(characterId: number): { id: number; advance: Advance }[] {
     const log = this.xpLog(characterId);
     const undone = new Set(log.flatMap((e) => (e.ref === undefined ? [] : [e.ref])));
     return log
       .filter((e) => e.kind === 'spend' && e.advance !== undefined && !undone.has(e.id))
-      .map((e) => e.advance as Advance);
+      .map((e) => ({ id: e.id, advance: e.advance as Advance }));
+  }
+
+  advancesOf(characterId: number): Advance[] {
+    return this.activeSpends(characterId).map((s) => s.advance);
   }
 
   // Blood Surge: lasts the scene (p. 147). Kept per character until the scene or session ends,

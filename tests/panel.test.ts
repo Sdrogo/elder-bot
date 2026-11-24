@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newCharacter } from '../src/game/character.js';
 import { emptyDraft, type SheetDraft } from '../src/game/creation.js';
+import { learnablePowers } from '../src/game/advancement.js';
 import { MAX_DRAFTS } from '../src/state/drafts.js';
 import { brujah } from './fixtures/sheets.js';
 import { Store } from '../src/state/store.js';
@@ -1153,6 +1154,87 @@ describe('character creation wizard', () => {
     expect((await send('POST', path, { advance: { kind: 'attribute', id: 'wits' } })).status).toBe(
       409,
     );
+  });
+
+  it('sends Humanity and out-of-clan purchases to the Storyteller, and lets them undo one', async () => {
+    const send = await asUser();
+    const made = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Richiesta',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 3, resolve: 2 }),
+      sheet: { data: brujah(), approvals: [] },
+    });
+    const chronicle = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Approvazioni',
+      sect: 'camarilla',
+    });
+    if (typeof made !== 'object' || typeof chronicle !== 'object') throw new Error('setup');
+    store.campaign.join(chronicle.id, made.id);
+    store.campaign.addXp([[made.id, 60]], '111', 'other', 'test');
+    const base = `/api/characters/${made.id}`;
+    type Payload = {
+      xp: { balance: number; requests: { id: number }[]; log: { id: number; kind: string }[] };
+    };
+
+    // Humanity can't be bought directly, only asked for, once.
+    const humanity = { advance: { kind: 'humanity' } };
+    expect((await send('POST', `${base}/spend`, humanity)).status).toBe(409);
+    // An ordinary purchase is not a request.
+    expect(
+      (await send('POST', `${base}/request`, { advance: { kind: 'skill', id: 'persuasion' } }))
+        .status,
+    ).toBe(409);
+    const asked = (await (await send('POST', `${base}/request`, humanity)).json()) as Payload;
+    expect(asked.xp.requests).toHaveLength(1);
+    expect((await send('POST', `${base}/request`, humanity)).status).toBe(409);
+    expect(store.campaign.getCharacter(made.id)!.values.humanity).toBe(6);
+
+    const answered = await send('POST', `${base}/answer`, {
+      request: asked.xp.requests[0]!.id,
+      approved: true,
+    });
+    expect(answered.status).toBe(200);
+    expect(store.campaign.getCharacter(made.id)!.values.humanity).toBe(7);
+    const after = (await answered.json()) as Payload;
+    expect(after.xp).toMatchObject({ balance: 40, requests: [] });
+
+    // Violations on the tracker close the door.
+    store.campaign.setTrack(made.id, 'violations', 1, '111');
+    expect((await send('POST', `${base}/request`, humanity)).status).toBe(409);
+
+    // An out-of-clan Discipline with its free power, refused once, then asked again and bought.
+    const power = learnablePowers(brujah(), 'auspex', 1)[0]!;
+    const auspex = { advance: { kind: 'discipline', id: 'auspex', power } };
+    const second = (await (await send('POST', `${base}/request`, auspex)).json()) as Payload;
+    const refused = await send('POST', `${base}/answer`, {
+      request: second.xp.requests[0]!.id,
+      approved: false,
+    });
+    expect(((await refused.json()) as Payload).xp).toMatchObject({ balance: 40, requests: [] });
+    const third = (await (await send('POST', `${base}/request`, auspex)).json()) as Payload;
+    await send('POST', `${base}/answer`, { request: third.xp.requests[0]!.id, approved: true });
+    expect(store.campaign.getSheet(made.id)?.data).not.toHaveProperty('disciplines.auspex');
+    const sheet = (await (await send('GET', `${base}/sheet`)).json()) as Payload & {
+      sheet: { data: { disciplines: Record<string, number> } };
+    };
+    expect(sheet.sheet.data.disciplines.auspex).toBe(1);
+    expect(sheet.xp.balance).toBe(20);
+
+    // The Storyteller gives the XP of a purchase back; the Discipline goes away.
+    const spend = sheet.xp.log.filter((e) => e.kind === 'spend').at(-1)!;
+    expect((await send('POST', `${base}/refund`, { entry: 9999 })).status).toBe(404);
+    const refunded = (await (
+      await send('POST', `${base}/refund`, { entry: spend.id })
+    ).json()) as Payload & {
+      sheet: { data: { disciplines: Record<string, number> } };
+    };
+    expect(refunded.xp.balance).toBe(40);
+    expect(refunded.sheet.data.disciplines.auspex).toBeUndefined();
+    expect((await send('POST', `${base}/refund`, { entry: spend.id })).status).toBe(404);
   });
 
   it('keeps a Chronicle and its characters on the same tier of play', async () => {

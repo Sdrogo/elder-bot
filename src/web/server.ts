@@ -36,11 +36,14 @@ import {
 } from '../state/campaign.js';
 import { evaluate, trackerValues, type SheetDraft } from '../game/creation.js';
 import {
-  advanceReasons,
+  blockers,
+  canUndo,
+  needsApproval,
   applyAdvance,
   applyAdvances,
   costOf,
   parseAdvance,
+  type Advance,
 } from '../game/advancement.js';
 import { advanceNote } from '../game/xp.js';
 import { awardAmount, parseAward, totals } from '../game/xp.js';
@@ -816,7 +819,118 @@ export function createPanelHandler(deps: PanelDeps) {
   function pendingOf(c: Character): number {
     if (!c.hasSheet) return 0;
     const approvals = store.campaign.getSheet(c.id)?.approvals ?? [];
-    return approvals.filter((a) => (a as SheetApproval).status === 'pending').length;
+    return (
+      approvals.filter((a) => (a as SheetApproval).status === 'pending').length +
+      store.campaign.xpRequests(c.id).length
+    );
+  }
+
+  /**
+   * XP on a sheet. POST …/spend {advance}: the owner buys something now. …/request {advance}:
+   * the owner asks for what needs the Storyteller (Humanity, out-of-clan). …/cancel {request}:
+   * the owner withdraws it. …/answer {request, approved}: the Storyteller's answer, which buys
+   * it. …/refund {entry}: the Storyteller undoes a purchase and the XP comes back.
+   */
+  async function xpApi(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    method: string,
+    c: Character,
+    base: SheetDraft,
+    isStoryteller: boolean,
+    sub: string,
+    payload: () => unknown,
+  ) {
+    const { campaign } = store;
+    if (method !== 'POST') return json(res, 404, { error: 'not found' });
+    const ownerOnly = sub === 'spend' || sub === 'request' || sub === 'cancel';
+    if (ownerOnly ? c.ownerId !== me.userId : !isStoryteller) {
+      return json(res, 403, { error: ownerOnly ? 'owner only' : 'storyteller only' });
+    }
+    const text = await readBody(req);
+    if (text === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    const body = parseObject(text);
+    if (!body) return json(res, 400, { error: 'invalid body' });
+    const advances = campaign.advancesOf(c.id);
+    const now = applyAdvances(base, advances);
+
+    /** Attributes and Humanity live on the trackers too: bring them in line with the sheet. */
+    const syncTrackers = (sheet: SheetDraft, humanityDelta = 0) => {
+      const { stamina, composure, resolve } = trackerValues(sheet);
+      const humanity = (campaign.getCharacter(c.id) ?? c).values.humanity + humanityDelta;
+      campaign.updateCharacter(
+        c.id,
+        { values: { stamina, composure, resolve, humanity } },
+        me.userId,
+      );
+    };
+    /** Humanity goes up only with no violations marked, and never past 10. */
+    const humanityBlocked = () => {
+      const v = (campaign.getCharacter(c.id) ?? c).values;
+      return v.violations > 0 || v.humanity >= LIMITS.humanity;
+    };
+    /** Buys `advance` for the character as it is now; the error to send, or undefined. */
+    const buy = (advance: Advance, approved: boolean): string | undefined => {
+      const needs = needsApproval(now, advance);
+      if (blockers(now, advance).length || (needs && !approved)) return 'not allowed';
+      if (advance.kind === 'humanity' && humanityBlocked()) return 'not allowed';
+      const cost = costOf(now, advance);
+      const note = advanceNote(advance);
+      if (campaign.spendXp(c.id, me.userId, cost, advance, note) === 'short') return 'short';
+      syncTrackers(applyAdvance(now, advance), advance.kind === 'humanity' ? 1 : 0);
+      return undefined;
+    };
+
+    if (sub === 'spend' || sub === 'request') {
+      const advance = parseAdvance(body.advance);
+      if (!advance) return json(res, 400, { error: 'invalid body' });
+      if (sub === 'spend') {
+        const error = buy(advance, false);
+        return error ? json(res, 409, { error }) : json(res, 200, payload());
+      }
+      if (!needsApproval(now, advance) || blockers(now, advance).length) {
+        return json(res, 409, { error: 'not allowed' });
+      }
+      if (advance.kind === 'humanity' && humanityBlocked()) {
+        return json(res, 409, { error: 'not allowed' });
+      }
+      const cost = costOf(now, advance);
+      const made = campaign.requestXp(c.id, advance, cost);
+      return made === 'duplicate'
+        ? json(res, 409, { error: 'duplicate' })
+        : json(res, 200, payload());
+    }
+
+    if (sub === 'cancel' || sub === 'answer') {
+      const found = campaign.xpRequests(c.id).find((r) => r.id === body.request);
+      if (!found) return json(res, 404, { error: 'not found' });
+      if (sub === 'cancel' || body.approved !== true) {
+        campaign.closeXpRequest(c.id, found.id, 'refused');
+        return json(res, 200, payload());
+      }
+      const error = buy(found.advance, true);
+      if (error) return json(res, 409, { error });
+      campaign.closeXpRequest(c.id, found.id, 'done');
+      return json(res, 200, payload());
+    }
+
+    // refund
+    const spends = campaign.activeSpends(c.id);
+    const index = spends.findIndex((s) => s.id === body.entry);
+    if (index < 0) return json(res, 404, { error: 'not found' });
+    if (!canUndo(base, advances, index)) return json(res, 409, { error: 'dependent' });
+    if (!campaign.refundXp(c.id, me.userId, spends[index]!.id)) {
+      return json(res, 404, { error: 'not found' });
+    }
+    const undone = spends[index]!.advance;
+    const rest = applyAdvances(base, campaign.advancesOf(c.id));
+    syncTrackers(rest, undone.kind === 'humanity' ? -1 : 0);
+    return json(res, 200, payload());
   }
 
   /**
@@ -852,7 +966,7 @@ export function createPanelHandler(deps: PanelDeps) {
           data: applyAdvances(sheet.data as SheetDraft, campaign.advancesOf(c.id)),
         },
         canApprove,
-        xp: { ...totals(log), log },
+        xp: { ...totals(log), log, requests: campaign.xpRequests(c.id) },
       };
     };
     const chronicles = new Map<number, Chronicle>(chronicle ? [[chronicle.id, chronicle]] : []);
@@ -883,31 +997,18 @@ export function createPanelHandler(deps: PanelDeps) {
     if (sub === 'sheet' && method === 'GET') {
       return json(res, 200, sheetPayload());
     }
-    if (sub === 'spend') {
-      // POST …/spend {advance}: the owner buys one improvement with XP.
-      if (method !== 'POST' || c.ownerId !== me.userId) {
-        return json(res, 403, { error: 'owner only' });
-      }
-      const text = await readBody(req);
-      if (text === undefined) return json(res, 413, { error: 'body too large' });
-      if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
-      if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
-        return json(res, 429, { error: 'too many requests' });
-      }
-      const body = parseObject(text);
-      const advance = body ? parseAdvance(body.advance) : undefined;
-      if (!advance) return json(res, 400, { error: 'invalid body' });
-      const now = applyAdvances(sheet.data as SheetDraft, campaign.advancesOf(c.id));
-      if (advanceReasons(now, advance).length) return json(res, 409, { error: 'not allowed' });
-      const cost = costOf(now, advance);
-      if (campaign.spendXp(c.id, me.userId, cost, advance, advanceNote(advance)) === 'short') {
-        return json(res, 409, { error: 'short' });
-      }
-      if (advance.kind === 'attribute') {
-        const { stamina, composure, resolve } = trackerValues(applyAdvance(now, advance));
-        campaign.updateCharacter(c.id, { values: { stamina, composure, resolve } }, me.userId);
-      }
-      return json(res, 200, sheetPayload());
+    if (['spend', 'request', 'answer', 'cancel', 'refund'].includes(sub)) {
+      return xpApi(
+        req,
+        res,
+        me,
+        method,
+        c,
+        sheet.data as SheetDraft,
+        canApprove,
+        sub,
+        sheetPayload,
+      );
     }
     if (sub !== 'approval' || method !== 'POST') return json(res, 404, { error: 'not found' });
     const text = await readBody(req);
@@ -1610,7 +1711,10 @@ export function createPanelHandler(deps: PanelDeps) {
     const portraitPath = /^\/api\/characters\/(\d{1,12})\/portrait$/.exec(path);
     if (portraitPath) return portraitApi(req, res, me, method, Number(portraitPath[1]));
 
-    const sheetPath = /^\/api\/characters\/(\d{1,12})\/(sheet|approval|edit|spend)$/.exec(path);
+    const sheetPath =
+      /^\/api\/characters\/(\d{1,12})\/(sheet|approval|edit|spend|request|answer|cancel|refund)$/.exec(
+        path,
+      );
     if (sheetPath) return sheetApi(req, res, me, method, Number(sheetPath[1]), sheetPath[2]!);
 
     const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam|give))?)?$/.exec(path);
