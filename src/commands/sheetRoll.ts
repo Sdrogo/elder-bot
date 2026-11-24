@@ -5,7 +5,9 @@ import {
   attributeChoices,
   buildSheetPool,
   checkSurge,
-  decodeSurge,
+  decodeSurgeBonus,
+  decodeSurgeKey,
+  surgeBonusChoices,
   decodeTrait,
   recipe,
   secondChoices,
@@ -59,6 +61,7 @@ export interface SheetOptionNames {
   with: string;
   specialty: string;
   surge?: string;
+  surgeBonus?: string;
 }
 
 /**
@@ -105,6 +108,15 @@ export async function respondSheetChoices(
     }
   } else if (focused.name === names.surge) {
     choices = surgeChoices(sheet, character.values, surges, surgeKeysOf(attribute, second));
+  } else if (focused.name === names.surgeBonus) {
+    const key = decodeSurgeKey(interaction.options.getString(names.surge ?? ''));
+    choices = key ? surgeBonusChoices(sheet, character.values, surges, key) : [];
+    if (!choices.length) {
+      const locale = localeFor(interaction, ctx.store);
+      return interaction.respond([
+        { name: t(locale, 'sheetRoll.hint.pickSurge').slice(0, 100), value: 'none' },
+      ]);
+    }
   }
   await interaction.respond(matching(choices, String(focused.value)));
 }
@@ -135,6 +147,7 @@ export function rollFromSheet(
     with: string | null;
     specialty: string | null;
     surge?: string | null;
+    surgeBonus?: string | null;
   },
   names: SheetOptionNames,
 ): SheetSide | SheetRefusal {
@@ -150,19 +163,25 @@ export function rollFromSheet(
 
   const attribute = decodeTrait(values.attribute);
   const second = decodeTrait(values.with);
-  const surge = decodeSurge(values.surge);
+  const surgeKey = decodeSurgeKey(values.surge);
+  const surgeBonus = decodeSurgeBonus(values.surgeBonus);
   const specialty = decodeSpecialty(values.specialty);
   // A value typed by hand instead of picked from the list.
   for (const [name, text, decoded] of [
     [names.attribute, values.attribute, attribute],
     [names.with, values.with, second],
     [names.specialty, values.specialty, specialty],
-    [names.surge ?? '', values.surge, surge],
+    [names.surge ?? '', values.surge, surgeKey],
+    [names.surgeBonus ?? '', values.surgeBonus, surgeBonus],
   ] as const) {
-    if (text != null && !decoded) {
+    if (text != null && decoded === undefined) {
       return { refuse: 'sheetRoll.pickFromList', params: { option: name } };
     }
   }
+
+  // The bonus goes with a trait picked in `surge`; without one, +1.
+  if (surgeBonus !== undefined && !surgeKey) return { refuse: 'sheetRoll.issue.bonusNeedsSurge' };
+  const surge = surgeKey ? { key: surgeKey, dots: surgeBonus ?? 1 } : undefined;
 
   // A specialty adds a die to the Skill picked in `with`, and to nothing else.
   if (specialty !== undefined && second?.kind !== 'skill') {

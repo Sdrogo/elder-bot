@@ -425,10 +425,22 @@ export function decodeSpecialty(value: string | null | undefined): number | unde
   return Number(value);
 }
 
+/** The trait picked in `surge`: `attr:dexterity` or `disc:potence`. */
+export function decodeSurgeKey(value: string | null | undefined): SurgeKey | undefined {
+  return decodeSurge(`${value ?? ''}:1`)?.key;
+}
+
+/** The dots picked in `surge_bonus`, or undefined for anything typed by hand. */
+export function decodeSurgeBonus(value: string | null | undefined): number | undefined {
+  if (!value || !/^\d$/.test(value)) return undefined;
+  const n = Number(value);
+  return n >= 1 ? n : undefined;
+}
+
 /**
- * Blood Surges the character can afford now, for the `surge` option: the Attributes and the
- * Disciplines with dots, each at every step within the tier limit and the Vitae left.
- * The traits already in the roll come first.
+ * The traits Blood Surge can raise now, for the `surge` option: every Attribute and Discipline
+ * with dots that can take at least +1 within the tier limit and the Vitae left. The bonus is
+ * picked apart in `surge_bonus`. The traits already in the roll come first.
  */
 export function surgeChoices(
   sheet: SheetDraft,
@@ -443,14 +455,26 @@ export function surgeChoices(
   keys.sort((a, b) => Number(first.includes(b)) - Number(first.includes(a)));
   const out: TraitChoice[] = [];
   for (const key of keys) {
-    for (let dots = 1; dots <= 6; dots++) {
-      const check = checkSurge(sheet, values, surges, { key, dots });
-      if (typeof check === 'string') break;
-      out.push({
-        name: `${surgeLabel(key)} +${dots} (${check.cost} Vitae)`,
-        value: encodeSurge({ key, dots }),
-      });
-    }
+    const steps = surgeBonusChoices(sheet, values, surges, key).length;
+    if (!steps) continue;
+    const per = SURGE_COST[key.split(':')[0] as 'attr' | 'disc'];
+    out.push({ name: `${surgeLabel(key)} (${per} Vitae per +1, up to +${steps})`, value: key });
+  }
+  return out;
+}
+
+/** The bonuses the character can afford on one trait, for `surge_bonus`: "+2 (4 Vitae)". */
+export function surgeBonusChoices(
+  sheet: SheetDraft,
+  values: Pick<CharacterValues, 'tier' | 'vitae'>,
+  surges: Surges,
+  key: SurgeKey,
+): TraitChoice[] {
+  const out: TraitChoice[] = [];
+  for (let dots = 1; dots <= 9; dots++) {
+    const check = checkSurge(sheet, values, surges, { key, dots });
+    if (typeof check === 'string') break;
+    out.push({ name: `+${dots} (${check.cost} Vitae)`, value: String(dots) });
   }
   return out;
 }

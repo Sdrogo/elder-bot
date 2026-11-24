@@ -12,6 +12,9 @@ import {
   specialtyChoices,
   decodeSpecialty,
   surgeChoices,
+  surgeBonusChoices,
+  decodeSurgeKey,
+  decodeSurgeBonus,
   type SheetPool,
 } from '../src/game/sheetPool.js';
 import { Store } from '../src/state/store.js';
@@ -158,11 +161,27 @@ describe('Blood Surge', () => {
     expect(check).toMatchObject({ cost: 1, surges: { 'attr:dexterity': 2 } });
   });
 
-  it("lists only what the Vitae and the limits allow, the roll's traits first", () => {
-    const list = surgeChoices(sheet(), { tier: 'neonate', vitae: 2 }, {}, ['disc:potence']);
-    expect(list[0]).toEqual({ name: 'Potence +1 (2 Vitae)', value: 'disc:potence:1' });
-    expect(list.some((c) => c.value === 'attr:strength:2')).toBe(true);
-    expect(list.some((c) => c.value === 'attr:strength:3')).toBe(false);
+  it('lists the traits, then the bonuses the Vitae and the limits allow', () => {
+    const traits = surgeChoices(sheet(), { tier: 'neonate', vitae: 2 }, {}, ['disc:potence']);
+    expect(traits[0]).toEqual({
+      name: 'Potence (2 Vitae per +1, up to +1)',
+      value: 'disc:potence',
+    });
+    expect(traits.filter((c) => c.value === 'attr:strength')).toEqual([
+      { name: 'Strength (1 Vitae per +1, up to +2)', value: 'attr:strength' },
+    ]);
+    const bonus = surgeBonusChoices(sheet(), { tier: 'neonate', vitae: 2 }, {}, 'attr:strength');
+    expect(bonus).toEqual([
+      { name: '+1 (1 Vitae)', value: '1' },
+      { name: '+2 (2 Vitae)', value: '2' },
+    ]);
+    expect(decodeSurgeKey('disc:potence')).toBe('disc:potence');
+    expect(decodeSurgeKey('disc:nope')).toBeUndefined();
+    expect([decodeSurgeBonus('2'), decodeSurgeBonus('0'), decodeSurgeBonus('x')]).toEqual([
+      2,
+      undefined,
+      undefined,
+    ]);
   });
 });
 
@@ -254,5 +273,63 @@ describe('/elder contest options', () => {
     expect(wantsSheet('attr:wits', null)).toBe(true);
     expect(wantsSheet(null, 'skill:fighting')).toBe(true);
     expect(wantsSheet(null, null, 'attr:strength:1')).toBe(true);
+  });
+});
+
+describe('rollFromSheet', () => {
+  it('takes the first specialization and a Blood Surge bonus, paying the Vitae', async () => {
+    const { rollFromSheet } = await import('../src/commands/sheetRoll.js');
+    const store = new Store(':memory:');
+    try {
+      const values = newCharacter({ tier: 'neonate', stamina: 3, composure: 3, resolve: 2 });
+      const c = store.campaign.createCharacter({
+        guildId: 'g1',
+        ownerId: 'u1',
+        name: 'Nico',
+        clan: 'brujah',
+        values,
+        sheet: { data: sheet(), approvals: [] },
+      });
+      if (typeof c !== 'object') throw new Error(c);
+      const names = {
+        attribute: 'attribute',
+        with: 'with',
+        specialty: 'specialization',
+        surge: 'surge',
+        surgeBonus: 'surge_bonus',
+      };
+      const side = rollFromSheet(
+        { store } as never,
+        'en',
+        { guildId: 'g1', channelId: 'c1' },
+        'u1',
+        'u1',
+        {
+          attribute: 'attr:dexterity',
+          with: 'skill:fighting',
+          specialty: '0',
+          surge: 'attr:dexterity',
+          surgeBonus: '2',
+        },
+        names,
+      );
+      if ('refuse' in side) throw new Error(side.refuse);
+      expect(recipe(side.pool)).toBe(
+        'Dexterity 3 (+2 Blood Surge) + Fighting 2 + Hand-to-Hand 1 = 8',
+      );
+      expect(side.character.values.vitae).toBe(values.vitae - 2);
+      const lonely = rollFromSheet(
+        { store } as never,
+        'en',
+        { guildId: 'g1', channelId: 'c1' },
+        'u1',
+        'u1',
+        { attribute: 'attr:dexterity', with: 'skill:fighting', specialty: null, surgeBonus: '1' },
+        names,
+      );
+      expect(lonely).toEqual({ refuse: 'sheetRoll.issue.bonusNeedsSurge' });
+    } finally {
+      store.close();
+    }
   });
 });

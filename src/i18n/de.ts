@@ -161,7 +161,7 @@ export const de: Messages = {
   'opt.roll.npc': 'Wurf für einen NSC: Pool aus dem Werteblock, ohne Hunger-Würfel',
   'opt.roll.attribute': 'Attribut vom Charakterbogen',
   'opt.roll.with': 'Was dazukommt: Fertigkeit, Disziplin, Kraft, Attribut oder Lifepath',
-  'opt.roll.surge': 'Blood Surge: Vitae ausgeben, um ein Attribut oder eine Disziplin zu steigern',
+  'opt.roll.surge': 'Blood Surge: das Attribut oder die Disziplin, die für die Szene steigt',
   'sheetRoll.pool': 'Pool',
   'sheetRoll.mixed':
     'Nutze `dice` oder die Bogen-Optionen (`attribute`, `with`, `surge`), nicht beides.',
@@ -197,6 +197,10 @@ export const de: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} auf dem Bogen, {tracker} auf den Leisten. Der Wurf nutzt den Bogen.',
   'button.surgeEnd': 'Blood Surge beenden',
+  'sheetRoll.issue.bonusNeedsSurge': 'Wähle zuerst in `surge` den Wert, der steigen soll.',
+  'sheetRoll.hint.pickSurge': 'Wähle zuerst den Wert in surge',
+  'opt.contest.surge_bonus': 'Bonus des Blood Surge, mit seinen Vitae-Kosten (Standard +1)',
+  'opt.roll.surge_bonus': 'Bonus des Blood Surge, mit seinen Vitae-Kosten (Standard +1)',
   'opt.roll.specialization': 'Spezialisierung der Fertigkeit in with (+1 Würfel)',
   'opt.contest.specialization': 'Spezialisierung der Fertigkeit in with (+1 Würfel)',
   'opt.contest.opponent_specialization':
@@ -210,8 +214,7 @@ export const de: Messages = {
   'sheetRoll.contest.needPool': 'Gib deinen Pool an: `dice`, oder `attribute` + `with` vom Bogen.',
   'sheetRoll.hint.pickOpponent': 'Wähle zuerst den Gegner',
   'opt.contest.opponent_with': 'Was zum Attribut des gegnerischen Spielers kommt, von seinem Bogen',
-  'opt.contest.surge':
-    'Blood Surge: Vitae ausgeben, um ein Attribut oder eine Disziplin zu steigern',
+  'opt.contest.surge': 'Blood Surge: das Attribut oder die Disziplin, die für die Szene steigt',
   'opt.contest.with': 'Was zu deinem Attribut kommt: Fertigkeit, Disziplin, Kraft, Lifepath',
   'button.masqueradeThreat': 'Bedrohungsprobe',
   'button.prolongedCancel': 'Aufgabe abbrechen',

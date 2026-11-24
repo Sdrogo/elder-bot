@@ -9,8 +9,14 @@ import type { Command } from './types.js';
 // an `attribute` plus what goes `with` it (Skill, Discipline, power, Attribute, lifepath),
 // a `specialization` of that Skill (+1), with an optional [Blood Surge] (`surge`) bought with Vitae for the scene.
 
-const SHEET_OPTIONS = ['attribute', 'with', 'specialization', 'surge'] as const;
-const NAMES = { attribute: 'attribute', with: 'with', specialty: 'specialization', surge: 'surge' };
+const SHEET_OPTIONS = ['attribute', 'with', 'specialization', 'surge', 'surge_bonus'] as const;
+const NAMES = {
+  attribute: 'attribute',
+  with: 'with',
+  specialty: 'specialization',
+  surge: 'surge',
+  surgeBonus: 'surge_bonus',
+};
 
 const data = addTestOptions(
   described(new SlashCommandBuilder().setName('roll'), 'cmd.roll.description')
@@ -24,8 +30,9 @@ const data = addTestOptions(
     .addStringOption((o) =>
       described(o.setName('specialization'), 'opt.roll.specialization').setAutocomplete(true),
     )
+    .addStringOption((o) => described(o.setName('surge'), 'opt.roll.surge').setAutocomplete(true))
     .addStringOption((o) =>
-      described(o.setName('surge'), 'opt.roll.surge').setAutocomplete(true),
+      described(o.setName('surge_bonus'), 'opt.roll.surge_bonus').setAutocomplete(true),
     ) as SlashCommandBuilder,
 ).addBooleanOption((o) => described(o.setName('npc'), 'opt.roll.npc'));
 
@@ -66,6 +73,7 @@ export const roll: Command = {
         with: interaction.options.getString('with'),
         specialty: interaction.options.getString('specialization'),
         surge: interaction.options.getString('surge'),
+        surgeBonus: interaction.options.getString('surge_bonus'),
       },
       NAMES,
     );
