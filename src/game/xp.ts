@@ -22,6 +22,10 @@ export interface XpEntry {
   amount: number;
   kind: 'session' | 'other' | 'spend' | 'refund';
   note: string;
+  /** For a purchase: what it bought (an Advance, see advancement.ts). */
+  advance?: unknown;
+  /** For a refund: the purchase it undoes. */
+  ref?: number;
 }
 
 /** The award a Storyteller asked for: 1 XP per condition, or a free amount (outside the cap). */
@@ -57,4 +61,14 @@ export function totals(log: readonly XpEntry[]): { earned: number; balance: numb
     if (e.kind === 'session' || e.kind === 'other') earned += e.amount;
   }
   return { earned, balance };
+}
+
+/** The log line of a purchase: kind and target, e.g. `skill:persuasion`. */
+export function advanceNote(a: {
+  kind: string;
+  id?: string;
+  skill?: string;
+  name?: string;
+}): string {
+  return a.kind === 'specialty' ? `specialty:${a.skill}:${a.name}` : `${a.kind}:${a.id}`;
 }
