@@ -159,7 +159,7 @@ export const fr: Messages = {
   'opt.roll.npc': 'Jet pour un PNJ : la réserve de sa fiche, sans dés de Hunger',
   'opt.roll.attribute': 'Attribut de la fiche de ton personnage',
   'opt.roll.with': 'Ce qui va avec : Compétence, Discipline, pouvoir, Attribut ou lifepath',
-  'opt.roll.surge': 'Blood Surge : dépense de la Vitae pour hausser un Attribut ou une Discipline',
+  'opt.roll.surge': "Blood Surge : l'Attribut ou la Discipline à hausser pour la scène",
   'sheetRoll.pool': 'Réserve',
   'sheetRoll.mixed':
     'Utilise `dice` ou les options de la fiche (`attribute`, `with`, `surge`), pas les deux.',
@@ -196,6 +196,10 @@ export const fr: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute} : {sheet} sur la fiche, {tracker} sur les jauges. Le jet utilise la fiche.',
   'button.surgeEnd': 'Fin du Blood Surge',
+  'sheetRoll.issue.bonusNeedsSurge': "Choisis d'abord dans `surge` le trait à hausser.",
+  'sheetRoll.hint.pickSurge': "Choisis d'abord le trait dans surge",
+  'opt.contest.surge_bonus': 'Bonus du Blood Surge, avec son coût en Vitae (par défaut +1)',
+  'opt.roll.surge_bonus': 'Bonus du Blood Surge, avec son coût en Vitae (par défaut +1)',
   'opt.roll.specialization': 'Spécialité de la Compétence choisie dans with (+1 dé)',
   'opt.contest.specialization': 'Spécialité de la Compétence choisie dans with (+1 dé)',
   'opt.contest.opponent_specialization':
@@ -210,8 +214,7 @@ export const fr: Messages = {
     'Indique ta réserve : `dice`, ou `attribute` + `with` depuis ta fiche.',
   'sheetRoll.hint.pickOpponent': "Choisis d'abord l'adversaire",
   'opt.contest.opponent_with': "Ce qui va avec l'Attribut du joueur adverse, depuis sa fiche",
-  'opt.contest.surge':
-    'Blood Surge : dépense de la Vitae pour hausser un Attribut ou une Discipline',
+  'opt.contest.surge': "Blood Surge : l'Attribut ou la Discipline à hausser pour la scène",
   'opt.contest.with': 'Ce qui va avec ton Attribut : Compétence, Discipline, pouvoir, lifepath',
   'button.masqueradeThreat': 'Test de menace',
   'button.prolongedCancel': 'Annuler la tâche',

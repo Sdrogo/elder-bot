@@ -29,6 +29,7 @@ const NAMES: SheetOptionNames = {
   with: 'with',
   specialty: 'specialization',
   surge: 'surge',
+  surgeBonus: 'surge_bonus',
 };
 const OPPONENT: SheetOptionNames = {
   attribute: 'opponent_attribute',
@@ -50,6 +51,9 @@ const data = described(new SlashCommandBuilder().setName('contest'), 'cmd.contes
     described(o.setName('specialization'), 'opt.contest.specialization').setAutocomplete(true),
   )
   .addStringOption((o) => described(o.setName('surge'), 'opt.contest.surge').setAutocomplete(true))
+  .addStringOption((o) =>
+    described(o.setName('surge_bonus'), 'opt.contest.surge_bonus').setAutocomplete(true),
+  )
   .addUserOption((o) => described(o.setName('opponent'), 'opt.contest.opponent'))
   .addIntegerOption((o) =>
     described(o.setName('opponent_dice'), 'opt.contest.opponent_dice')
@@ -138,7 +142,13 @@ export const contest: Command = {
     // My pool: a number, or Attribute + trait from my sheet (with a Blood Surge if I buy one).
     const myDiceOption = interaction.options.getInteger('dice');
     let mySheet: SheetSide | undefined;
-    if (wantsSheet(opt('attribute'), opt('with'), opt('surge') ?? opt('specialization'))) {
+    if (
+      wantsSheet(
+        opt('attribute'),
+        opt('with'),
+        opt('surge') ?? opt('surge_bonus') ?? opt('specialization'),
+      )
+    ) {
       if (myDiceOption !== null) return void (await refuse('sheetRoll.mixed'));
       const side = rollFromSheet(
         ctx,
@@ -151,6 +161,7 @@ export const contest: Command = {
           with: opt('with'),
           specialty: opt('specialization'),
           surge: opt('surge'),
+          surgeBonus: opt('surge_bonus'),
         },
         NAMES,
       );

@@ -154,7 +154,7 @@ export const en = {
   'opt.roll.npc': 'Roll for an NPC: the pool from their stat block, no Hunger dice',
   'opt.roll.attribute': 'Attribute from your character sheet',
   'opt.roll.with': 'What goes with it: Skill, Discipline, power, Attribute or lifepath',
-  'opt.roll.surge': 'Blood Surge: spend Vitae to raise an Attribute or Discipline for the scene',
+  'opt.roll.surge': 'Blood Surge: the Attribute or Discipline to raise for the scene',
   'sheetRoll.pool': 'Pool',
   'sheetRoll.mixed':
     'Use either `dice` or the sheet options (`attribute`, `with`, `surge`), not both.',
@@ -188,6 +188,10 @@ export const en = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} on the sheet, {tracker} on the trackers. The roll uses the sheet.',
   'button.surgeEnd': 'End Blood Surge',
+  'sheetRoll.issue.bonusNeedsSurge': 'Pick the trait to raise in `surge` first.',
+  'sheetRoll.hint.pickSurge': 'Pick the trait in surge first',
+  'opt.contest.surge_bonus': 'Blood Surge bonus, with its Vitae cost (default +1)',
+  'opt.roll.surge_bonus': 'Blood Surge bonus, with its Vitae cost (default +1)',
   'opt.roll.specialization': 'Specialty of the Skill in with (+1 die)',
   'opt.contest.specialization': 'Specialty of the Skill in with (+1 die)',
   'opt.contest.opponent_specialization': 'Specialty of the Skill in opponent_with (+1 die)',
@@ -200,7 +204,7 @@ export const en = {
   'sheetRoll.contest.needPool': 'Give your pool: `dice`, or `attribute` + `with` from your sheet.',
   'sheetRoll.hint.pickOpponent': 'Choose the opponent first',
   'opt.contest.opponent_with': "What goes with the opposing player's Attribute, from their sheet",
-  'opt.contest.surge': 'Blood Surge: spend Vitae to raise an Attribute or Discipline for the scene',
+  'opt.contest.surge': 'Blood Surge: the Attribute or Discipline to raise for the scene',
   'opt.contest.with': 'What goes with your Attribute: Skill, Discipline, power, lifepath',
   'button.masqueradeThreat': 'Threat test',
   'button.prolongedCancel': 'Cancel task',

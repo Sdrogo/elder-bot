@@ -158,8 +158,7 @@ export const es: Messages = {
   'opt.roll.npc': 'Tirada de un PNJ: la reserva de su ficha, sin dados de Hunger',
   'opt.roll.attribute': 'Atributo de la ficha de tu personaje',
   'opt.roll.with': 'Qué va con él: Habilidad, Disciplina, poder, Atributo o lifepath',
-  'opt.roll.surge':
-    'Blood Surge: gasta Vitae para subir un Atributo o una Disciplina durante la escena',
+  'opt.roll.surge': 'Blood Surge: el Atributo o la Disciplina que subir durante la escena',
   'sheetRoll.pool': 'Reserva',
   'sheetRoll.mixed':
     'Usa `dice` o las opciones de la ficha (`attribute`, `with`, `surge`), no ambos.',
@@ -194,6 +193,10 @@ export const es: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} en la ficha, {tracker} en los contadores. La tirada usa la ficha.',
   'button.surgeEnd': 'Terminar Blood Surge',
+  'sheetRoll.issue.bonusNeedsSurge': 'Elige primero en `surge` el rasgo que subir.',
+  'sheetRoll.hint.pickSurge': 'Elige primero el rasgo en surge',
+  'opt.contest.surge_bonus': 'Bonificador del Blood Surge, con su coste en Vitae (por defecto +1)',
+  'opt.roll.surge_bonus': 'Bonificador del Blood Surge, con su coste en Vitae (por defecto +1)',
   'opt.roll.specialization': 'Especialidad de la Habilidad elegida en with (+1 dado)',
   'opt.contest.specialization': 'Especialidad de la Habilidad elegida en with (+1 dado)',
   'opt.contest.opponent_specialization':
@@ -207,8 +210,7 @@ export const es: Messages = {
   'sheetRoll.contest.needPool': 'Indica tu reserva: `dice`, o `attribute` + `with` de tu ficha.',
   'sheetRoll.hint.pickOpponent': 'Elige primero al rival',
   'opt.contest.opponent_with': 'Qué va con el Atributo del jugador rival, de su ficha',
-  'opt.contest.surge':
-    'Blood Surge: gasta Vitae para subir un Atributo o una Disciplina durante la escena',
+  'opt.contest.surge': 'Blood Surge: el Atributo o la Disciplina que subir durante la escena',
   'opt.contest.with': 'Qué va con tu Atributo: Habilidad, Disciplina, poder, lifepath',
   'button.masqueradeThreat': 'Prueba de amenaza',
   'button.prolongedCancel': 'Cancelar tarea',

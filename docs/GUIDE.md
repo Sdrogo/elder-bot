@@ -100,7 +100,7 @@ A standard, Power or Self-Control test.
 
 `/elder roll dice [difficulty] [bonus] [reason] [npc]`
 
-`/elder roll attribute with [specialization] [surge] [difficulty] [bonus] [reason]`
+`/elder roll attribute with [specialization] [surge] [surge_bonus] [difficulty] [bonus] [reason]`
 
 | Option           | What it does                                                                                                           |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -108,7 +108,8 @@ A standard, Power or Self-Control test.
 | `attribute`      | An Attribute from your sheet, picked from the list with its dots                                                       |
 | `with`           | What goes with it: a Skill (its specializations in brackets), a Discipline, a power, another Attribute, a lifepath (2) |
 | `specialization` | A specialization of the Skill in `with`: +1 die. The list shows only that Skill's specializations                      |
-| `surge`          | **Blood Surge**: spend Vitae to raise an Attribute (1 Vitae a dot) or a Discipline (2 Vitae a dot) for the scene       |
+| `surge`          | **Blood Surge**: the Attribute (1 Vitae a dot) or Discipline (2 Vitae a dot) to raise for the scene                    |
+| `surge_bonus`    | How much to raise it, each choice with its Vitae cost; +1 when left out                                                |
 | `difficulty`     | Successes needed to win (1–15)                                                                                         |
 | `bonus`          | Bonus (positive) or penalty (negative) dice, −10 to +10                                                                |
 | `reason`         | What you are attempting, shown in the title                                                                            |
@@ -123,14 +124,14 @@ A character with a full sheet (made with the panel's wizard) can roll without co
 - **Power test**: pick the power in `with`. Its Attribute comes with it, so `attribute` can stay empty. Another Attribute is allowed (the Storyteller decides), and the roll says so.
 - **Two Attributes** (a task everyone knows, like driving) or a **lifepath** (2 dots, when no Skill fits) are in the same list.
 - **Impairment**: at 0 Health the Physical Attributes lose 2 dice, at 0 Willpower the Social and Mental ones do. The bot takes them off and says why.
-- **Blood Surge**: `surge` lists what your Vitae and your tier allow (an Attribute up to +2 for neonates, +4 ancillae, +6 elders; a Discipline up to the tier maximum). The Vitae are spent before the roll, so Hunger dice already count them. The surge stays on the character for the rest of the scene and is added to the next rolls from the sheet. It ends with the **End Blood Surge** button, when the session ends on the panel, or after 3 hours.
+- **Blood Surge**: pick the trait in `surge` and the bonus in `surge_bonus` (+1 if left out); both lists show only what your Vitae and your tier allow (an Attribute up to +2 for neonates, +4 ancillae, +6 elders; a Discipline up to the tier maximum). The Vitae are spent before the roll, so Hunger dice already count them. The surge stays on the character for the rest of the scene and is added to the next rolls from the sheet. It ends with the **End Blood Surge** button, when the session ends on the panel, or after 3 hours.
 - Hunger dice come from the character's Vitae, as always.
 
 ### `/elder contest`
 
 A contested test: both sides roll, the most successes wins.
 
-`/elder contest dice | attribute with [specialization] [surge] [opponent] opponent_dice | opponent_attribute opponent_with [opponent_specialization] [opponent_hunger] [reason]`
+`/elder contest dice | attribute with [specialization] [surge] [surge_bonus] [opponent] opponent_dice | opponent_attribute opponent_with [opponent_specialization] [opponent_hunger] [reason]`
 
 Each side's pool is a number (`dice`, `opponent_dice`) or comes from a character sheet, like `/elder roll`: `attribute` + `with` for you (with an optional `surge`), `opponent_attribute` + `opponent_with` for the opposing player picked in `opponent`. Their lists are read from that player's sheet. The opposing player's Blood Surges already running count too.
 

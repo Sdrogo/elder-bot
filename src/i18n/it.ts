@@ -156,8 +156,7 @@ export const it: Messages = {
   'opt.roll.npc': 'Tiro per un PNG: il pool dalla sua scheda, senza dadi Hunger',
   'opt.roll.attribute': 'Attributo dalla scheda del personaggio',
   'opt.roll.with': 'Cosa va insieme: Skill, Disciplina, potere, Attributo o lifepath',
-  'opt.roll.surge':
-    'Blood Surge: spendi Vitae per alzare un Attributo o una Disciplina per la scena',
+  'opt.roll.surge': "Blood Surge: l'Attributo o la Disciplina da alzare per la scena",
   'sheetRoll.pool': 'Pool',
   'sheetRoll.mixed':
     'Usa `dice` oppure le opzioni della scheda (`attribute`, `with`, `surge`), non entrambi.',
@@ -193,6 +192,10 @@ export const it: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} sulla scheda, {tracker} sui tracker. Il tiro usa la scheda.',
   'button.surgeEnd': 'Fine Blood Surge',
+  'sheetRoll.issue.bonusNeedsSurge': 'Scegli prima in `surge` il tratto da alzare.',
+  'sheetRoll.hint.pickSurge': 'Scegli prima il tratto in surge',
+  'opt.contest.surge_bonus': 'Bonus del Blood Surge, con il costo in Vitae (predefinito +1)',
+  'opt.roll.surge_bonus': 'Bonus del Blood Surge, con il costo in Vitae (predefinito +1)',
   'opt.roll.specialization': 'Specialità della Skill scelta in with (+1 dado)',
   'opt.contest.specialization': 'Specialità della Skill scelta in with (+1 dado)',
   'opt.contest.opponent_specialization': 'Specialità della Skill scelta in opponent_with (+1 dado)',
@@ -206,8 +209,7 @@ export const it: Messages = {
     'Indica la tua pool: `dice`, oppure `attribute` + `with` dalla scheda.',
   'sheetRoll.hint.pickOpponent': "Scegli prima l'avversario",
   'opt.contest.opponent_with': "Cosa va con l'Attributo del giocatore avversario, dalla sua scheda",
-  'opt.contest.surge':
-    'Blood Surge: spendi Vitae per alzare un Attributo o una Disciplina per la scena',
+  'opt.contest.surge': "Blood Surge: l'Attributo o la Disciplina da alzare per la scena",
   'opt.contest.with': 'Cosa va col tuo Attributo: Skill, Disciplina, potere, lifepath',
   'button.masqueradeThreat': 'Test di minaccia',
   'button.prolongedCancel': 'Annulla compito',
