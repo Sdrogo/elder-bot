@@ -695,6 +695,21 @@ export class Campaign {
   }
 
   /**
+   * Who pays for a Willpower reroll: the character played here, or `ambiguous` when the
+   * player owns several characters on this server and none is chosen (so nothing can be
+   * charged), or `none` when they have no character at all and play without a tracker.
+   */
+  willpowerPayer(
+    guildId: string | null,
+    channelId: string,
+    userId: string,
+  ): { character: Character } | 'ambiguous' | 'none' {
+    const character = this.playedCharacter(guildId, channelId, userId);
+    if (character) return { character };
+    return guildId && this.charactersOf(guildId, userId).length > 1 ? 'ambiguous' : 'none';
+  }
+
+  /**
    * The Chronicle a roll belongs to, for the overlay: the one played in this channel,
    * otherwise a Chronicle on air where the roller has a character, otherwise the roller's
    * own Chronicle on air (a Storyteller rolling for an NPC). With the roller's character.

@@ -229,6 +229,8 @@ export const en = {
   'frenzy.error.noCharacter':
     'You have no character at this table: give `dice` (Composure + Resolve) and `humanity`.',
   'willpower.none': '**{name}** has no Willpower left.',
+  'willpower.pickCharacter':
+    'Choose which character you are playing with `/elder sheet` first, so Willpower can be taken off the right sheet.',
   'willpower.left': '{name}: Willpower {left}/{max}.',
 
   // Web panel.

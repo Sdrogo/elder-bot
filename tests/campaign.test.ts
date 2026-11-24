@@ -89,6 +89,23 @@ describe('playedCharacter', () => {
   });
 });
 
+describe('willpowerPayer', () => {
+  it('asks for a choice instead of rerolling unpaid when several characters and none chosen', () => {
+    expect(store.campaign.willpowerPayer('g1', 'free', 'u1')).toBe('none');
+    const a = makeCharacter('u1', 'Alfa');
+    expect(store.campaign.willpowerPayer('g1', 'free', 'u1')).toEqual({
+      character: expect.objectContaining({ id: a.id }),
+    });
+    const b = makeCharacter('u1', 'Beta');
+    expect(store.campaign.willpowerPayer('g1', 'free', 'u1')).toBe('ambiguous');
+    expect(store.campaign.willpowerPayer(null, 'dm', 'u1')).toBe('none');
+    store.campaign.selectCharacter(b.id, 'u1');
+    expect(store.campaign.willpowerPayer('g1', 'free', 'u1')).toEqual({
+      character: expect.objectContaining({ id: b.id }),
+    });
+  });
+});
+
 describe('selected character', () => {
   it('wins over the sole-character fallback and the scene order, and only for the owner', () => {
     const a = makeCharacter('u1', 'Alfa');
