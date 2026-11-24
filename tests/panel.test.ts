@@ -877,6 +877,33 @@ describe('character creation wizard', () => {
     expect((await send('POST', '/api/drafts', { data: big })).status).toBe(413);
   });
 
+  it('creates a character with a custom lifepath waiting for the Storyteller', async () => {
+    const send = await asUser();
+    const data = brujah();
+    data.lifepaths[1] = {
+      id: 'custom-1',
+      custom: {
+        name: 'Gondoliere',
+        description: 'Canali e segreti.',
+        group: 'mortal',
+        skills: ['awareness', 'investigation', 'athletics', 'persuasion', 'shooting'],
+        resources: [{ kind: 'vehicle', detail: 'Gondola' }, { kind: 'contact' }, { kind: 'mask' }],
+      },
+      skills: { awareness: 2, investigation: 2, shooting: 1 },
+      resources: [1, 1, 1],
+    };
+    const saved = await send('POST', '/api/drafts', { data });
+    const id = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    const res = await send('POST', `/api/drafts/${id}/create`, { guild: 'g' });
+    expect(res.status).toBe(200);
+    const { character } = (await res.json()) as { character: { id: number } };
+    const sheet = store.campaign.getSheet(character.id)!;
+    expect(sheet.approvals).toEqual([
+      { code: 'custom-lifepath', target: 'Gondoliere', status: 'pending' },
+    ]);
+    expect(sheet.data).toMatchObject({ lifepaths: [{}, { custom: { name: 'Gondoliere' } }] });
+  });
+
   it('creates a character with its full sheet from a complete draft, only once', async () => {
     const send = await asUser();
     const half = await send('POST', '/api/drafts', { data: { tier: 'neonate', name: 'Mezza' } });
