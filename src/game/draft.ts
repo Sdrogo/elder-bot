@@ -174,6 +174,7 @@ export function parseDraft(v: unknown): SheetDraft | undefined {
   if (name?.trim()) d.name = name;
   if (Number.isInteger(v.characterId) && (v.characterId as number) > 0) {
     d.characterId = v.characterId as number;
+    if (v.editing === true) d.editing = true;
   }
   return d;
 }

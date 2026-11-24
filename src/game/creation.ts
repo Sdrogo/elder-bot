@@ -127,6 +127,8 @@ export interface SheetDraft {
   name?: string;
   /** A tracker-only character this sheet completes, instead of making a new one. */
   characterId?: number;
+  /** With `characterId`: this draft changes the character's existing sheet instead of completing it. */
+  editing?: boolean;
 }
 
 export function emptyDraft(tier: CreationTier): SheetDraft {

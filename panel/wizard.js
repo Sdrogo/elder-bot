@@ -132,6 +132,9 @@ const TEXT = {
     'create.server': 'Server Discord',
     'create.button': 'Crea il personaggio',
     'create.completeButton': 'Completa la scheda',
+    'create.editing': (name) =>
+      `Stai modificando la scheda di ${name}. I tracciati attuali (Health, Vitae, Willpower...) restano come sono.`,
+    'create.saveButton': 'Salva le modifiche',
     'create.complete': (name) => `La scheda completerà ${name}, che hai già sul bot.`,
     'create.notYet': 'Il bottone si attiva quando non resta niente da sistemare.',
     'create.approvals': (list) => `Il Narratore dovrà approvare: ${list}.`,
@@ -357,6 +360,9 @@ const TEXT = {
     'create.server': 'Discord server',
     'create.button': 'Create the character',
     'create.completeButton': 'Complete the sheet',
+    'create.editing': (name) =>
+      `You are changing ${name}'s sheet. Current trackers (Health, Vitae, Willpower...) stay as they are.`,
+    'create.saveButton': 'Save the changes',
     'create.complete': (name) => `This sheet will complete ${name}, already on the bot.`,
     'create.notYet': 'The button turns on when nothing is left to fix.',
     'create.approvals': (list) => `The Storyteller will have to approve: ${list}.`,
@@ -1575,7 +1581,7 @@ function setPriority(x, cat, rank) {
 /** The last box: where the character goes, and the button that makes it. */
 function createBox() {
   const box = el('div', 'card create');
-  box.append(el('h3', '', tr('create.title')));
+  box.append(el('h3', '', d.editing ? tr('create.saveButton') : tr('create.title')));
   if (current.approvals.length) {
     const names = current.approvals.map((a) =>
       a.code === 'path'
@@ -1588,7 +1594,8 @@ function createBox() {
   }
   const existing = d.characterId !== undefined && me.characters.find((c) => c.id === d.characterId);
   let guild;
-  if (existing) box.append(el('p', '', tr('create.complete', existing.name)));
+  if (d.editing) box.append(el('p', '', tr('create.editing', d.name || '')));
+  else if (existing) box.append(el('p', '', tr('create.complete', existing.name)));
   else if (!me.guilds.length) box.append(el('p', 'error', tr('create.noServer')));
   else {
     guild = el('select');
@@ -1600,7 +1607,11 @@ function createBox() {
     box.append(field(tr('create.server'), guild));
   }
   const make = button(
-    existing ? tr('create.completeButton') : tr('create.button'),
+    d.editing
+      ? tr('create.saveButton')
+      : existing
+        ? tr('create.completeButton')
+        : tr('create.button'),
     async () => {
       make.disabled = true;
       try {
@@ -1610,7 +1621,7 @@ function createBox() {
           guild: guild?.value,
         });
         if (response.ok) {
-          location.href = '/';
+          location.href = d.editing ? `/scheda?id=${d.characterId}` : '/';
           return;
         }
         const data = await response.json().catch(() => ({}));
@@ -1623,7 +1634,7 @@ function createBox() {
     },
     'primary',
   );
-  make.disabled = !current.complete || (!existing && !guild);
+  make.disabled = !current.complete || (!existing && !d.editing && !guild);
   box.append(make);
   if (!current.complete) box.append(el('p', 'quiet', tr('create.notYet')));
   return box;

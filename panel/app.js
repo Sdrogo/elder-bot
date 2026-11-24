@@ -18,6 +18,7 @@ const TEXT = {
     'characters.sheet': 'Scheda',
     'characters.pending': 'da approvare',
     'drafts.untitled': 'Senza nome',
+    'drafts.editing': 'modifica della scheda',
     'drafts.continue': 'Continua',
     'drafts.updated': 'modificata il',
     'chronicles.title': 'Le mie Cronache',
@@ -163,6 +164,7 @@ const TEXT = {
     'characters.sheet': 'Sheet',
     'characters.pending': 'to approve',
     'drafts.untitled': 'Untitled',
+    'drafts.editing': 'sheet edit',
     'drafts.continue': 'Continue',
     'drafts.updated': 'changed on',
     'chronicles.title': 'My Chronicles',
@@ -527,7 +529,18 @@ function characterCard(c, chronicle) {
   const actions = el('div', 'actions');
   if (c.editable) {
     actions.append(
-      button(tr('edit'), () => {
+      button(tr('edit'), async () => {
+        if (c.sheet) {
+          // A full sheet changes in the wizard, where every rule is checked again.
+          const response = await fetch(`/api/characters/${c.id}/edit`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-Token': me.csrf },
+          });
+          if (response.ok) location.href = `/crea?bozza=${(await response.json()).draft.id}`;
+          else notify(tr('error.change'));
+          return;
+        }
         const form = characterForm(c, () => form.replaceWith(actions));
         actions.replaceWith(form);
       }),
@@ -1263,7 +1276,12 @@ function draftCard(draft) {
   card.append(el('h3', '', data.name || tr('drafts.untitled')));
   const tier = data.tier.charAt(0).toUpperCase() + data.tier.slice(1);
   const when = new Date(draft.updatedAt).toLocaleDateString(lang);
-  const meta = [tier, data.clan ? clanName(data.clan) : '', `${tr('drafts.updated')} ${when}`];
+  const meta = [
+    tier,
+    data.clan ? clanName(data.clan) : '',
+    data.editing ? tr('drafts.editing') : '',
+    `${tr('drafts.updated')} ${when}`,
+  ];
   card.append(el('div', 'meta', meta.filter(Boolean).join(' · ')));
   const actions = el('div', 'actions');
   const go = el('a', 'button', tr('drafts.continue'));
