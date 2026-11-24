@@ -39,17 +39,14 @@ export class Store {
       DROP TABLE IF EXISTS drama;
       DROP TABLE IF EXISTS scene_traits;
       DROP TABLE IF EXISTS bargains;
-      CREATE TABLE IF NOT EXISTS storytellers (
-        channel_id TEXT PRIMARY KEY, user_id TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS prolonged (
         channel_id TEXT NOT NULL, user_id TEXT NOT NULL, task TEXT NOT NULL,
         PRIMARY KEY (channel_id, user_id));
       CREATE TABLE IF NOT EXISTS masquerade (
         channel_id TEXT PRIMARY KEY, value INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS table_locale (
-        channel_id TEXT PRIMARY KEY, locale TEXT NOT NULL);
     `);
     this.campaign = new Campaign(this.db);
+    this.dropChannelSessions();
     this.sessions = new WebSessions(this.db);
     this.overlayKeys = new OverlayKeys(this.db);
     this.viewKeys = new ViewKeys(this.db);
@@ -101,42 +98,35 @@ export class Store {
     })();
   }
 
-  /** The Storyteller of a table, set by /session; undefined until someone takes the role. */
+  /**
+   * Tables before Chronicles took over the session: the language moves to the Chronicle played
+   * in that channel, then the per-channel Storyteller and language are dropped.
+   */
+  private dropChannelSessions(): void {
+    const tables = this.db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'table_locale'")
+      .all();
+    this.db.transaction(() => {
+      if (tables.length) {
+        this.db.exec(`UPDATE chronicles SET locale = (
+            SELECT t.locale FROM table_locale t WHERE t.channel_id = chronicles.channel_id)
+          WHERE locale IS NULL AND channel_id IN (SELECT channel_id FROM table_locale)`);
+      }
+      this.db.exec('DROP TABLE IF EXISTS table_locale; DROP TABLE IF EXISTS storytellers;');
+    })();
+  }
+
+  /**
+   * The Storyteller of a table: the one who runs the Chronicle played in this channel.
+   * A channel with no Chronicle has none (server admins still count, see isStoryteller).
+   */
   getStoryteller(channelId: string): string | undefined {
-    const row = this.db
-      .prepare('SELECT user_id FROM storytellers WHERE channel_id = ?')
-      .get(channelId) as { user_id: string } | undefined;
-    return row?.user_id;
+    return this.campaign.chronicleByChannel(channelId)?.storytellerId;
   }
 
-  setStoryteller(channelId: string, userId: string): void {
-    this.db
-      .prepare(
-        `INSERT INTO storytellers (channel_id, user_id) VALUES (?, ?)
-         ON CONFLICT (channel_id) DO UPDATE SET user_id = excluded.user_id`,
-      )
-      .run(channelId, userId);
-  }
-
-  /** The language fixed for a table by /elder session language; undefined follows each user. */
+  /** The language of the Chronicle played here; undefined follows each user's Discord. */
   getTableLocale(channelId: string): string | undefined {
-    const row = this.db
-      .prepare('SELECT locale FROM table_locale WHERE channel_id = ?')
-      .get(channelId) as { locale: string } | undefined;
-    return row?.locale;
-  }
-
-  setTableLocale(channelId: string, locale: string): void {
-    this.db
-      .prepare(
-        `INSERT INTO table_locale (channel_id, locale) VALUES (?, ?)
-         ON CONFLICT (channel_id) DO UPDATE SET locale = excluded.locale`,
-      )
-      .run(channelId, locale);
-  }
-
-  clearTableLocale(channelId: string): void {
-    this.db.prepare('DELETE FROM table_locale WHERE channel_id = ?').run(channelId);
+    return this.campaign.chronicleByChannel(channelId)?.locale;
   }
 
   getProlonged(channelId: string, userId: string): ProlongedTask | undefined {
@@ -162,15 +152,14 @@ export class Store {
   }
 
   /**
-   * End of the game at this table: everything is wiped, including the Storyteller and the language.
-   * The Masquerade Tracker stays: it belongs to the chronicle, not to one session.
+   * End of a session at this table: prolonged tasks still running are dropped and Blood
+   * Surges end. The Storyteller, the language and the Masquerade Tracker belong to the Chronicle and stay.
    */
   endSession(channelId: string): void {
-    this.db.transaction(() => {
-      for (const table of ['prolonged', 'storytellers', 'table_locale']) {
-        this.db.prepare(`DELETE FROM ${table} WHERE channel_id = ?`).run(channelId);
-      }
-    })();
+    this.db.prepare('DELETE FROM prolonged WHERE channel_id = ?').run(channelId);
+    // Blood Surge lasts a scene at most: none survives the end of the session.
+    const chronicle = this.campaign.chronicleByChannel(channelId);
+    if (chronicle) this.campaign.clearChronicleSurges(chronicle.id);
   }
 
   close(): void {

@@ -1,4 +1,4 @@
-/* global document, window, fetch, FormData, location, navigator, setTimeout, URLSearchParams */
+/* global document, window, fetch, Event, FormData, location, navigator, setTimeout, URLSearchParams, createImageBitmap */
 // ElderBot web panel. No framework: the page asks /api/me and draws the cards.
 // Names come from users, so every text goes in with textContent, never as HTML.
 
@@ -23,7 +23,7 @@ const TEXT = {
     'chronicles.title': 'Le mie Cronache',
     noChronicle: 'nessuna Cronaca',
     live: 'in onda',
-    noMembers: 'Nessun personaggio. Invita i giocatori su Discord con /elder chronicle invite.',
+    noMembers: 'Nessun personaggio. Invita i giocatori su Discord con /elder invite.',
     error: 'Qualcosa è andato storto. Ricarica la pagina.',
     edit: 'Modifica',
     delete: 'Elimina',
@@ -35,7 +35,7 @@ const TEXT = {
     clan: 'Clan',
     tier: 'Livello',
     server: 'Server Discord',
-    noServer: 'Il bot non è in nessun server con te: aggiungilo o crea il PG su Discord.',
+    noServer: 'Il bot non è in nessun server con te: aggiungilo a un server.',
     'error.duplicate': 'Hai già un personaggio con questo nome su quel server.',
     'error.limit': 'Hai raggiunto il numero massimo di personaggi su quel server.',
     'error.invalid': 'Controlla i campi: qualcosa non va.',
@@ -61,6 +61,14 @@ const TEXT = {
     'cam.mine': 'La tua webcam (Narratore)',
     'cam.on': 'attiva',
     'cam.myLink': 'Il tuo link',
+    'portrait.title': 'Ritratto',
+    'portrait.on': 'caricato',
+    'portrait.note':
+      'Compare nella targhetta dell’overlay al posto del simbolo del clan, e riempie la cornice quando la webcam è spenta o assente. PNG, JPEG o WebP: le foto grandi vengono rimpicciolite.',
+    'portrait.upload': 'Carica ritratto',
+    'portrait.change': 'Cambia ritratto',
+    'portrait.remove': 'Togli il ritratto',
+    'portrait.bad': 'Immagine non valida: usa PNG, JPEG o WebP.',
     'stage.title': 'Scena',
     'stage.resolution': 'Risoluzione',
     'stage.layout': 'Disposizione',
@@ -77,6 +85,26 @@ const TEXT = {
     'layout.grid': 'Griglia: tutte le cornici uguali',
     'layout.stage': 'Palco: Narratore grande in alto, giocatori sotto',
     'layout.sides': 'Ai lati: giocatori a sinistra e a destra, Narratore al centro',
+    'editor.title': 'Layout personalizzati',
+    'editor.onAir': 'Layout in scena',
+    'editor.auto': 'Automatico (la disposizione qui sopra)',
+    'editor.edit': 'Editor del layout',
+    'editor.which': 'Layout da modificare',
+    'editor.new': 'Nuovo layout',
+    'editor.name': 'Nome',
+    'editor.players': 'Cornici dei giocatori',
+    'editor.startFrom': 'Parti da',
+    'editor.note':
+      'Trascina un riquadro per spostarlo e l’angolo in basso a destra per ridimensionarlo: tutto si aggancia alla griglia di 32 × 18 caselle. Le cornici dei giocatori seguono l’ordine della Cronaca; il riquadro dei tiri, se è più alto che largo, mostra gli ultimi tiri uno sotto l’altro. I riquadri rossi si sovrappongono.',
+    'editor.storyteller': 'Narratore',
+    'editor.player': 'Giocatore',
+    'editor.roll': 'Tiri',
+    'editor.hide': 'nascosto',
+    'editor.save': 'Salva',
+    'editor.saveUse': 'Salva e metti in scena',
+    'editor.delete': 'Elimina layout',
+    'editor.streamDeck':
+      'Stream Deck: con la chiave di modifica (header X-Elder-Token), POST a {url}?name=<nome> mette in scena quel layout, ?step=1 passa al successivo, ?step=-1 al precedente, ?auto=1 torna a quello automatico.',
     'overlay.roll': 'Solo il riquadro dei tiri',
     'overlay.title': 'Overlay di OBS',
     'overlay.pages':
@@ -101,6 +129,24 @@ const TEXT = {
     'overlay.key': 'Chiave',
     copy: 'Copia',
     copied: 'Copiata',
+    'chronicles.channel': 'Canale del tavolo',
+    'chronicles.noChannel': 'nessun canale',
+    'chronicles.channelNote':
+      'Il canale Discord dove si gioca: lì i tiri usano i PG della Cronaca e tu sei il Narratore.',
+    'chronicles.language': 'Lingua del bot',
+    'chronicles.autoLanguage': 'quella di Discord di ciascuno',
+    'chronicles.end': 'Chiudi sessione',
+    'chronicles.ended': 'Sessione chiusa: i compiti prolungati in corso sono stati annullati.',
+    'chronicles.archive': 'Archivia',
+    'chronicles.transfer': 'Cedi la Cronaca',
+    'characters.give': 'Cedi',
+    'give.to': 'A chi',
+    'give.other': 'Altro utente (ID Discord)…',
+    'give.id': 'ID Discord',
+    'give.idNote':
+      'Su Discord: tasto destro sul nome, "Copia ID utente" (serve la modalità sviluppatore).',
+    'give.confirm': 'Cedi',
+    'error.to': 'Utente non trovato su quel server.',
   },
   en: {
     'login.intro': 'Your Vampire: The Masquerade characters and Chronicles.',
@@ -122,7 +168,7 @@ const TEXT = {
     'chronicles.title': 'My Chronicles',
     noChronicle: 'no Chronicle',
     live: 'on air',
-    noMembers: 'No characters yet. Invite players on Discord with /elder chronicle invite.',
+    noMembers: 'No characters yet. Invite players on Discord with /elder invite.',
     error: 'Something went wrong. Reload the page.',
     edit: 'Edit',
     delete: 'Delete',
@@ -134,7 +180,7 @@ const TEXT = {
     clan: 'Clan',
     tier: 'Tier',
     server: 'Discord server',
-    noServer: 'The bot shares no server with you: add it, or create the character on Discord.',
+    noServer: 'The bot shares no server with you: add it to a server.',
     'error.duplicate': 'You already have a character with this name on that server.',
     'error.limit': 'You reached the maximum number of characters on that server.',
     'error.invalid': 'Check the fields: something is wrong.',
@@ -159,6 +205,14 @@ const TEXT = {
     'cam.mine': 'Your webcam (Storyteller)',
     'cam.on': 'on',
     'cam.myLink': 'Your link',
+    'portrait.title': 'Portrait',
+    'portrait.on': 'uploaded',
+    'portrait.note':
+      'Shown on the overlay plate instead of the clan symbol, and filling the frame while the webcam is off or missing. PNG, JPEG or WebP: large photos are scaled down.',
+    'portrait.upload': 'Upload portrait',
+    'portrait.change': 'Change portrait',
+    'portrait.remove': 'Remove the portrait',
+    'portrait.bad': 'Invalid image: use PNG, JPEG or WebP.',
     'stage.title': 'Scene',
     'stage.resolution': 'Resolution',
     'stage.layout': 'Layout',
@@ -174,6 +228,26 @@ const TEXT = {
     'layout.grid': 'Grid: all frames alike',
     'layout.stage': 'Stage: Storyteller large on top, players below',
     'layout.sides': 'Sides: players left and right, Storyteller in the middle',
+    'editor.title': 'Custom layouts',
+    'editor.onAir': 'Layout on the scene',
+    'editor.auto': 'Automatic (the layout above)',
+    'editor.edit': 'Layout editor',
+    'editor.which': 'Layout to edit',
+    'editor.new': 'New layout',
+    'editor.name': 'Name',
+    'editor.players': 'Player frames',
+    'editor.startFrom': 'Start from',
+    'editor.note':
+      'Drag a box to move it and its bottom-right corner to resize it: everything snaps to the 32 × 18 grid. Player frames follow the Chronicle order; a roll box taller than it is wide shows the last rolls one under the other. Red boxes overlap.',
+    'editor.storyteller': 'Storyteller',
+    'editor.player': 'Player',
+    'editor.roll': 'Rolls',
+    'editor.hide': 'hidden',
+    'editor.save': 'Save',
+    'editor.saveUse': 'Save and put on the scene',
+    'editor.delete': 'Delete layout',
+    'editor.streamDeck':
+      'Stream Deck: with the edit key (X-Elder-Token header), POST to {url}?name=<name> puts that layout on the scene, ?step=1 goes to the next, ?step=-1 to the previous, ?auto=1 back to the automatic one.',
     'overlay.roll': 'Roll box only',
     'overlay.title': 'OBS overlay',
     'overlay.pages':
@@ -197,6 +271,23 @@ const TEXT = {
     'overlay.key': 'Key',
     copy: 'Copy',
     copied: 'Copied',
+    'chronicles.channel': 'Table channel',
+    'chronicles.noChannel': 'no channel',
+    'chronicles.channelNote':
+      "The Discord channel where it is played: rolls there use the Chronicle's characters and you are the Storyteller.",
+    'chronicles.language': 'Bot language',
+    'chronicles.autoLanguage': "each user's Discord language",
+    'chronicles.end': 'End session',
+    'chronicles.ended': 'Session ended: prolonged tasks still open were cancelled.',
+    'chronicles.archive': 'Archive',
+    'chronicles.transfer': 'Hand over the Chronicle',
+    'characters.give': 'Give away',
+    'give.to': 'To',
+    'give.other': 'Another user (Discord ID)…',
+    'give.id': 'Discord ID',
+    'give.idNote': 'On Discord: right-click the name, "Copy User ID" (needs Developer Mode).',
+    'give.confirm': 'Give',
+    'error.to': 'User not found on that server.',
   },
 };
 
@@ -269,7 +360,8 @@ async function change(method, url, body) {
       invalid: 'error.invalid',
       tier: 'error.tier',
     };
-    notify(tr(key[data.error] ?? 'error.change'));
+    const fieldKey = data.field === 'to' ? 'error.to' : undefined;
+    notify(tr(fieldKey ?? key[data.error] ?? 'error.change'));
     return false;
   }
   await loadPanel();
@@ -430,7 +522,7 @@ function characterCard(c, chronicle) {
     track(c, 'Violations', '', String(hu.violations), 'violations'),
   );
 
-  if (c.editable) card.append(camBox(c));
+  if (c.editable) card.append(camBox(c), portraitBox(c));
 
   const actions = el('div', 'actions');
   if (c.editable) {
@@ -453,6 +545,11 @@ function characterCard(c, chronicle) {
     }
     if (c.owned) {
       actions.append(
+        button(tr('characters.give'), () => {
+          const url = `/api/characters/${c.id}/give`;
+          const form = recipientForm(c.guild, url, () => form.replaceWith(actions));
+          actions.replaceWith(form);
+        }),
         confirmButton(tr('delete'), () => change('DELETE', `/api/characters/${c.id}`)),
       );
     }
@@ -495,6 +592,123 @@ function camBox(c) {
   return box;
 }
 
+/** Scales a photo down to at most 1600 px on its longest side, as WebP (PNG where unsupported). */
+async function shrinkImage(file) {
+  const MAX = 1600;
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return undefined;
+  }
+  const k = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * k);
+  canvas.height = Math.round(bitmap.height * k);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.88));
+}
+
+/** The character's portrait for the overlay: a thumbnail, upload and remove. */
+function portraitBox(c) {
+  const box = el('details', 'portrait-box');
+  box.append(
+    el(
+      'summary',
+      '',
+      c.portrait ? `${tr('portrait.title')} · ${tr('portrait.on')}` : tr('portrait.title'),
+    ),
+  );
+  const path = `/api/characters/${c.id}/portrait`;
+  if (c.portrait) {
+    const img = el('img', 'portrait-thumb');
+    img.alt = '';
+    img.src = `${path}?t=${c.portrait}`;
+    box.append(img);
+  }
+  box.append(el('p', 'note', tr('portrait.note')));
+  const file = el('input');
+  file.type = 'file';
+  file.accept = 'image/png,image/jpeg,image/webp';
+  file.hidden = true;
+  file.addEventListener('change', async () => {
+    const picked = file.files?.[0];
+    if (!picked) return;
+    const image = await shrinkImage(picked);
+    if (!image) return notify(tr('portrait.bad'));
+    const response = await fetch(path, {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': image.type, 'X-CSRF-Token': me.csrf },
+      body: image,
+    });
+    if (!response.ok) return notify(tr(response.status === 415 ? 'portrait.bad' : 'error.change'));
+    await loadPanel();
+  });
+  const actions = el('div', 'actions');
+  actions.append(
+    button(tr(c.portrait ? 'portrait.change' : 'portrait.upload'), () => file.click()),
+    file,
+  );
+  if (c.portrait)
+    actions.append(confirmButton(tr('portrait.remove'), () => change('DELETE', path)));
+  box.append(actions);
+  return box;
+}
+
+/** Channels or people of a Discord server, asked when a form opens. */
+async function choicesOf(guild, kind) {
+  const response = await fetch(`/api/guilds/${guild}/${kind}`, { credentials: 'same-origin' });
+  if (!response.ok) return [];
+  const data = await response.json().catch(() => ({}));
+  return Array.isArray(data[kind]) ? data[kind] : [];
+}
+
+/** Picks someone on the server (or types their Discord ID) and hands something over to them. */
+function recipientForm(guild, url, onDone) {
+  const form = el('form', 'sheet-form');
+  const pick = select('pick', [{ id: '', name: '…' }], '');
+  const id = el('input');
+  id.name = 'id';
+  id.inputMode = 'numeric';
+  id.pattern = '\\d{5,20}';
+  const idField = field(tr('give.id'), id);
+  const idNote = el('p', 'note', tr('give.idNote'));
+  idField.hidden = true;
+  idNote.hidden = true;
+  pick.addEventListener('change', () => {
+    const other = pick.value === 'other';
+    idField.hidden = !other;
+    idNote.hidden = !other;
+    id.required = other;
+  });
+  choicesOf(guild, 'people').then((people) => {
+    pick.replaceChildren();
+    for (const o of [...people, { id: 'other', name: tr('give.other') }]) {
+      const opt = el('option', '', o.name);
+      opt.value = o.id;
+      pick.append(opt);
+    }
+    pick.dispatchEvent(new Event('change'));
+  });
+  form.append(field(tr('give.to'), pick), idField, idNote);
+  const actions = el('div', 'actions');
+  const submit = el('button', 'primary', tr('give.confirm'));
+  submit.type = 'submit';
+  actions.append(submit, button(tr('cancel'), onDone));
+  form.append(actions);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const to = pick.value === 'other' ? id.value.trim() : pick.value;
+    if (!to) return;
+    submit.disabled = true;
+    const ok = await change('POST', url, { to });
+    submit.disabled = false;
+    if (ok) onDone();
+  });
+  return form;
+}
+
 /** The form for a new Chronicle (no `ch`) or for renaming one and changing its sect. */
 function chronicleForm(ch, onDone) {
   const form = el('form', 'sheet-form');
@@ -518,6 +732,43 @@ function chronicleForm(ch, onDone) {
       ),
     ),
   );
+  if (ch) {
+    // Where it is played on Discord and the bot's language there.
+    const channel = select(
+      'channel',
+      [
+        { id: '', name: tr('chronicles.noChannel') },
+        ...(ch.channel ? [{ id: ch.channel, name: ch.channelName ?? ch.channel }] : []),
+      ],
+      ch.channel,
+    );
+    choicesOf(ch.guild, 'channels').then((channels) => {
+      const current = channel.value;
+      channel.replaceChildren();
+      const list = [{ id: '', name: tr('chronicles.noChannel') }, ...channels];
+      if (current && !channels.some((c) => c.id === current)) {
+        list.push({ id: current, name: ch.channelName ?? current });
+      }
+      for (const o of list) {
+        const opt = el('option', '', o.name);
+        opt.value = o.id;
+        opt.selected = o.id === current;
+        channel.append(opt);
+      }
+    });
+    form.append(
+      field(tr('chronicles.channel'), channel),
+      el('p', 'note', tr('chronicles.channelNote')),
+      field(
+        tr('chronicles.language'),
+        select(
+          'locale',
+          [{ id: '', name: tr('chronicles.autoLanguage') }, ...me.options.languages],
+          ch.locale,
+        ),
+      ),
+    );
+  }
   const actions = el('div', 'actions');
   const submit = el('button', 'primary', tr(ch ? 'save' : 'create'));
   submit.type = 'submit';
@@ -527,7 +778,10 @@ function chronicleForm(ch, onDone) {
     event.preventDefault();
     const data = new FormData(form);
     const body = { name: data.get('name'), sect: data.get('sect'), tier: data.get('tier') };
-    if (!ch) body.guild = data.get('guild') ?? me.guilds[0].id;
+    if (ch) {
+      body.channel = data.get('channel') ?? '';
+      body.locale = data.get('locale') ?? '';
+    } else body.guild = data.get('guild') ?? me.guilds[0].id;
     submit.disabled = true;
     const ok = await change('POST', ch ? `/api/chronicles/${ch.id}` : '/api/chronicles', body);
     submit.disabled = false;
@@ -549,6 +803,20 @@ function chronicleBlock(ch) {
       tools.replaceWith(form);
     }),
   );
+  if (ch.channel) {
+    tools.append(
+      confirmButton(tr('chronicles.end'), async () => {
+        if (await change('POST', `${path}/end`)) notify(tr('chronicles.ended'));
+      }),
+    );
+  }
+  tools.append(
+    button(tr('chronicles.transfer'), () => {
+      const form = recipientForm(ch.guild, `${path}/transfer`, () => form.replaceWith(tools));
+      tools.replaceWith(form);
+    }),
+    confirmButton(tr('chronicles.archive'), () => change('POST', `${path}/archive`)),
+  );
   const masquerade = el('div', 'track masquerade');
   const step = (delta) => () => change('POST', `${path}/masquerade`, { delta });
   const value = el('span', 'value');
@@ -562,7 +830,11 @@ function chronicleBlock(ch) {
     el('span', 'boxes', boxes(ch.masquerade, 10 - ch.masquerade)),
     value,
   );
-  const meta = [ch.sect, ch.tier ?? tr('chronicles.anyTier')].join(' · ');
+  const meta = [
+    ch.sect,
+    ch.tier ?? tr('chronicles.anyTier'),
+    ch.channelName ?? tr('chronicles.noChannel'),
+  ].join(' · ');
   block.append(title, el('div', 'meta', meta), masquerade, tools);
   const cards = el('div', 'cards');
   cards.append(...ch.characters.map((c) => characterCard(c, ch)));
@@ -583,6 +855,234 @@ function copyField(label, value) {
   const row = el('div', 'copy-row');
   row.append(input, copy);
   return field(label, row);
+}
+
+/**
+ * The layout being edited: kept here, outside the page, so a reload of the panel (any change
+ * anywhere) doesn't lose unsaved moves. `id` is undefined for a new layout.
+ */
+let layoutDraft = null;
+
+const boxesOverlap = (a, b) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Saved layouts for OBS: the one on the scene, and an editor on a 32 × 18 grid. */
+function layoutEditor(pages) {
+  const E = window.ELDER;
+  const grid = pages.grid ?? { cols: 32, rows: 18 };
+  const saved = pages.saved ?? [];
+  const box = el('div', 'stage-box layout-editor');
+  box.append(el('h4', '', tr('editor.title')));
+
+  // Which layout is on the scene; the Stream Deck changes the same setting.
+  const onAir = select(
+    'active',
+    [
+      { id: '', name: tr('editor.auto') },
+      ...saved.map((l) => ({ id: String(l.id), name: l.name })),
+    ],
+    pages.activeLayout ? String(pages.activeLayout) : '',
+  );
+  onAir.addEventListener('change', () =>
+    change('POST', '/api/stage/layout', { id: onAir.value ? Number(onAir.value) : null }),
+  );
+  box.append(
+    field(tr('editor.onAir'), onAir),
+    el(
+      'p',
+      'note',
+      tr('editor.streamDeck').replace('{url}', `${location.origin}/api/overlay/layout`),
+    ),
+  );
+  if (!E?.presetItems) return box;
+
+  const defaultPlayers = Math.max(1, Math.min(12, pages.characters.length || 4));
+  const fresh = (players = defaultPlayers) => ({
+    id: undefined,
+    name: '',
+    items: E.presetItems(players, 'grid', grid),
+  });
+  // A draft of a layout that was deleted meanwhile starts again from scratch.
+  if (layoutDraft && layoutDraft.id !== undefined && !saved.some((l) => l.id === layoutDraft.id)) {
+    layoutDraft = null;
+  }
+  layoutDraft ??= fresh();
+  const draft = layoutDraft;
+
+  const details = el('details', 'editor');
+  details.open = true;
+  details.append(el('summary', '', tr('editor.edit')));
+
+  const which = select(
+    'which',
+    [{ id: '', name: tr('editor.new') }, ...saved.map((l) => ({ id: String(l.id), name: l.name }))],
+    draft.id === undefined ? '' : String(draft.id),
+  );
+  which.addEventListener('change', () => {
+    const found = saved.find((l) => String(l.id) === which.value);
+    layoutDraft = found
+      ? { id: found.id, name: found.name, items: JSON.parse(JSON.stringify(found.items)) }
+      : fresh();
+    loadPanel();
+  });
+  const name = el('input');
+  name.maxLength = 32;
+  name.value = draft.name;
+  name.addEventListener('input', () => (draft.name = name.value));
+  const players = el('input');
+  players.type = 'number';
+  players.min = '0';
+  players.max = '12';
+  players.value = String(draft.items.players.length);
+  players.addEventListener('change', () => {
+    const n = Math.max(0, Math.min(12, Number(players.value) || 0));
+    const list = draft.items.players;
+    // New frames start in the top-left corner, small, ready to be dragged into place.
+    while (list.length < n) list.push({ x: 0, y: 0, w: 6, h: 4 });
+    list.length = n;
+    draw();
+  });
+  details.append(
+    field(tr('editor.which'), which),
+    field(tr('editor.name'), name),
+    field(tr('editor.players'), players),
+  );
+
+  const presets = el('div', 'actions');
+  presets.append(el('span', 'note', tr('editor.startFrom')));
+  for (const id of pages.layouts) {
+    presets.append(
+      button(tr(`layout.${id}`).split(':')[0], () => {
+        draft.items = E.presetItems(draft.items.players.length, id, grid);
+        draw();
+      }),
+    );
+  }
+  details.append(presets, el('p', 'note', tr('editor.note')));
+
+  // The scene in small: a 16:9 box with the grid drawn on it, the frames as boxes.
+  const canvas = el('div', 'grid-canvas');
+  canvas.style.setProperty('--cols', String(grid.cols));
+  canvas.style.setProperty('--rows', String(grid.rows));
+  const toggles = el('div', 'toggles');
+  details.append(canvas, toggles);
+
+  const entries = () => [
+    ...draft.items.players.map((b, i) => ({ b, label: `${tr('editor.player')} ${i + 1}` })),
+    { b: draft.items.storyteller, label: tr('editor.storyteller'), cls: 'st' },
+    { b: draft.items.roll, label: tr('editor.roll'), cls: 'roll' },
+  ];
+
+  function draw() {
+    canvas.replaceChildren();
+    toggles.replaceChildren();
+    const list = entries();
+    for (const entry of list) {
+      const { b } = entry;
+      const hide = el('input');
+      hide.type = 'checkbox';
+      hide.checked = !!b.hidden;
+      hide.addEventListener('change', () => {
+        if (hide.checked) b.hidden = true;
+        else delete b.hidden;
+        draw();
+      });
+      const t = el('label', 'check');
+      t.append(hide, el('span', '', `${entry.label} · ${tr('editor.hide')}`));
+      toggles.append(t);
+      if (b.hidden) continue;
+      const node = el('div', `cell-box ${entry.cls ?? ''}`, entry.label);
+      const overlap = list.some((o) => o !== entry && !o.b.hidden && boxesOverlap(o.b, b));
+      if (overlap) node.classList.add('overlap');
+      position(node, b);
+      const handle = el('span', 'resize');
+      node.append(handle);
+      drag(node, node, b, false);
+      drag(handle, node, b, true);
+      canvas.append(node);
+    }
+  }
+
+  function position(node, b) {
+    node.style.left = `${(b.x / grid.cols) * 100}%`;
+    node.style.top = `${(b.y / grid.rows) * 100}%`;
+    node.style.width = `${(b.w / grid.cols) * 100}%`;
+    node.style.height = `${(b.h / grid.rows) * 100}%`;
+  }
+
+  /**
+   * Moves (or with `resize`, stretches) a box cell by cell while the pointer is down; the
+   * overlaps are worked out again when it is let go.
+   */
+  function drag(target, node, b, resize) {
+    target.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      target.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      const cw = rect.width / grid.cols;
+      const ch = rect.height / grid.rows;
+      const start = { ...b, px: e.clientX, py: e.clientY };
+      const move = (ev) => {
+        const dx = Math.round((ev.clientX - start.px) / cw);
+        const dy = Math.round((ev.clientY - start.py) / ch);
+        if (resize) {
+          b.w = Math.max(2, Math.min(grid.cols - b.x, start.w + dx));
+          b.h = Math.max(2, Math.min(grid.rows - b.y, start.h + dy));
+        } else {
+          b.x = Math.max(0, Math.min(grid.cols - b.w, start.x + dx));
+          b.y = Math.max(0, Math.min(grid.rows - b.h, start.y + dy));
+        }
+        position(node, b);
+      };
+      const up = () => {
+        draw();
+        target.removeEventListener('pointermove', move);
+        target.removeEventListener('pointerup', up);
+        target.removeEventListener('pointercancel', up);
+      };
+      target.addEventListener('pointermove', move);
+      target.addEventListener('pointerup', up);
+      target.addEventListener('pointercancel', up);
+    });
+  }
+  draw();
+
+  const save = async (use) => {
+    const body = { name: draft.name.trim(), items: draft.items };
+    if (draft.id !== undefined) body.id = draft.id;
+    const response = await fetch('/api/stage/layouts', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': me.csrf },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const key = { duplicate: 'error.duplicate', limit: 'error.limit', invalid: 'error.invalid' };
+      return notify(tr(key[data.error] ?? 'error.change'));
+    }
+    draft.id = data.layout.id;
+    if (use) return change('POST', '/api/stage/layout', { id: data.layout.id });
+    return loadPanel();
+  };
+  const actions = el('div', 'actions');
+  actions.append(
+    button(tr('editor.save'), () => save(false)),
+    button(tr('editor.saveUse'), () => save(true)),
+  );
+  if (draft.id !== undefined) {
+    actions.append(
+      confirmButton(tr('editor.delete'), () => {
+        const id = draft.id;
+        layoutDraft = null;
+        return change('DELETE', `/api/stage/layouts/${id}`);
+      }),
+    );
+  }
+  details.append(actions);
+  box.append(details);
+  return box;
 }
 
 /** The scene's settings: size, layout, roll box, background and the Storyteller's webcam. */
@@ -689,7 +1189,7 @@ function overlayBox(newKey) {
       copyField(tr('overlay.roll'), `${base}/frame?pg=tiro&${v}`),
       ...pages.characters.map((c) => copyField(c.name, `${base}/frame?pg=${c.id}&${v}`)),
     );
-    box.append(stageBox(pages));
+    box.append(stageBox(pages), layoutEditor(pages));
     const layout = window.ELDER?.sceneLayout;
     if (layout) {
       const names = [...pages.characters.map((c) => c.name), 'Storyteller'];

@@ -1,22 +1,88 @@
-import { SlashCommandBuilder } from 'discord.js';
-import { described, localeFor, t } from '../i18n/index.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { described, localeFor, t, type MessageKey } from '../i18n/index.js';
+import { rollerHunger } from './campaignShared.js';
 import { addTestOptions, replyWithRoll } from './shared.js';
+import { respondSheetChoices, rollFromSheet, shortTitle, surgeEndButton } from './sheetRoll.js';
 import type { Command } from './types.js';
 
+// /elder roll takes the pool as a number (`dice`) or from the character's sheet:
+// an `attribute` plus what goes `with` it (Skill, Discipline, power, Attribute, lifepath),
+// a `specialization` of that Skill (+1), with an optional [Blood Surge] (`surge`) bought with Vitae for the scene.
+
+const SHEET_OPTIONS = ['attribute', 'with', 'specialization', 'surge', 'surge_bonus'] as const;
+const NAMES = {
+  attribute: 'attribute',
+  with: 'with',
+  specialty: 'specialization',
+  surge: 'surge',
+  surgeBonus: 'surge_bonus',
+};
+
 const data = addTestOptions(
-  described(new SlashCommandBuilder().setName('roll'), 'cmd.roll.description').addIntegerOption(
-    (o) =>
-      described(o.setName('dice'), 'opt.roll.dice')
-        .setRequired(true)
-        .setMinValue(0)
-        .setMaxValue(30),
-  ) as SlashCommandBuilder,
-);
+  described(new SlashCommandBuilder().setName('roll'), 'cmd.roll.description')
+    .addIntegerOption((o) =>
+      described(o.setName('dice'), 'opt.roll.dice').setMinValue(0).setMaxValue(30),
+    )
+    .addStringOption((o) =>
+      described(o.setName('attribute'), 'opt.roll.attribute').setAutocomplete(true),
+    )
+    .addStringOption((o) => described(o.setName('with'), 'opt.roll.with').setAutocomplete(true))
+    .addStringOption((o) =>
+      described(o.setName('specialization'), 'opt.roll.specialization').setAutocomplete(true),
+    )
+    .addStringOption((o) => described(o.setName('surge'), 'opt.roll.surge').setAutocomplete(true))
+    .addStringOption((o) =>
+      described(o.setName('surge_bonus'), 'opt.roll.surge_bonus').setAutocomplete(true),
+    ) as SlashCommandBuilder,
+).addBooleanOption((o) => described(o.setName('npc'), 'opt.roll.npc'));
 
 export const roll: Command = {
   data,
+
+  async autocomplete(interaction, ctx) {
+    await respondSheetChoices(interaction, ctx, interaction.user.id, NAMES);
+  },
+
   async execute(interaction, ctx) {
-    const title = t(localeFor(interaction, ctx.store), 'roll.title');
-    await replyWithRoll(interaction, ctx, interaction.options.getInteger('dice', true), title);
+    const locale = localeFor(interaction, ctx.store);
+    // An NPC's pool from its stat block: no Hunger dice, no Willpower, no Beast's Bargain.
+    const npc = interaction.options.getBoolean('npc') ?? false;
+    const dice = interaction.options.getInteger('dice');
+    const fromSheet = SHEET_OPTIONS.some((o) => interaction.options.getString(o) !== null);
+
+    const refuse = (key: MessageKey, params: Record<string, string | number> = {}) =>
+      interaction.reply({ content: t(locale, key, params), flags: MessageFlags.Ephemeral });
+
+    if (fromSheet && npc) return void (await refuse('sheetRoll.npc'));
+    if (fromSheet && dice !== null) return void (await refuse('sheetRoll.mixed'));
+    if (!fromSheet) {
+      if (dice === null) return void (await refuse('sheetRoll.needPool'));
+      const title = t(locale, npc ? 'npc.name' : 'roll.title');
+      await replyWithRoll(interaction, ctx, dice, title, { npc });
+      return;
+    }
+
+    const side = rollFromSheet(
+      ctx,
+      locale,
+      { guildId: interaction.guildId, channelId: interaction.channelId },
+      interaction.user.id,
+      interaction.user.id,
+      {
+        attribute: interaction.options.getString('attribute'),
+        with: interaction.options.getString('with'),
+        specialty: interaction.options.getString('specialization'),
+        surge: interaction.options.getString('surge'),
+        surgeBonus: interaction.options.getString('surge_bonus'),
+      },
+      NAMES,
+    );
+    if ('refuse' in side) return void (await refuse(side.refuse, side.params));
+    const hunger = rollerHunger(interaction, ctx, locale, 'hunger', side.character);
+    await replyWithRoll(interaction, ctx, side.pool.dice, shortTitle(side.pool), {
+      hunger,
+      notes: side.notes,
+      extraButtons: surgeEndButton(locale, side),
+    });
   },
 };

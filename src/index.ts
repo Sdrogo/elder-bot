@@ -1,6 +1,17 @@
-import { Client, Events, GatewayIntentBits, MessageFlags, type Interaction } from 'discord.js';
+import {
+  ChannelType,
+  Client,
+  Events,
+  GatewayIntentBits,
+  MessageFlags,
+  PermissionFlagsBits,
+  type Interaction,
+} from 'discord.js';
 import { commands } from './commands/index.js';
 import { autocompleteElder, runElder } from './commands/elder.js';
+import { handleMasqueradeButton, isMasqueradeId } from './commands/masquerade.js';
+import { handleProlongedButton, isProlongedId } from './commands/prolonged.js';
+import { handleSurgeButton, isSurgeId } from './interactions/surgeButtons.js';
 import type { Context } from './commands/types.js';
 import { loadConfig } from './config.js';
 import { localeFor, resolveLocale, t } from './i18n/index.js';
@@ -42,7 +53,11 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     } else if (interaction.isAutocomplete()) {
       await autocompleteElder(byName, interaction, ctx);
     } else if (interaction.isButton()) {
-      if (isCampaignId(interaction.customId)) await handleCampaignButton(interaction, ctx);
+      const id = interaction.customId;
+      if (isCampaignId(id)) await handleCampaignButton(interaction, ctx);
+      else if (isMasqueradeId(id)) await handleMasqueradeButton(interaction, ctx);
+      else if (isProlongedId(id)) await handleProlongedButton(interaction, ctx);
+      else if (isSurgeId(id)) await handleSurgeButton(interaction, ctx);
       else await handleRollButton(interaction, ctx);
     } else if (interaction.isStringSelectMenu()) {
       if (isCampaignId(interaction.customId)) await handleCampaignSelect(interaction, ctx);
@@ -83,6 +98,36 @@ const panel = config.panel
             if (member) guilds.push({ id: guild.id, name: guild.name });
           }
           return guilds;
+        },
+        // Text channels where the user and the bot can both read and write.
+        channelsOf: async (guildId, userId) => {
+          const guild = client.guilds.cache.get(guildId);
+          if (!guild) return [];
+          const [channels, member, bot] = await Promise.all([
+            guild.channels.fetch(),
+            guild.members.fetch({ user: userId, cache: false }).catch(() => undefined),
+            guild.members.fetchMe(),
+          ]);
+          if (!member) return [];
+          return [...channels.values()]
+            .filter(
+              (ch) =>
+                ch !== null &&
+                (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement) &&
+                ch.permissionsFor(member).has(PermissionFlagsBits.ViewChannel) &&
+                ch
+                  .permissionsFor(bot)
+                  .has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]),
+            )
+            .sort((a, b) => a!.rawPosition - b!.rawPosition)
+            .map((ch) => ({ id: ch!.id, name: `#${ch!.name}` }));
+        },
+        memberName: async (guildId, userId) => {
+          const guild = client.guilds.cache.get(guildId);
+          const member = await guild?.members
+            .fetch({ user: userId, cache: false })
+            .catch(() => undefined);
+          return member?.displayName;
         },
       },
       config.panel.port,

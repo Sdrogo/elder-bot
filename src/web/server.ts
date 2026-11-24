@@ -42,13 +42,18 @@ import {
   BACKGROUND_TYPES,
   LAYOUTS,
   MAX_BACKGROUND,
+  GRID,
+  MAX_PORTRAIT,
   RESOLUTIONS,
+  cleanLayoutName,
+  parseLayoutItems,
   camLinks,
   imageType,
   isLayout,
   isResolution,
 } from '../state/stage.js';
 import { MASQUERADE_BOXES, type Store } from '../state/store.js';
+import { LANGUAGE_NAMES, LOCALES, isLocale } from '../i18n/index.js';
 import { authorizeUrl, identify, type Fetch, type OAuthApp } from './discord.js';
 
 // The web panel: "Log in with Discord", then each user sees their own characters and Chronicles.
@@ -145,6 +150,10 @@ export interface PanelDeps {
    * Without it, only the servers where they already have a character or a Chronicle count.
    */
   guildsOf?: (userId: string) => Promise<Guild[]>;
+  /** Text channels of a server where both the user and the bot can read and write. */
+  channelsOf?: (guildId: string, userId: string) => Promise<Guild[]>;
+  /** A member's name on a server, or undefined when they are not on it. */
+  memberName?: (guildId: string, userId: string) => Promise<string | undefined>;
 }
 
 export interface Guild {
@@ -220,12 +229,14 @@ export function characterView(
   viewerId = '',
   cam?: string,
   pending = 0,
+  portrait?: string,
 ) {
   const v = c.values;
   const chronicle = c.chronicleId !== undefined ? chronicles.get(c.chronicleId) : undefined;
   const editable = c.ownerId === viewerId || (!!viewerId && chronicle?.storytellerId === viewerId);
   return {
     id: c.id,
+    guild: c.guildId,
     name: c.name,
     clan: CLAN_NAMES[c.clan],
     clanId: c.clan,
@@ -240,6 +251,8 @@ export function characterView(
     pending,
     // The player's VDO.Ninja links, only for those who may change the character.
     cam: cam && editable ? camLinks(cam, c.name) : null,
+    // A short hash of the portrait, for its URL; null without one.
+    portrait: portrait ?? null,
     attributes: { stamina: v.stamina, composure: v.composure, resolve: v.resolve },
     health: { current: v.health, max: healthMax(v), baneful: v.baneful },
     vitae: { current: v.vitae, max: vitaeMax(v) },
@@ -263,6 +276,7 @@ export function overlayView(store: Store, userId: string) {
   const characters = live ? overlayCharacters(campaign.members(live.id)) : [];
   const stage = store.stage.settings(userId);
   const [width, height] = RESOLUTIONS[stage.resolution];
+  const custom = store.stage.activeLayout(userId);
   return {
     // The /scena page: its size, where the frames go, the background and the roll box.
     stage: {
@@ -272,8 +286,13 @@ export function overlayView(store: Store, userId: string) {
       rollBox: stage.rollBox,
       background: stage.background ?? null,
       cam: stage.cam ?? null,
+      // A saved layout from the editor, in cells of the grid; null for the automatic one.
+      grid: GRID,
+      custom: custom ? { name: custom.name, items: custom.items } : null,
     },
     roll: (live && store.stage.lastRoll(live.id)) ?? null,
+    // The last rolls, newest first, for a roll box taller than it is wide.
+    rolls: custom && live ? store.stage.recentRolls(live.id) : [],
     chronicle: live
       ? { slug: live.slug, name: live.name, sect: live.sect, masquerade: live.masquerade }
       : null,
@@ -290,6 +309,7 @@ export function overlayView(store: Store, userId: string) {
         humanity: { rank: v.humanity, violations: v.violations },
         hunger: hungerDice(v),
         cam: store.stage.camOf(c.id) ?? null,
+        portrait: store.stage.portraitTag(c.id) ?? null,
       };
     }),
   };
@@ -425,6 +445,20 @@ export function createPanelHandler(deps: PanelDeps) {
       if (!body) return json(res, 404, { error: 'no symbol' });
       return sendFile(req, res, body, 'image/png', headers);
     }
+    const portrait = /^portraits\/([a-z0-9-]{1,80})$/.exec(name);
+    if (portrait) {
+      // Only the characters of the Storyteller's Chronicle on air, by their overlay id.
+      const { campaign } = store;
+      const live = campaign
+        .chroniclesRunBy(userId)
+        .find((c) => campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id);
+      const member = live
+        ? overlayCharacters(campaign.members(live.id)).find((m) => m.id === portrait[1])
+        : undefined;
+      const image = member && store.stage.portrait(member.c.id);
+      if (!image) return json(res, 404, { error: 'no portrait' });
+      return sendFile(req, res, image.image, image.type, headers);
+    }
     if (name === 'background') {
       const found = store.stage.background(userId);
       if (!found) return json(res, 404, { error: 'no background' });
@@ -485,6 +519,68 @@ export function createPanelHandler(deps: PanelDeps) {
     if (guildCache.size > 1000) guildCache.clear();
     guildCache.set(userId, { at: now(), guilds });
     return guilds;
+  }
+
+  const channelCache = new Map<string, { at: number; channels: Guild[] }>();
+
+  /** Channels where a user may play a Chronicle on that server; empty without the bot's help. */
+  async function channelsFor(guildId: string, userId: string): Promise<Guild[]> {
+    const key = `${guildId}:${userId}`;
+    const cached = channelCache.get(key);
+    if (cached && now() - cached.at < GUILDS_TTL_MS) return cached.channels;
+    let channels: Guild[] = [];
+    if (deps.channelsOf) {
+      try {
+        channels = await deps.channelsOf(guildId, userId);
+      } catch (error) {
+        console.error('Canali Discord non letti:', (error as Error).message);
+      }
+    }
+    if (channelCache.size > 1000) channelCache.clear();
+    channelCache.set(key, { at: now(), channels });
+    return channels;
+  }
+
+  const nameCache = new Map<string, { at: number; name: string | undefined }>();
+
+  /** A user's name on a server; undefined when they are not a member. */
+  async function nameOn(guildId: string, userId: string): Promise<string | undefined> {
+    const key = `${guildId}:${userId}`;
+    const cached = nameCache.get(key);
+    if (cached && now() - cached.at < GUILDS_TTL_MS) return cached.name;
+    let name: string | undefined;
+    if (deps.memberName) {
+      try {
+        name = await deps.memberName(guildId, userId);
+      } catch (error) {
+        console.error('Membro Discord non letto:', (error as Error).message);
+        return undefined;
+      }
+    } else if (store.campaign.peopleOf(guildId).includes(userId)) {
+      // Without Discord (tests, local runs), only people the bot already knows count.
+      name = userId;
+    }
+    if (nameCache.size > 5000) nameCache.clear();
+    nameCache.set(key, { at: now(), name });
+    return name;
+  }
+
+  /** People the bot knows on a server, for handing over a character or a Chronicle. */
+  async function peopleFor(guildId: string, userId: string): Promise<Guild[]> {
+    const ids = store.campaign.peopleOf(guildId).filter((id) => id !== userId);
+    const people: Guild[] = [];
+    for (const id of ids.slice(0, 50)) {
+      const name = await nameOn(guildId, id);
+      if (name !== undefined) people.push({ id, name });
+    }
+    return people.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** A Discord user id typed or picked on the panel, checked against the server. */
+  async function recipient(guildId: string, value: unknown, userId: string) {
+    if (typeof value !== 'string' || !/^\d{5,20}$/.test(value) || value === userId)
+      return undefined;
+    return (await nameOn(guildId, value)) === undefined ? undefined : value;
   }
 
   const cookie = (name: string, value: string, maxAgeSeconds: number) =>
@@ -771,15 +867,57 @@ export function createPanelHandler(deps: PanelDeps) {
     return Buffer.concat(chunks);
   }
 
+  /**
+   * A character's portrait: GET shows it in the panel, PUT (the image itself) replaces it,
+   * DELETE removes it. Owner and the Chronicle's Storyteller only, like the trackers.
+   */
+  async function portraitApi(
+    req: IncomingMessage,
+    res: ServerResponse,
+    me: WebSession,
+    method: string,
+    id: number,
+  ) {
+    const character = store.campaign.getCharacter(id);
+    const allowed =
+      !!character && canEditOnPanel(me.userId, character, (c) => store.campaign.getChronicle(c));
+    if (method === 'GET') {
+      const found = allowed ? store.stage.portrait(id) : undefined;
+      if (!found) return json(res, 404, { error: 'not found' });
+      return sendFile(req, res, found.image, found.type);
+    }
+    if (method !== 'PUT' && method !== 'DELETE') return json(res, 404, { error: 'not found' });
+    const data = await readBytes(req, MAX_PORTRAIT);
+    if (data === undefined) return json(res, 413, { error: 'body too large' });
+    if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+    if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+      return json(res, 429, { error: 'too many requests' });
+    }
+    // The same answer for "not there" and "not yours": ids can't be probed.
+    if (!allowed) return json(res, 404, { error: 'not found' });
+    if (method === 'DELETE') {
+      store.stage.removePortrait(id);
+      return json(res, 200, { ok: true });
+    }
+    const type = imageType(data);
+    if (!type) return json(res, 415, { error: 'PNG, JPEG or WebP only' });
+    store.stage.setPortrait(id, data, type);
+    return json(res, 200, { ok: true, portrait: store.stage.portraitTag(id) });
+  }
+
   /** The Storyteller's scene: size, layout, roll box, their webcam and the background. */
   async function stageChange(
     req: IncomingMessage,
     res: ServerResponse,
     me: WebSession,
     action: string | undefined,
+    idText?: string,
   ) {
     const method = req.method ?? 'GET';
     const isBackground = action === 'background';
+    if (idText !== undefined && action !== 'layouts') {
+      return json(res, 404, { error: 'not found' });
+    }
     const data = await readBytes(req, isBackground ? MAX_BACKGROUND : MAX_BODY);
     if (data === undefined) return json(res, 413, { error: 'body too large' });
     if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
@@ -810,9 +948,42 @@ export function createPanelHandler(deps: PanelDeps) {
       else return json(res, 404, { error: 'not found' });
       return ok();
     }
-    if (method !== 'POST' || action !== undefined) return json(res, 404, { error: 'not found' });
+    if (action === 'layouts' && method === 'DELETE' && idText !== undefined) {
+      return stage.deleteLayout(me.userId, Number(idText))
+        ? ok()
+        : json(res, 404, { error: 'not found' });
+    }
+    if (method !== 'POST' || idText !== undefined) return json(res, 404, { error: 'not found' });
     const body = parseObject(data.toString('utf8'));
     if (!body) return json(res, 400, { error: 'invalid body' });
+    if (action === 'layouts') {
+      // POST /api/stage/layouts {id?, name, items}: a new layout, or changes to one.
+      const name = cleanLayoutName(body.name);
+      const items = parseLayoutItems(body.items);
+      if (!name) return json(res, 400, { error: 'invalid', field: 'name' });
+      if (!items) return json(res, 400, { error: 'invalid', field: 'items' });
+      if (body.id !== undefined && !isInt(body.id, 1, Number.MAX_SAFE_INTEGER)) {
+        return json(res, 400, { error: 'invalid', field: 'id' });
+      }
+      const saved = stage.saveLayout(me.userId, {
+        ...(body.id !== undefined ? { id: body.id } : {}),
+        name,
+        items,
+      });
+      if (saved === 'missing') return json(res, 404, { error: 'not found' });
+      if (typeof saved === 'string') return json(res, 409, { error: saved });
+      return json(res, 200, { layout: saved });
+    }
+    if (action === 'layout') {
+      // POST /api/stage/layout {id}: that saved layout on the scene; {id: null} the automatic one.
+      if (body.id !== null && !isInt(body.id, 1, Number.MAX_SAFE_INTEGER)) {
+        return json(res, 400, { error: 'invalid', field: 'id' });
+      }
+      return stage.useLayout(me.userId, body.id ?? undefined)
+        ? ok()
+        : json(res, 404, { error: 'not found' });
+    }
+    if (action !== undefined) return json(res, 404, { error: 'not found' });
     const patch: Parameters<typeof stage.update>[1] = {};
     if (body.resolution !== undefined) {
       if (!isResolution(body.resolution))
@@ -907,6 +1078,22 @@ export function createPanelHandler(deps: PanelDeps) {
       case 'live':
         campaign.setLive(chronicle.id);
         return ok();
+      case 'end':
+        // End of a session at the Chronicle's table: prolonged tasks still open are dropped.
+        if (chronicle.channelId) store.endSession(chronicle.channelId);
+        return ok();
+      case 'archive':
+        campaign.archiveChronicle(chronicle.id);
+        return ok();
+      case 'transfer': {
+        const to = await recipient(chronicle.guildId, body.to, userId);
+        if (!to) return json(res, 400, { error: 'invalid', field: 'to' });
+        if (campaign.chronicles(chronicle.guildId, to).length >= LIMITS.chroniclesPerStoryteller) {
+          return json(res, 409, { error: 'limit' });
+        }
+        campaign.transferChronicle(chronicle.id, to);
+        return ok();
+      }
       case 'masquerade': {
         if (!isInt(body.delta, -MASQUERADE_BOXES, MASQUERADE_BOXES)) {
           return json(res, 400, { error: 'invalid body' });
@@ -948,6 +1135,21 @@ export function createPanelHandler(deps: PanelDeps) {
           }
           tier = body.tier === '' ? undefined : body.tier;
         }
+        // The channel where it is played ('' frees it) and the bot's language at its table.
+        let channel: string | null | undefined;
+        if (body.channel !== undefined) {
+          if (body.channel === '') channel = null;
+          else {
+            const channels = await channelsFor(chronicle.guildId, userId);
+            if (!channels.some((c) => c.id === body.channel)) {
+              return json(res, 400, { error: 'invalid', field: 'channel' });
+            }
+            channel = body.channel as string;
+          }
+        }
+        if (body.locale !== undefined && body.locale !== '' && !isLocale(body.locale)) {
+          return json(res, 400, { error: 'invalid', field: 'locale' });
+        }
         // Checked before anything changes: a refused tier leaves the Chronicle as it was.
         if (
           tier !== null &&
@@ -957,6 +1159,16 @@ export function createPanelHandler(deps: PanelDeps) {
         }
         campaign.updateChronicle(chronicle.id, patch);
         if (tier !== null) campaign.setChronicleTier(chronicle.id, tier);
+        if (channel === null) campaign.unbindChannel(chronicle.id);
+        else if (channel !== undefined && channel !== chronicle.channelId) {
+          store.bindChronicle(channel, chronicle.id);
+        }
+        if (body.locale !== undefined) {
+          campaign.setChronicleLocale(
+            chronicle.id,
+            isLocale(body.locale) ? body.locale : undefined,
+          );
+        }
         return ok();
       }
     }
@@ -999,7 +1211,10 @@ export function createPanelHandler(deps: PanelDeps) {
       });
     }
 
-    if (method !== 'POST' || !['/api/overlay/adjust', '/api/overlay/live'].includes(path)) {
+    if (
+      method !== 'POST' ||
+      !['/api/overlay/adjust', '/api/overlay/live', '/api/overlay/layout'].includes(path)
+    ) {
       return json(res, 404, { error: 'not found' });
     }
     if (!limiter.allow(`change:${userId}`, RATE_LIMIT)) {
@@ -1021,6 +1236,36 @@ export function createPanelHandler(deps: PanelDeps) {
       if (!target) return json(res, 404, { error: 'no Chronicle with that id' });
       campaign.setLive(target.id);
       return json(res, 200, { ok: true });
+    }
+
+    if (path === '/api/overlay/layout') {
+      // Stream Deck: ?name=Combattimento puts that saved layout on the scene, ?step=1 (or -1)
+      // goes to the next (or previous) one, ?auto=1 back to the automatic layout.
+      const saved = store.stage.layouts(userId);
+      let target: (typeof saved)[number] | undefined;
+      if (body.auto !== undefined && body.auto !== '0' && body.auto !== false) {
+        store.stage.useLayout(userId, undefined);
+        return json(res, 200, { ok: true, layout: null });
+      }
+      if (typeof body.name === 'string') {
+        const wanted = body.name.trim().toLowerCase();
+        target = saved.find((l) => l.name.toLowerCase() === wanted);
+        if (!target) return json(res, 404, { error: 'no layout with that name' });
+      } else if (body.step !== undefined) {
+        const step = Number(body.step);
+        if (!Number.isInteger(step) || !saved.length) {
+          return json(res, 400, { error: 'bad step, or no saved layouts' });
+        }
+        const current = saved.findIndex((l) => l.id === store.stage.settings(userId).activeLayout);
+        // From the automatic layout, +1 goes to the first saved one and -1 to the last.
+        const from = current === -1 ? (step > 0 ? -1 : saved.length) : current;
+        const n = saved.length;
+        target = saved[(((from + step) % n) + n) % n];
+      } else {
+        return json(res, 400, { error: 'name, step or auto needed' });
+      }
+      store.stage.useLayout(userId, target!.id);
+      return json(res, 200, { ok: true, layout: target!.name });
     }
 
     // POST /api/overlay/adjust {pg, track, field?, delta}: the overlay's Stream Deck keys.
@@ -1142,8 +1387,20 @@ export function createPanelHandler(deps: PanelDeps) {
         if (c) chronicles.set(id, c);
       }
       const view = (c: Character) =>
-        characterView(c, chronicles, me.userId, store.stage.camOf(c.id), pendingOf(c));
+        characterView(
+          c,
+          chronicles,
+          me.userId,
+          store.stage.camOf(c.id),
+          pendingOf(c),
+          store.stage.portraitTag(c.id),
+        );
       const stage = store.stage.settings(me.userId);
+      // The names of the channels where the Chronicles are played.
+      const channelNames = new Map<string, string>();
+      for (const guildId of new Set(runs.filter((c) => c.channelId).map((c) => c.guildId))) {
+        for (const ch of await channelsFor(guildId, me.userId)) channelNames.set(ch.id, ch.name);
+      }
       return json(res, 200, {
         user: { id: me.userId, name: me.name },
         csrf: me.csrf,
@@ -1158,6 +1415,9 @@ export function createPanelHandler(deps: PanelDeps) {
           tierId: c.tier ?? '',
           guild: c.guildId,
           masquerade: c.masquerade,
+          channel: c.channelId ?? '',
+          channelName: c.channelId ? (channelNames.get(c.channelId) ?? c.channelId) : null,
+          locale: c.locale ?? '',
           live: campaign.liveChronicle(c.guildId, c.storytellerId)?.id === c.id,
           characters: campaign.members(c.id).map(view),
         })),
@@ -1179,6 +1439,9 @@ export function createPanelHandler(deps: PanelDeps) {
                 cam: stage.cam ? camLinks(stage.cam, 'Storyteller') : null,
               },
               layouts: LAYOUTS,
+              saved: store.stage.layouts(me.userId),
+              activeLayout: stage.activeLayout ?? null,
+              grid: GRID,
               resolutions: Object.keys(RESOLUTIONS),
               backgroundTypes: BACKGROUND_TYPES,
             }
@@ -1188,10 +1451,25 @@ export function createPanelHandler(deps: PanelDeps) {
           tiers: TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
           sects: SECTS.map((id) => ({ id, name: SECT_NAMES[id] })),
           chronicleTiers: CHRONICLE_TIERS.map((id) => ({ id, name: TIER_NAMES[id] })),
+          languages: LOCALES.map((id) => ({ id, name: LANGUAGE_NAMES[id] })),
           maxAttribute: LIMITS.attribute,
           maxName: LIMITS.nameLength,
         },
       });
+    }
+
+    // GET /api/guilds/:id/channels|people: choices for the Chronicle and hand-over forms.
+    const guildPath = /^\/api\/guilds\/([0-9A-Za-z]{1,20})\/(channels|people)$/.exec(path);
+    if (guildPath && method === 'GET') {
+      const guildId = guildPath[1]!;
+      if (!(await guildsFor(me.userId)).some((g) => g.id === guildId)) {
+        return json(res, 404, { error: 'not found' });
+      }
+      const list =
+        guildPath[2] === 'channels'
+          ? await channelsFor(guildId, me.userId)
+          : await peopleFor(guildId, me.userId);
+      return json(res, 200, { [guildPath[2]!]: list });
     }
 
     // Every change below: a JSON body, the CSRF token and the panel's own origin.
@@ -1216,15 +1494,22 @@ export function createPanelHandler(deps: PanelDeps) {
     const draftPath = /^\/api\/drafts(?:\/(\d{1,12})(?:\/(create))?)?$/.exec(path);
     if (draftPath) return draftsApi(req, res, me, method, draftPath[1], draftPath[2]);
 
-    const stagePath = /^\/api\/stage(?:\/(cam|background))?$/.exec(path);
-    if (stagePath) return stageChange(req, res, me, stagePath[1]);
+    const stagePath = /^\/api\/stage(?:\/(cam|background|layouts|layout))?(?:\/(\d{1,12}))?$/.exec(
+      path,
+    );
+    if (stagePath) return stageChange(req, res, me, stagePath[1], stagePath[2]);
+
+    const portraitPath = /^\/api\/characters\/(\d{1,12})\/portrait$/.exec(path);
+    if (portraitPath) return portraitApi(req, res, me, method, Number(portraitPath[1]));
 
     const sheetPath = /^\/api\/characters\/(\d{1,12})\/(sheet|approval)$/.exec(path);
     if (sheetPath) return sheetApi(req, res, me, method, Number(sheetPath[1]), sheetPath[2]!);
 
-    const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam))?)?$/.exec(path);
+    const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam|give))?)?$/.exec(path);
     const chroniclePath =
-      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove))?)?$/.exec(path);
+      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove|end|archive|transfer))?)?$/.exec(
+        path,
+      );
     if (!(characterPath || chroniclePath) || !['POST', 'DELETE'].includes(method)) {
       return json(res, 404, { error: 'not found' });
     }
@@ -1234,8 +1519,8 @@ export function createPanelHandler(deps: PanelDeps) {
     if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
       return json(res, 429, { error: 'too many requests' });
     }
-    // A new webcam link needs no body.
-    const noBody = method === 'DELETE' || (characterPath?.[2] === 'cam' && !text.trim());
+    // Deleting, a new webcam link and the Chronicle's buttons (on air, end, archive) need no body.
+    const noBody = method === 'DELETE' || !text.trim();
     const body = noBody ? {} : parseObject(text);
     if (!body) return json(res, 400, { error: 'invalid body' });
     const { campaign } = store;
@@ -1245,7 +1530,14 @@ export function createPanelHandler(deps: PanelDeps) {
       const ch = c.chronicleId === undefined ? undefined : getChronicle(c.chronicleId);
       if (ch) chronicles.set(ch.id, ch);
       return json(res, 200, {
-        character: characterView(c, chronicles, me.userId, store.stage.camOf(c.id)),
+        character: characterView(
+          c,
+          chronicles,
+          me.userId,
+          store.stage.camOf(c.id),
+          0,
+          store.stage.portraitTag(c.id),
+        ),
       });
     };
 
@@ -1291,6 +1583,18 @@ export function createPanelHandler(deps: PanelDeps) {
       if (method === 'POST') store.stage.renewCam(character.id);
       else store.stage.removeCam(character.id);
       return done(character);
+    }
+
+    if (sub === 'give') {
+      // POST /api/characters/:id/give {to}: the owner hands the character to another player.
+      if (method !== 'POST' || character.ownerId !== me.userId) {
+        return json(res, 403, { error: 'owner only' });
+      }
+      const to = await recipient(character.guildId, body.to, me.userId);
+      if (!to) return json(res, 400, { error: 'invalid', field: 'to' });
+      const moved = campaign.transferCharacter(character.id, me.userId, to);
+      if (moved === 'duplicate' || moved === 'limit') return json(res, 409, { error: moved });
+      return moved ? send(res, 204, '') : json(res, 404, { error: 'not found' });
     }
 
     if (method === 'DELETE') {

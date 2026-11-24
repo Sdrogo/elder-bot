@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { SURGE_TTL_MS, parseSurges, type Surges } from '../game/sheetPool.js';
 import {
   LIMITS,
   normalize,
@@ -61,8 +62,10 @@ export interface Chronicle {
   masquerade: number;
   /** Tier of play: its characters must match it. None takes any character. */
   tier?: ChronicleTier;
-  /** The Discord channel where this Chronicle is played, set by /elder session new. */
+  /** The Discord channel where this Chronicle is played, chosen on the panel. */
   channelId?: string;
+  /** The bot's language at this Chronicle's table; none follows each user's Discord. */
+  locale?: string;
   archived: boolean;
 }
 
@@ -100,6 +103,7 @@ interface ChronicleRow {
   channel_id: string | null;
   archived: number;
   tier: string | null;
+  locale: string | null;
 }
 
 const toCharacter = (r: CharacterRow): Character => ({
@@ -134,6 +138,7 @@ const toChronicle = (r: ChronicleRow): Chronicle => ({
   masquerade: r.masquerade,
   ...(isChronicleTier(r.tier) ? { tier: r.tier } : {}),
   ...(r.channel_id !== null ? { channelId: r.channel_id } : {}),
+  ...(r.locale ? { locale: r.locale } : {}),
   archived: r.archived === 1,
 });
 
@@ -190,11 +195,16 @@ export class Campaign {
       CREATE TABLE IF NOT EXISTS character_sheets (
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         data TEXT NOT NULL, approvals TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS character_surges (
+        character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
+        data TEXT NOT NULL, at INTEGER NOT NULL);
     `);
     // Chronicles made before tiers of play have none: they take any character.
     const columns = db.prepare('PRAGMA table_info(chronicles)').all() as { name: string }[];
     if (!columns.some((c) => c.name === 'tier'))
       db.exec('ALTER TABLE chronicles ADD COLUMN tier TEXT');
+    if (!columns.some((c) => c.name === 'locale'))
+      db.exec('ALTER TABLE chronicles ADD COLUMN locale TEXT');
   }
 
   // Characters.
@@ -277,6 +287,45 @@ export class Campaign {
           createdAt: row.created_at,
         }
       : undefined;
+  }
+
+  // Blood Surge: lasts the scene (p. 147). Kept per character until the scene or session ends,
+  // and forgotten after SURGE_TTL_MS in case nobody ends it.
+
+  getSurges(characterId: number, now = Date.now()): Surges {
+    const row = this.db
+      .prepare('SELECT data, at FROM character_surges WHERE character_id = ?')
+      .get(characterId) as { data: string; at: number } | undefined;
+    if (!row) return {};
+    if (now - row.at > SURGE_TTL_MS) {
+      this.clearSurges(characterId);
+      return {};
+    }
+    return parseSurges(JSON.parse(row.data));
+  }
+
+  /** Saves the active surges; the clock restarts with each new surge. */
+  setSurges(characterId: number, surges: Surges, now = Date.now()): void {
+    this.db
+      .prepare(
+        `INSERT INTO character_surges (character_id, data, at) VALUES (?, ?, ?)
+         ON CONFLICT (character_id) DO UPDATE SET data = excluded.data, at = excluded.at`,
+      )
+      .run(characterId, JSON.stringify(surges), now);
+  }
+
+  clearSurges(characterId: number): void {
+    this.db.prepare('DELETE FROM character_surges WHERE character_id = ?').run(characterId);
+  }
+
+  /** End of a session: every surge in the Chronicle ends. */
+  clearChronicleSurges(chronicleId: number): void {
+    this.db
+      .prepare(
+        `DELETE FROM character_surges WHERE character_id IN
+           (SELECT character_id FROM chronicle_members WHERE chronicle_id = ?)`,
+      )
+      .run(chronicleId);
   }
 
   getCharacter(id: number): Character | undefined {
@@ -538,7 +587,7 @@ export class Campaign {
     return row ? toChronicle(row) : undefined;
   }
 
-  /** The Chronicle played in a channel, if /elder session new bound one. */
+  /** The Chronicle played in a channel, if one was bound to it on the panel. */
   chronicleByChannel(channelId: string): Chronicle | undefined {
     const row = this.db
       .prepare('SELECT * FROM chronicles WHERE channel_id = ? AND archived = 0')
@@ -584,6 +633,39 @@ export class Campaign {
       this.db.prepare('UPDATE chronicles SET archived = 1, channel_id = NULL WHERE id = ?').run(id);
       this.db.prepare('DELETE FROM live_chronicle WHERE chronicle_id = ?').run(id);
     })();
+  }
+
+  /** Hands a Chronicle to another Storyteller. It goes off air for the one who ran it. */
+  transferChronicle(id: number, toId: string): Chronicle | undefined {
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE chronicles SET storyteller_id = ? WHERE id = ?').run(toId, id);
+      this.db.prepare('DELETE FROM live_chronicle WHERE chronicle_id = ?').run(id);
+    })();
+    return this.getChronicle(id);
+  }
+
+  /** The language of the Chronicle's table; undefined follows each user's Discord. */
+  setChronicleLocale(id: number, locale: string | undefined): void {
+    this.db.prepare('UPDATE chronicles SET locale = ? WHERE id = ?').run(locale ?? null, id);
+  }
+
+  /** Frees the Chronicle's channel: nobody plays it on Discord until a channel is chosen again. */
+  unbindChannel(id: number): void {
+    this.db.prepare('UPDATE chronicles SET channel_id = NULL WHERE id = ?').run(id);
+  }
+
+  /**
+   * Everyone the bot knows on a server: owners of characters and Storytellers of Chronicles.
+   * The panel offers them when a character or a Chronicle changes hands.
+   */
+  peopleOf(guildId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT owner_id AS id FROM characters WHERE guild_id = ?
+         UNION SELECT storyteller_id FROM chronicles WHERE guild_id = ? AND archived = 0`,
+      )
+      .all(guildId, guildId) as { id: string }[];
+    return rows.map((r) => r.id);
   }
 
   /** Plays a Chronicle in a channel; a channel holds one Chronicle at a time. */

@@ -6,7 +6,7 @@ import {
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import { canEditCharacter } from '../auth/campaign.js';
-import { CLAN_NAMES, LIMITS, TIER_NAMES } from '../game/character.js';
+import { CLAN_NAMES, TIER_NAMES } from '../game/character.js';
 import { tierFits } from '../state/campaign.js';
 import type { Context } from '../commands/types.js';
 import { localeFor, t, type Locale, type MessageKey } from '../i18n/index.js';
@@ -24,7 +24,7 @@ async function ephemeral(
   await interaction.reply({ content: t(locale, key, params), flags: MessageFlags.Ephemeral });
 }
 
-/** True for the ids of character sheets, invitations and hand-overs. */
+/** True for the ids of character sheets and invitations. */
 export function isCampaignId(customId: string): boolean {
   return customId.startsWith('pc:') || customId.startsWith('chr:');
 }
@@ -54,45 +54,6 @@ export async function handleCampaignButton(
     const chronicle =
       updated.chronicleId !== undefined ? campaign.getChronicle(updated.chronicleId) : undefined;
     await interaction.update(sheetMessage(locale, updated, chronicle, true));
-    return;
-  }
-
-  if (ref.kind === 'delete') {
-    const c = campaign.getCharacter(ref.characterId);
-    if (!c) return ephemeral(interaction, locale, 'character.notFound');
-    if (c.ownerId !== interaction.user.id) {
-      return ephemeral(interaction, locale, 'character.ownerOnly');
-    }
-    campaign.deleteCharacter(c.id);
-    await interaction.update({
-      content: t(locale, 'character.deleted', { name: c.name }),
-      components: [],
-    });
-    return;
-  }
-
-  if (ref.kind === 'give') {
-    if (interaction.user.id !== ref.toId) return ephemeral(interaction, locale, 'button.notYours');
-    const c = campaign.getCharacter(ref.characterId);
-    if (!c) return ephemeral(interaction, locale, 'character.notFound');
-    if (!ref.accept) {
-      await interaction.update({
-        content: t(locale, 'character.give.refused', { name: c.name, to: `<@${ref.toId}>` }),
-        components: [],
-      });
-      return;
-    }
-    const moved = campaign.transferCharacter(c.id, ref.fromId, ref.toId);
-    if (moved === 'duplicate') return ephemeral(interaction, locale, 'character.duplicate');
-    if (moved === 'limit')
-      return ephemeral(interaction, locale, 'character.limit', {
-        max: LIMITS.charactersPerUser,
-      });
-    if (!moved) return ephemeral(interaction, locale, 'button.alreadyUsed');
-    await interaction.update({
-      content: t(locale, 'character.give.done', { name: c.name, to: `<@${ref.toId}>` }),
-      components: [],
-    });
     return;
   }
 

@@ -160,7 +160,7 @@ export function newCharacter(input: {
   });
 }
 
-/** Trackers a player or Storyteller can move with the sheet buttons or `/elder character set`. */
+/** Trackers a player or Storyteller can move with the sheet buttons or on the web panel. */
 export const TRACKS = [
   'health',
   'baneful',

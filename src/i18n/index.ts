@@ -16,7 +16,7 @@ const CATALOGS: Record<Locale, Messages> = { en, it, es, fr, de };
 
 export const LOCALES = Object.keys(CATALOGS) as Locale[];
 
-/** Each language under its own name, for the /elder session language choices and replies. */
+/** Each language under its own name, for the panel's language choice. */
 export const LANGUAGE_NAMES: Record<Locale, string> = {
   en: 'English',
   it: 'Italiano',
@@ -93,7 +93,7 @@ export function choice<V extends string | number>(key: MessageKey, value: V, par
 
 /**
  * The language to answer an interaction in: the table's language if the Storyteller fixed one
- * with /elder session language, otherwise the user's Discord language.
+ * on the panel for the Chronicle played there, otherwise the user's Discord language.
  */
 export function localeFor(
   interaction: { channelId: string | null; locale?: string | null },

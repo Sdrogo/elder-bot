@@ -133,6 +133,14 @@ body {
   -webkit-mask: var(--m) center / contain no-repeat;
   mask: var(--m) center / contain no-repeat;
 }
+.plate .face {
+  width: 1.9cqw;
+  height: 1.9cqw;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.1cqw solid var(--clan);
+}
 .sym[hidden] {
   display: none;
 }
@@ -463,26 +471,32 @@ body {
   justify-self: start;
   margin-left: 0.2cqw;
 }
-.nx.hunger .die {
-  width: 2.2cqw;
-  height: 2.2cqw;
-  margin-bottom: -0.2cqw;
+.nx.hunger .hn {
+  font-weight: 600;
+  font-size: 1.6cqw;
+  color: #ff6b70;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 0.4cqw #000;
 }
-.nx.hunger .die.none {
-  opacity: 0.35;
+.nx.hunger .hn.none {
+  opacity: 0.4;
 }
-.nx.hunger .die > b {
-  font-size: 1.15cqw;
+.nx.hunger .hn.hot {
+  animation: numpop 0.7s;
+  display: inline-block;
 }
 .trk .nx.hunger {
   grid-area: auto;
   align-self: center;
   margin: 0;
 }
-.trk .nx.hunger .die {
-  width: 1.6cqw;
-  height: 1.6cqw;
-  margin: 0;
+.trk .nx.hunger {
+  font-size: 0.9cqw;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.trk .nx.hunger .hn {
+  font-size: 1.3cqw;
 }
 .nl .ico,
 .trk > span .ico {
@@ -551,8 +565,17 @@ body {
 #cams {
   z-index: -1;
 }
+.portrait {
+  position: absolute;
+  z-index: 0;
+  object-fit: cover;
+  /* faces sit in the upper part of most portraits */
+  object-position: center 25%;
+  border-radius: 0.2cqw;
+}
 .cam {
   position: absolute;
+  z-index: 1;
   border: 0;
   border-radius: 0.2cqw;
   background: transparent;
@@ -564,6 +587,46 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+}
+/* A roll box placed with the layout editor: it fills its box, whatever the proportions. */
+.roll-slot.custom {
+  align-items: stretch;
+  justify-content: stretch;
+}
+.roll-slot.custom > .roll {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  align-content: center;
+}
+/* Narrow boxes: what was rolled, the dice, then the result, one under the other. */
+.roll-slot.narrow .roll {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'head'
+    'sides'
+    'outcome';
+}
+.roll-slot.narrow .outcome {
+  justify-self: start;
+}
+/* Taller boxes: the last rolls, newest on top, as many as fit. */
+.roll-history {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4cqw;
+  overflow: hidden;
+}
+.roll-history > .roll {
+  flex: none;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.roll-history > .roll:not(:first-child) {
+  opacity: 0.72;
 }
 .roll-alone {
   position: absolute;

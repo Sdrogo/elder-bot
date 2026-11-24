@@ -9,26 +9,21 @@ export const fr: Messages = {
 
   'cmd.roll.description':
     'Test : Attribut + Compétence (ou Discipline), réussite sur 6+, un 10 compte 2',
-  'opt.roll.dice': 'Attribut + Compétence, Discipline ou Composure + Resolve',
+  'opt.roll.dice': 'Réserve en nombre (ou laisse vide et utilise attribute + with de ta fiche)',
 
   'opt.test.difficulty': 'Difficulté : réussites nécessaires pour gagner',
   'opt.test.bonus': 'Dés bonus (positif) ou dés de malus (négatif)',
-  'opt.test.hunger': 'Tes dés de Hunger (0-5) : ils remplacent des dés normaux de la réserve',
-  'opt.test.take_half':
-    'Taking Half : pas de jet, la moitié de la réserve (arrondie au supérieur) en réussites',
   'opt.test.reason': 'Ce que tu tentes',
 
-  'cmd.npc.description': 'Test pour un PNJ : lance la réserve indiquée dans son profil',
-  'opt.npc.dice': "Réserve du PNJ (Physique, Sociale, Mentale ou d'une Compétence)",
-
   'cmd.contest.description': "Test en opposition : celui qui a le plus de réussites l'emporte",
-  'opt.contest.dice': 'Ta réserve',
-  'opt.contest.opponent_dice': "Réserve de l'adversaire",
+  'opt.contest.dice': 'Ta réserve en nombre (ou attribute + with depuis ta fiche)',
+  'opt.contest.opponent_dice':
+    "Réserve de l'adversaire en nombre (ou opponent_attribute + opponent_with)",
   'opt.contest.opponent': 'Joueur adverse',
-  'opt.contest.attribute': 'Ton Attribut, pour les égalités',
+  'opt.contest.attribute':
+    'Attribut de ta fiche, ou sa valeur pour les égalités si tu utilises dice',
   'opt.contest.opponent_attribute':
-    "Attribut de l'adversaire, pour les égalités (un PNJ : la moitié de sa réserve)",
-  'opt.contest.hunger': 'Tes dés de Hunger (0-5)',
+    'Attribut du joueur adverse, ou un nombre pour les égalités (PNJ : moitié de la réserve)',
   'opt.contest.opponent_hunger': "Dés de Hunger de l'adversaire (un PJ vampire)",
   'opt.contest.reason': "L'enjeu",
 
@@ -42,19 +37,6 @@ export const fr: Messages = {
   'cmd.prolonged.roll.description': 'Lance pour ta tâche prolongée',
   'opt.prolonged.dice': 'Attribut + Compétence',
   'opt.prolonged.bonus': 'Dés bonus ou de malus',
-  'opt.prolonged.hunger': 'Tes dés de Hunger (0-5)',
-  'cmd.prolonged.status.description': 'Affiche ta tâche prolongée',
-  'cmd.prolonged.cancel.description': 'Ferme ta tâche prolongée',
-
-  'cmd.session.description': 'Sessions, Conteur et langue de la table',
-  'cmd.session.new.description': 'Nouvelle session : celui qui la lance devient Conteur',
-  'cmd.session.end.description':
-    'Termine la session : remet la table à zéro et libère le rôle de Conteur',
-  'cmd.session.storyteller.description': 'Affiche ou change le Conteur de ce salon',
-  'opt.session.user': 'Le nouveau Conteur',
-  'cmd.session.language.description': 'Langue des réponses du bot dans ce salon',
-  'opt.session.language': 'Langue de la table, ou auto pour suivre la langue Discord de chacun',
-  'choice.language.auto': 'Auto (langue de Discord)',
 
   // Shared roll output.
   'roll.title': 'Test',
@@ -100,7 +82,7 @@ export const fr: Messages = {
   'retry.modal.dice': 'Nouvelle réserve (change Attribut ou Compétence)',
   'retry.modal.invalid': 'Saisis un nombre entier de 0 à 30.',
 
-  // /elder npc and /elder contest.
+  // /elder roll npc:true and /elder contest.
   'npc.name': 'PNJ',
   'contest.opponent': 'Adversaire',
   'contest.title': '{a} contre {b}',
@@ -123,7 +105,7 @@ export const fr: Messages = {
   'prolonged.failed': 'Plus de jets : tâche échouée.',
   'prolonged.progress': 'Réussites **{successes}/{target}** · jets utilisés **{done}/{max}**',
 
-  // /elder session and the Storyteller.
+  // The Storyteller.
   // Willpower, /elder frenzy and /elder masquerade.
   'cmd.frenzy.description':
     "Résister à la frénésie : Composure + Resolve, au plus autant de dés que l'Humanité",
@@ -141,16 +123,8 @@ export const fr: Messages = {
   'frenzy.error.difficulty': 'Indique la `difficulty` fixée par le Conteur.',
   'frenzy.error.noHunger':
     'La Difficulté de la frénésie de faim, ce sont tes dés de Hunger : indique `hunger` (au moins 1) ou une `difficulty`.',
-  'cmd.masquerade.description': 'Le Masquerade Tracker de cette table',
-  'cmd.masquerade.show.description': 'Affiche le Masquerade Tracker',
-  'cmd.masquerade.mark.description': 'Coche des cases après une brèche (Conteur)',
-  'cmd.masquerade.clear.description': 'Efface des cases quand la Masquerade est réparée (Conteur)',
-  'cmd.masquerade.set.description': 'Règle le tracker à la main (Conteur)',
-  'cmd.masquerade.threat.description': 'Threat test : un dé par case cochée (Conteur)',
-  'opt.masquerade.mark': 'Cases à cocher (1 par défaut)',
-  'opt.masquerade.clear': 'Cases à effacer (1 par défaut)',
-  'opt.masquerade.reason': "Ce qui s'est passé",
-  'opt.masquerade.value': 'Cases cochées, de 0 à 10',
+  'cmd.masquerade.description':
+    'Le Masquerade Tracker de cette table, avec des boutons pour le Conteur',
   'masquerade.title': 'Masquerade Tracker',
   'masquerade.threat.title': 'Threat test de la Masquerade',
   'willpower.pick': "Choisis jusqu'à {max} dés à relancer (−1 Willpower)",
@@ -159,117 +133,107 @@ export const fr: Messages = {
   'button.cancel': 'Annuler',
 
   'auth.storytellerOnly':
-    'Seul le Conteur de cette table peut faire ça. Celui qui lance `/elder session new` devient Conteur, et peut passer le rôle avec `/elder session storyteller`.',
-  'session.storyteller.title': 'Conteur',
-  'session.storyteller.current': 'Conteur de la table : {who}.',
-  'session.storyteller.none': 'personne : celui qui lance `/elder session new` prend le rôle',
-  'session.storyteller.set': '{user} est le Conteur de cette table.',
-  'session.ended.title': 'Session terminée',
-  'session.ended':
-    "Tâches prolongées et langue de la table réinitialisées. La table n'a plus de Conteur : le prochain `/elder session new` en désigne un.",
-  'session.new.title': 'Nouvelle session',
-  'session.new':
-    "La table est prête. Ajoute tes dés de Hunger à chaque jet avec l'option `hunger`.",
-  'session.language.title': 'Langue',
-  'session.language.set': 'Langue de la table : {language}.',
-  'session.language.auto': 'Le bot répond à chacun dans sa propre langue Discord.',
+    'Seul le Conteur de la Chronique jouée dans ce salon (ou un admin du serveur) peut faire ça. Le salon se choisit sur le panneau web (`/elder panel`).',
 
   // Characters and Chronicles.
-  'cmd.character.description': 'Tes personnages : fiche et jauges',
-  'cmd.character.create.description':
-    'Crée un personnage avec Health, Vitae et Willpower au maximum',
-  'opt.character.name': 'Nom du personnage',
-  'opt.character.clan': 'Clan',
-  'opt.character.tier': 'Niveau de jeu : fixe la Vitae maximale et les dés de Hunger',
-  'opt.character.stamina': 'Stamina : Health = Stamina + 5',
-  'opt.character.composure': 'Composure : Willpower = Composure + Resolve',
-  'opt.character.resolve': 'Resolve : Willpower = Composure + Resolve',
-  'opt.character.humanity': 'Rang de Humanity (6 par défaut)',
-  'cmd.character.sheet.description': "Affiche la fiche d'un personnage avec des boutons + et −",
-  'opt.character.pick': 'Le personnage (par défaut : le tien à cette table)',
-  'opt.character.public': 'La montrer à tout le salon, sans boutons',
-  'cmd.character.list.description': 'Tes personnages sur ce serveur',
-  'cmd.character.set.description': 'Règle une jauge sur une valeur précise',
-  'opt.character.track': 'Jauge',
-  'opt.character.value': 'Nouvelle valeur (gardée dans les limites)',
-  'cmd.character.edit.description': 'Change nom, clan, niveau ou Attributs',
-  'opt.character.newName': 'Nouveau nom',
-  'cmd.character.give.description': 'Donne un de tes personnages à un autre joueur',
-  'opt.character.giveTo': 'Le joueur qui le reçoit',
-  'cmd.character.delete.description': 'Supprime un de tes personnages',
-  'cmd.chronicle.description': "Chroniques : joueurs, Masquerade Tracker et celle à l'antenne",
-  'cmd.chronicle.create.description': 'Crée une Chronique : tu en es le Conteur',
-  'opt.chronicle.name': 'Nom de la Chronique',
-  'opt.chronicle.sect': 'Secte affichée sur le cadre du Conteur',
-  'cmd.chronicle.list.description': 'Tes Chroniques et leurs personnages',
-  'cmd.chronicle.live.description': "Met une Chronique à l'antenne : l'overlay montre ses cadres",
-  'opt.chronicle.pick': 'La Chronique (par défaut : celle jouée dans ce salon)',
-  'cmd.chronicle.invite.description': 'Invite un joueur à amener un personnage dans une Chronique',
-  'opt.chronicle.player': 'Le joueur',
-  'cmd.chronicle.remove.description': 'Retire un personnage de sa Chronique',
-  'opt.chronicle.character': 'Le personnage',
-  'cmd.chronicle.edit.description': 'Renomme une Chronique ou change sa secte',
-  'opt.chronicle.newName': "Nouveau nom (les liens de l'overlay restent valides)",
-  'cmd.chronicle.archive.description': 'Masque une Chronique et libère ses personnages',
-  'opt.session.chronicle': "Chronique jouée dans ce salon : elle passe aussi à l'antenne",
+  'cmd.sheet.description': "Affiche la fiche d'un personnage avec des boutons + et −",
+  'opt.sheet.character': 'Le personnage (par défaut : le tien à cette table)',
+  'opt.sheet.public': 'La montrer à tout le salon, sans boutons',
+  'opt.invite.chronicle': 'La Chronique (par défaut : celle jouée dans ce salon)',
+  'cmd.invite.description': 'Invite un joueur à amener un personnage dans une Chronique',
+  'opt.invite.player': 'Le joueur',
   'campaign.guildOnly':
     'Les personnages et les Chroniques appartiennent à un serveur : utilise la commande là-bas.',
-  'character.badName':
-    'Le nom doit contenir au moins une lettre ou un chiffre, et 32 caractères au plus.',
-  'character.duplicate': 'Il existe déjà un personnage avec ce nom.',
-  'character.limit': 'Tu peux avoir au plus {max} personnages sur ce serveur.',
-  'character.created': '**{name}** est prêt. Revois-le avec `/elder character sheet`.',
-  'character.list.title': 'Tes personnages',
   'character.noneYet':
-    "Tu n'as pas encore de personnage sur ce serveur. Crée-en un avec `/elder character create`.",
+    "Tu n'as pas encore de personnage sur ce serveur. Crée-en un sur le panneau web (`/elder panel`).",
   'character.notFound': 'Personnage introuvable.',
   'character.pickOne': "Tu as plusieurs personnages : choisis-en un avec l'option `character`.",
   'character.cannotEdit':
     'Seuls le propriétaire, le Conteur de sa Chronique ou un admin du serveur peuvent modifier ce personnage.',
-  'character.ownerOnly': 'Seul le propriétaire peut faire ça.',
-  'character.editNothing': 'Rien à changer : remplis au moins une option.',
-  'character.delete.confirm': "Supprimer **{name}** et son historique ? C'est définitif.",
-  'character.deleted': '**{name}** a été supprimé.',
-  'character.give.invalid': 'Choisis un autre joueur (ni toi ni un bot).',
-  'character.give.offer': '{from} veut donner **{name}** à {to}.',
-  'character.give.done': '**{name}** appartient maintenant à {to}.',
-  'character.give.refused': "{to} n'a pas accepté **{name}**.",
+  'chronicle.invite.invalid': 'Choisis un autre joueur (ni toi ni un bot).',
   'character.hungerFromVitae':
     "{hunger} d'après la Vitae de {name} ({vitae}/{max}). L'option `hunger` permet de le changer.",
   'sheet.chronicle': 'Chronique : {name}',
   'sheet.noChronicle': 'aucune Chronique',
-  'button.delete': 'Supprimer',
-  'button.accept': 'Accepter',
-  'button.refuse': 'Refuser',
   'button.pickCharacter': 'Choisir un personnage',
-  'chronicle.created':
-    "Chronique créée, tu en es le Conteur. Id pour l'overlay : `{slug}`. Invite des joueurs avec `/elder chronicle invite` et joue-la dans un salon avec `/elder session new chronicle:`.",
-  'chronicle.duplicate': 'Il existe déjà une Chronique avec ce nom sur ce serveur.',
-  'chronicle.limit': "Tu peux mener au plus {max} Chroniques à la fois : archives-en une d'abord.",
-  'chronicle.list.title': 'Chroniques',
-  'chronicle.live.badge': "à l'antenne",
-  'chronicle.live.set': "**{name}** est à l'antenne.",
-  'chronicle.members': 'personnages : {count}',
-  'chronicle.noneYet': 'Aucune Chronique. Crée-en une avec `/elder chronicle create`.',
+  'opt.roll.npc': 'Jet pour un PNJ : la réserve de sa fiche, sans dés de Hunger',
+  'opt.roll.attribute': 'Attribut de la fiche de ton personnage',
+  'opt.roll.with': 'Ce qui va avec : Compétence, Discipline, pouvoir, Attribut ou lifepath',
+  'opt.roll.surge': "Blood Surge : l'Attribut ou la Discipline à hausser pour la scène",
+  'sheetRoll.pool': 'Réserve',
+  'sheetRoll.mixed':
+    'Utilise `dice` ou les options de la fiche (`attribute`, `with`, `surge`), pas les deux.',
+  'sheetRoll.needPool':
+    'Indique la réserve : `dice`, ou `attribute` + `with` depuis la fiche de ton personnage.',
+  'sheetRoll.npc':
+    'Les jets de PNJ utilisent `dice` : les options de la fiche sont pour les personnages joueurs.',
+  'sheetRoll.noCharacter':
+    'Aucun personnage avec une fiche complète ici : lance dans le salon de ta Chronique ou complète la fiche sur le panneau. Tu peux toujours utiliser `dice`.',
+  'sheetRoll.noSheet':
+    "{name} n'a que des jauges : complète la fiche sur le panneau pour lancer depuis elle, ou utilise `dice`.",
+  'sheetRoll.hint.noCharacter': 'Aucun personnage avec fiche complète ici : utilise dice',
+  'sheetRoll.hint.noSheet': 'Complète la fiche sur le panneau, ou utilise dice',
+  'sheetRoll.pickFromList': 'Choisis `{option}` dans la liste proposée par Discord.',
+  'sheetRoll.issue.needAttribute':
+    'Choisis un `attribute` (ou un pouvoir dans `with`, qui apporte le sien).',
+  'sheetRoll.issue.needSecond':
+    "Choisis ce qui va `with` l'Attribut : Compétence, Discipline, pouvoir, Attribut ou lifepath.",
+  'sheetRoll.issue.sameAttribute': 'Choisis deux Attributs différents.',
+  'sheetRoll.issue.unknownTrait': "Ce trait n'est pas sur la fiche : choisis-en un dans la liste.",
+  'sheetRoll.issue.noPower': 'Ton personnage ne connaît pas ce pouvoir.',
+  'sheetRoll.issue.noDiscipline': "Ton personnage n'a aucun point dans cette Discipline.",
+  'sheetRoll.issue.noSpecialty':
+    "Cette spécialité n'est plus sur la fiche : choisis à nouveau dans la liste.",
+  'sheetRoll.issue.surgeNoDiscipline': 'Blood Surge demande au moins 1 point dans la Discipline.',
+  'sheetRoll.issue.surgeLimit': 'Ce Blood Surge dépasse la limite de ton tier.',
+  'sheetRoll.issue.surgeVitae': 'Pas assez de Vitae pour ce Blood Surge.',
+  'sheetRoll.surgeSpent':
+    "{name} dépense {cost} Vitae : {trait} +{dots} jusqu'à la fin de la scène.",
+  'sheetRoll.surgeActive': "Actif jusqu'à la fin de la scène : {list}.",
+  'sheetRoll.surgeEnded': 'Blood Surge terminé pour {name}.',
+  'sheetRoll.impaired': '{attributes} Impaired (Health ou Willpower à 0) : −{dice} dés.',
+  'sheetRoll.powerAttribute': 'Ce pouvoir utilise normalement {attribute} : le Storyteller décide.',
+  'sheetRoll.trackerDiffers':
+    '{attribute} : {sheet} sur la fiche, {tracker} sur les jauges. Le jet utilise la fiche.',
+  'button.surgeEnd': 'Fin du Blood Surge',
+  'sheetRoll.issue.bonusNeedsSurge': "Choisis d'abord dans `surge` le trait à hausser.",
+  'sheetRoll.hint.pickSurge': "Choisis d'abord le trait dans surge",
+  'opt.contest.surge_bonus': 'Bonus du Blood Surge, avec son coût en Vitae (par défaut +1)',
+  'opt.roll.surge_bonus': 'Bonus du Blood Surge, avec son coût en Vitae (par défaut +1)',
+  'opt.roll.specialization': 'Spécialité de la Compétence choisie dans with (+1 dé)',
+  'opt.contest.specialization': 'Spécialité de la Compétence choisie dans with (+1 dé)',
+  'opt.contest.opponent_specialization':
+    'Spécialité de la Compétence choisie dans opponent_with (+1 dé)',
+  'sheetRoll.hint.noSpecialties': "Choisis d'abord dans with une Compétence avec spécialités",
+  'sheetRoll.issue.specialtyNeedsSkill':
+    "La spécialité va avec une Compétence : choisis d'abord la Compétence dans `with`.",
+  'sheetRoll.contest.needOpponent': "Choisis l'`opponent` pour lancer depuis sa fiche.",
+  'sheetRoll.contest.needOpponentPool':
+    "Indique la réserve de l'adversaire : `opponent_dice`, ou `opponent_attribute` + `opponent_with` depuis la fiche du joueur adverse.",
+  'sheetRoll.contest.needPool':
+    'Indique ta réserve : `dice`, ou `attribute` + `with` depuis ta fiche.',
+  'sheetRoll.hint.pickOpponent': "Choisis d'abord l'adversaire",
+  'opt.contest.opponent_with': "Ce qui va avec l'Attribut du joueur adverse, depuis sa fiche",
+  'opt.contest.surge': "Blood Surge : l'Attribut ou la Discipline à hausser pour la scène",
+  'opt.contest.with': 'Ce qui va avec ton Attribut : Compétence, Discipline, pouvoir, lifepath',
+  'button.masqueradeThreat': 'Test de menace',
+  'button.prolongedCancel': 'Annuler la tâche',
+  'button.willpowerBest': 'Willpower : relancer les échecs',
+  'willpower.noFailures': 'Aucun dé normal raté à relancer.',
+  'chronicle.noneYet': 'Aucune Chronique. Crée-en une sur le panneau web (`/elder panel`).',
   'chronicle.notFound': 'Chronique introuvable.',
   'chronicle.pickOne': "Tu mènes plusieurs Chroniques : choisis-en une avec l'option `chronicle`.",
   'chronicle.storytellerOnly':
     'Seul le Conteur de cette Chronique ou un admin du serveur peut faire ça.',
-  'chronicle.notMember': "Ce personnage n'est dans aucune Chronique.",
-  'chronicle.removed': '**{name}** quitte {chronicle}.',
-  'chronicle.archived': '**{name}** est archivée : son salon et ses personnages sont libres.',
   'chronicle.invite':
     "{user}, {storyteller} t'invite dans **{chronicle}** : choisis le personnage que tu amènes.",
   'chronicle.noFreeCharacter':
-    'Tous tes personnages sont déjà dans une Chronique. Crées-en un avec `/elder character create`, puis appuie à nouveau sur le bouton.',
+    'Tous tes personnages sont déjà dans une Chronique. Crées-en un sur le panneau web (`/elder panel`), puis appuie à nouveau sur le bouton.',
   'chronicle.pickPlaceholder': 'Ton personnage',
   'chronicle.busy': '**{name}** joue déjà dans une autre Chronique.',
   'chronicle.wrongTier': '**{name}** ne peut pas rejoindre : la Chronique est de niveau {tier}.',
-  'character.wrongTier': 'Le nouveau niveau ne correspond pas à celui de sa Chronique.',
   'chronicle.joined.private': '**{name}** rejoint {chronicle}.',
   'chronicle.joined': '**{name}** ({user}) rejoint {chronicle}.',
-  'session.new.chronicle':
-    'Chronique : **{name}**. Les dés de Hunger viennent de la Vitae de chaque personnage.',
   'frenzy.error.noCharacter':
     "Tu n'as pas de personnage à cette table : indique `dice` (Composure + Resolve) et `humanity`.",
   'willpower.none': "**{name}** n'a plus de Willpower.",

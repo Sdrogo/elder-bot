@@ -2,6 +2,8 @@
 
 ElderBot rolls dice for **Vampire: The Masquerade 6th Edition** using the playtest rules (Alpha 2.0). It does the math, shows every die and offers the follow-ups the rules allow: Willpower, Beast's Bargain, Try again. You type how many dice you roll. If your character is saved in the bot and plays in the channel's Chronicle, the bot also knows your Vitae, so it works out your Hunger dice, takes Willpower when you reroll and caps frenzy dice at your Humanity.
 
+Discord keeps only the commands you need at the table: managing characters, Chronicles and sessions happens on the **web panel** (`/elder panel` gives you the link).
+
 Every command lives under `/elder`. Discord shows each option as a field: type `/elder roll`, fill in `dice`, press Tab to move to the next option.
 
 ## Contents
@@ -19,12 +21,11 @@ Every command lives under `/elder`. Discord shows each option as a field: type `
 
 Each Discord channel is a separate **table**: prolonged tasks and the Masquerade Tracker in one channel never affect another.
 
-Each table has one **Storyteller**. Whoever runs `/elder session new` on a table without one becomes the Storyteller, and can hand the role over with `/elder session storyteller user:@someone`. Server admins (Manage Server permission) always count as Storyteller, so a table never gets stuck.
+A table's **Storyteller** is the Storyteller of the Chronicle played in that channel. On the web panel the Storyteller picks, for each Chronicle, the **table channel** and the bot's **language** there, and can **end the session** or **hand the Chronicle over** to someone else. Server admins (Manage Server permission) always count as Storyteller, so a table never gets stuck; in a channel with no Chronicle they are the only ones.
 
 Only the Storyteller can:
 
-- run `/elder session` (new session, end, language, change Storyteller);
-- mark, clear or set the Masquerade Tracker and roll the threat test (anyone can look with `/elder masquerade show`);
+- mark or clear the Masquerade Tracker and roll the threat test, with the buttons under `/elder masquerade` (anyone can look);
 - grant or refuse a Beast's Bargain.
 
 ## Characters and Chronicles
@@ -35,29 +36,19 @@ Each player can save characters in the bot, several per player. A character keep
 
 A **Chronicle** is a Storyteller's game: its players' characters, its Masquerade Tracker and its sect. A Storyteller can run several Chronicles; one at a time is **on air**, the one the OBS overlay shows.
 
-| Command                                                                                  | Who                | What it does                                                                      |
-| ---------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------- |
-| `/elder character create name clan tier stamina composure resolve [humanity]`            | Anyone             | Creates a character at full Health, Vitae and Willpower, Humanity 6 unless given  |
-| `/elder character sheet [character] [public]`                                            | Anyone             | The sheet with − and + buttons for each tracker. Only you see it, unless `public` |
-| `/elder character list`                                                                  | Anyone             | Your characters and their Chronicles                                              |
-| `/elder character set track value [character]`                                           | Owner, Storyteller | Sets a tracker to an exact value                                                  |
-| `/elder character edit [character] [name] [clan] [tier] [stamina] [composure] [resolve]` | Owner, Storyteller | Changes the sheet; current values follow the new maxima                           |
-| `/elder character give user character`                                                   | Owner              | Offers the character to another player, who accepts with a button                 |
-| `/elder character delete character`                                                      | Owner              | Deletes it, after a confirmation                                                  |
-| `/elder chronicle create name [sect]`                                                    | Anyone             | Creates a Chronicle; you are its Storyteller. Your first one goes on air          |
-| `/elder chronicle invite user [chronicle]`                                               | Storyteller        | The player chooses which character to bring                                       |
-| `/elder chronicle remove character`                                                      | Storyteller        | Takes a character out; the player keeps it                                        |
-| `/elder chronicle live [chronicle]`                                                      | Storyteller        | Puts the Chronicle on air                                                         |
-| `/elder chronicle list`                                                                  | Storyteller        | Your Chronicles, their characters and which is on air                             |
-| `/elder chronicle edit [chronicle] [name] [sect]`                                        | Storyteller        | Renames it or changes its sect                                                    |
-| `/elder chronicle archive chronicle`                                                     | Storyteller        | Hides it and frees its channel and characters; nothing is deleted                 |
+Characters and Chronicles are managed on the **web panel**: creating a character (with the guided Alpha 2.0 wizard), editing it, giving it to another player or deleting it; creating, editing, archiving or handing over a Chronicle, choosing the one on air, ordering and removing its characters. Two commands stay on Discord:
+
+| Command                             | Who         | What it does                                                                      |
+| ----------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `/elder sheet [character] [public]` | Anyone      | The sheet with − and + buttons for each tracker. Only you see it, unless `public` |
+| `/elder invite user [chronicle]`    | Storyteller | Invites a player, who picks the character to bring with a button                  |
 
 The owner, the Storyteller of the character's Chronicle and server admins can change a character; only the owner can give it away or delete it. A character plays in one Chronicle at a time.
 
-To play a Chronicle in a channel, the Storyteller runs `/elder session new chronicle:<name>`. From then on, in that channel:
+Once the Storyteller has chosen the Chronicle's table channel on the panel, in that channel:
 
-- every roll without `hunger` takes your Hunger dice from your character's Vitae, and says so under the roll; typing `hunger` still wins;
-- the **Willpower** button takes 1 Willpower from your character, and is refused at 0;
+- every roll takes your Hunger dice from your character's Vitae, and says so under the roll (`/elder frenzy` still lets you type them);
+- the **Willpower** buttons take 1 Willpower from your character, and are refused at 0;
 - `/elder frenzy` takes Composure + Resolve and Humanity from your character if you leave them out;
 - `/elder masquerade` works on the Chronicle's tracker, which follows the Chronicle to any channel.
 
@@ -66,7 +57,7 @@ When you pick a `character` or `chronicle`, Discord suggests names as you type. 
 ## How a roll works
 
 1. **Pool** = Attribute + Skill (or Discipline, or Composure + Resolve), plus or minus any bonus or penalty dice: assist, focus, story assets, Impairment.
-2. **Hunger dice**: if your character has any (0–5), give them with `hunger`, or let the bot take them from your saved character (see above). They replace normal dice one for one; they are not extra dice.
+2. **Hunger dice**: the bot takes them (0–5) from your saved character's Vitae (see above). They replace normal dice one for one; they are not extra dice.
 3. Roll d10s:
    - every die showing **6 or more** is a success, and a **10** counts as **two**;
    - successes equal to or above the **Difficulty** win. Winning with at least one 10 is a **Critical Win**;
@@ -95,6 +86,7 @@ The summary below shows the pool, the Difficulty, the successes and the margin. 
 Depending on the result, the roll message offers buttons. Only the player who rolled can press them, except where noted.
 
 - **Willpower** (once per test): spend 1 Willpower and pick up to 3 normal dice to reroll. Hunger dice can never be rerolled. The bot rerolls them in the same message and works the outcome out again. **Cancel** brings back the other buttons.
+- **Willpower: reroll failures** (shown when a normal die failed): the same, in one click. The bot rerolls up to 3 normal dice that show 1 to 5, never a Hunger die.
 - **Beast's Bargain** (after a plain Failure; never on a Painful or Bestial Failure or a second attempt): you reach for the Beast. The **Storyteller** describes the price (collateral damage, feed the Beast, a Masquerade breach, risking a frenzy), sized by your margin of failure, and presses **Grant bargain** for a basic win or **No bargain**.
 - **Try again** (after a failure against a Difficulty, once): roll a second time at Difficulty +1, changing your Attribute or Skill in the form that opens. Any failure on the second attempt is a Painful Failure.
 
@@ -106,33 +98,51 @@ Options in `[brackets]` are optional.
 
 A standard, Power or Self-Control test.
 
-`/elder roll dice [difficulty] [bonus] [hunger] [take_half] [reason]`
+`/elder roll dice [difficulty] [bonus] [reason] [npc]`
 
-| Option       | What it does                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------- |
-| `dice`       | Attribute + Skill (0–30)                                                                                      |
-| `difficulty` | Successes needed to win (1–15)                                                                                |
-| `bonus`      | Bonus (positive) or penalty (negative) dice, −10 to +10                                                       |
-| `hunger`     | Your Hunger dice (0–5)                                                                                        |
-| `take_half`  | **Taking Half**: no roll, half your pool (rounded up) counts as successes. Only when you are not under stress |
-| `reason`     | What you are attempting, shown in the title                                                                   |
+`/elder roll attribute with [specialization] [surge] [surge_bonus] [difficulty] [bonus] [reason]`
 
-Example: `/elder roll dice:7 difficulty:2 hunger:1 reason:Climb the wall`
+| Option           | What it does                                                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `dice`           | The pool as a number (0–30). Leave it out to roll from the character sheet                                             |
+| `attribute`      | An Attribute from your sheet, picked from the list with its dots                                                       |
+| `with`           | What goes with it: a Skill (its specializations in brackets), a Discipline, a power, another Attribute, a lifepath (2) |
+| `specialization` | A specialization of the Skill in `with`: +1 die. The list shows only that Skill's specializations                      |
+| `surge`          | **Blood Surge**: the Attribute (1 Vitae a dot) or Discipline (2 Vitae a dot) to raise for the scene                    |
+| `surge_bonus`    | How much to raise it, each choice with its Vitae cost; +1 when left out                                                |
+| `difficulty`     | Successes needed to win (1–15)                                                                                         |
+| `bonus`          | Bonus (positive) or penalty (negative) dice, −10 to +10                                                                |
+| `reason`         | What you are attempting, shown in the title                                                                            |
+| `npc`            | A test for an NPC (see below)                                                                                          |
+
+Example: `/elder roll dice:7 difficulty:2 reason:Climb the wall`
+
+#### Rolling from the sheet
+
+A character with a full sheet (made with the panel's wizard) can roll without counting dots. In the Chronicle's channel, pick `attribute` and `with` from the lists: the bot adds the dots and writes the sum on the roll, for example _Dexterity 3 + Fighting 2 + Hand-to-Hand 1 = 6_.
+
+- **Power test**: pick the power in `with`. Its Attribute comes with it, so `attribute` can stay empty. Another Attribute is allowed (the Storyteller decides), and the roll says so.
+- **Two Attributes** (a task everyone knows, like driving) or a **lifepath** (2 dots, when no Skill fits) are in the same list.
+- **Impairment**: at 0 Health the Physical Attributes lose 2 dice, at 0 Willpower the Social and Mental ones do. The bot takes them off and says why.
+- **Blood Surge**: pick the trait in `surge` and the bonus in `surge_bonus` (+1 if left out); both lists show only what your Vitae and your tier allow (an Attribute up to +2 for neonates, +4 ancillae, +6 elders; a Discipline up to the tier maximum). The Vitae are spent before the roll, so Hunger dice already count them. The surge stays on the character for the rest of the scene and is added to the next rolls from the sheet. It ends with the **End Blood Surge** button, when the session ends on the panel, or after 3 hours.
+- Hunger dice come from the character's Vitae, as always.
 
 ### `/elder contest`
 
 A contested test: both sides roll, the most successes wins.
 
-`/elder contest dice opponent_dice [opponent] [attribute] [opponent_attribute] [hunger] [opponent_hunger] [reason]`
+`/elder contest dice | attribute with [specialization] [surge] [surge_bonus] [opponent] opponent_dice | opponent_attribute opponent_with [opponent_specialization] [opponent_hunger] [reason]`
 
-- **Ties** go to the higher Attribute, so fill in `attribute` and `opponent_attribute`. For a minor or standard NPC, its Attribute is half its pool. With equal or unknown Attributes, whoever started the contest wins.
+Each side's pool is a number (`dice`, `opponent_dice`) or comes from a character sheet, like `/elder roll`: `attribute` + `with` for you (with an optional `surge`), `opponent_attribute` + `opponent_with` for the opposing player picked in `opponent`. Their lists are read from that player's sheet. The opposing player's Blood Surges already running count too.
+
+- **Ties** go to the higher Attribute. A pool from a sheet uses its Attribute (Blood Surge included); with `dice`, type the Attribute as a number in `attribute` and `opponent_attribute`. For a minor or standard NPC, its Attribute is half its pool. With equal or unknown Attributes, whoever started the contest wins.
 - The winner's margin is shown: the loser's margin of failure.
-- `hunger` and `opponent_hunger`: each side's Hunger dice. Losing with a 1 on a Hunger die is a Bestial Failure.
+- Hunger dice come from each player's character; `opponent_hunger` gives them for an opponent without a saved character. Losing with a 1 on a Hunger die is a Bestial Failure.
 - `opponent`: the opposing player, shown by name.
 
-### `/elder npc`
+#### NPCs
 
-`/elder npc dice [difficulty] [bonus] [take_half] [reason]`: a test for an NPC. Roll the pool from its stat block: its Physical, Social or Mental pool, or a Skill pool.
+`/elder roll dice npc:true [difficulty] [bonus] [reason]`: a test for an NPC. Roll the pool from its stat block: its Physical, Social or Mental pool, or a Skill pool.
 
 NPCs don't use the players' mechanics: no Hunger dice, Willpower, Beast's Bargain, complications or Try again. An NPC with no successes simply fails.
 
@@ -154,43 +164,41 @@ To **ride the wave** instead, don't roll: you suffer the frenzy and regain 1 Wil
 A task that needs several rolls to complete.
 
 - `/elder prolonged start name target tests`: start it. `target` is the successes needed (3, 5, 7 or 10), `tests` the rolls available (3, 5 or 7).
-- `/elder prolonged roll dice [bonus] [hunger]`: roll for it. The bot adds up the successes and tells you when the task is done or failed. A roll with no successes (a Painful or Bestial Failure) fails the task at once.
-- `/elder prolonged status`: show your progress.
-- `/elder prolonged cancel`: close it.
+- `/elder prolonged roll dice [bonus]`: roll for it. The bot adds up the successes and shows your progress, and tells you when the task is done or failed. A roll with no successes (a Painful or Bestial Failure) fails the task at once.
+- **Cancel task**: the button under the task drops it.
 
 Each player can have one prolonged task open per channel.
 
 ### `/elder masquerade`
 
-The table's Masquerade Tracker: 10 boxes, from Superstition (0) to Open War (9–10).
+The table's Masquerade Tracker: 10 boxes, from Superstition (0) to Open War (9–10). Anyone can show it; its buttons are for the Storyteller:
 
-- `show`: the tracker and its level (anyone).
-- `mark [amount] [reason]`, `clear [amount]`, `set value`: Storyteller only.
-- `threat`: the optional threat test. The bot rolls one die per marked box and names the reaction, from Calm Before the Storm to Overwhelming Threat.
+- **−1** and **+1** clear or mark a box;
+- **Threat test**: the optional threat test. The bot rolls one die per marked box and names the reaction, from Calm Before the Storm to Overwhelming Threat.
 
-The tracker belongs to the chronicle: `/elder session end` doesn't reset it.
+The tracker belongs to the Chronicle: ending a session doesn't reset it. The panel moves it too.
 
-### `/elder session`
+### `/elder sheet` and `/elder invite`
 
-- `new [chronicle]`: start a session. On a table without a Storyteller, you become it. With `chronicle`, this channel plays that Chronicle and it goes on air.
-- `end`: end the game on this table. Prolonged tasks and table language are reset, and the Storyteller role is freed. The Masquerade Tracker stays.
-- `storyteller [user]`: show the Storyteller, or hand the role to `user`.
-- `language language`: the table's language (see below).
+See [Characters and Chronicles](#characters-and-chronicles).
+
+### `/elder panel`
+
+The link to the web panel, only for you.
 
 ## Languages
 
 The bot speaks English, Italian, Spanish, French and German. By default it answers each player in their own Discord language, and English for any other language. Command descriptions in the Discord menu follow your Discord language too; command and option names stay in English.
 
-The Storyteller can fix one language for the whole table with `/elder session language`, or pick `Auto` to go back to each player's language. Game terms (Hunger, Willpower, Painful Failure, Bestial Failure, Beast's Bargain, Taking Half…) stay in English in every language, as in the playtest.
+The Storyteller can fix one language for a Chronicle's table on the web panel, or leave it on each player's Discord language. Game terms (Hunger, Willpower, Painful Failure, Bestial Failure, Beast's Bargain, Taking Half…) stay in English in every language, as in the playtest.
 
 ## Typical session
 
-1. Once: the Storyteller runs `/elder chronicle create name:Nights of Rome` and `/elder chronicle invite user:@player`; each player creates a character with `/elder character create` and picks it from the invitation.
-2. The Storyteller opens the table: `/elder session new chronicle:Nights of Rome`.
-3. Players roll: `/elder roll dice:6 difficulty:2 reason:Pick the lock`. Hunger dice come from their Vitae; spending Vitae is a click on the sheet (`/elder character sheet`).
-4. A failed roll? Press **Willpower** to reroll up to 3 dice, ask for a **Beast's Bargain**, or **Try again** another way.
-5. Someone bares their fangs in public: `/elder masquerade mark reason:Fangs in the hotel lobby`.
-6. When the chronicle is over, `/elder session end` clears the table.
+1. Once, on the web panel: the Storyteller creates the Chronicle "Nights of Rome" and picks its table channel; each player creates a character. On Discord the Storyteller runs `/elder invite user:@player`, and each player picks a character from the invitation.
+2. Players roll: `/elder roll dice:6 difficulty:2 reason:Pick the lock`. Hunger dice come from their Vitae; spending Vitae is a click on the sheet (`/elder sheet`).
+3. A failed roll? Press **Willpower** to pick up to 3 dice, or **Willpower: reroll failures** to let the bot pick them; ask for a **Beast's Bargain**, or **Try again** another way.
+4. Someone bares their fangs in public: the Storyteller shows `/elder masquerade` and presses **+1**.
+5. At the end of the night the Storyteller presses **End session** on the panel: prolonged tasks still open are dropped.
 
 ---
 
