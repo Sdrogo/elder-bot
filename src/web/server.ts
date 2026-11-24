@@ -736,16 +736,31 @@ export function createPanelHandler(deps: PanelDeps) {
     if (!name) return json(res, 400, { error: 'invalid', field: 'name' });
     // The bot still calls the Giovanni line by its V5 name.
     const clan: Clan = d.clan === 'giovanni' ? 'hecata' : d.clan;
-    const sheet = {
-      data: d,
+    // The `editing` flag is about the draft, not the sheet.
+    const kept = { ...d };
+    delete kept.editing;
+    const sheet: { data: unknown; approvals: SheetApproval[] } = {
+      data: kept,
       approvals: result.approvals.map((a) => ({ ...a, status: 'pending' as const })),
     };
     const { campaign } = store;
     let character: Character | undefined;
     if (d.characterId !== undefined) {
       const old = campaign.getCharacter(d.characterId);
-      if (!old || old.ownerId !== me.userId) return json(res, 404, { error: 'not found' });
-      if (old.hasSheet) return json(res, 409, { error: 'has sheet' });
+      if (!old) return json(res, 404, { error: 'not found' });
+      // Completing a tracker-only character is for its owner; changing a full sheet is also open
+      // to the Chronicle's Storyteller, like every other change to the character.
+      const allowed = d.editing
+        ? canEditOnPanel(me.userId, old, (n) => campaign.getChronicle(n))
+        : old.ownerId === me.userId;
+      if (!allowed) return json(res, 404, { error: 'not found' });
+      if (!!old.hasSheet !== !!d.editing) return json(res, 409, { error: 'has sheet' });
+      // Choices the Storyteller already answered keep their answer while they stay the same.
+      const before = (campaign.getSheet(old.id)?.approvals ?? []) as SheetApproval[];
+      sheet.approvals = sheet.approvals.map((a) => {
+        const same = before.find((b) => b.code === a.code && b.target === a.target);
+        return same ? { ...a, status: same.status } : a;
+      });
       const { tier, stamina, composure, resolve } = trackerValues(d);
       const updated = campaign.updateCharacter(
         old.id,
@@ -815,6 +830,30 @@ export function createPanelHandler(deps: PanelDeps) {
     const chronicle = c.chronicleId === undefined ? undefined : getChronicle(c.chronicleId);
     const canApprove = chronicle?.storytellerId === me.userId;
     const chronicles = new Map<number, Chronicle>(chronicle ? [[chronicle.id, chronicle]] : []);
+    if (sub === 'edit') {
+      // POST …/edit: a draft with this sheet, for the wizard to change it as a whole.
+      if (method !== 'POST') return json(res, 404, { error: 'not found' });
+      if (!trustedChange(req, me)) return json(res, 403, { error: 'forbidden' });
+      if (!limiter.allow(`change:${me.userId}`, RATE_LIMIT)) {
+        return json(res, 429, { error: 'too many requests' });
+      }
+      const open = store.drafts
+        .ownedBy(me.userId)
+        .find(
+          (x) => x.data.characterId === c.id && x.data.editing && x.updatedAt >= sheet.createdAt,
+        );
+      if (open) return json(res, 200, { draft: draftView(open) });
+      const data = parseDraft({
+        ...(sheet.data as object),
+        name: c.name,
+        characterId: c.id,
+        editing: true,
+      });
+      if (!data) return json(res, 400, { error: 'invalid body' });
+      const created = store.drafts.create(me.userId, data);
+      if (created === 'limit') return json(res, 409, { error: 'limit' });
+      return json(res, 200, { draft: draftView(created) });
+    }
     if (sub === 'sheet' && method === 'GET') {
       return json(res, 200, {
         character: characterView(c, chronicles, me.userId, undefined, pendingOf(c)),
@@ -1502,7 +1541,7 @@ export function createPanelHandler(deps: PanelDeps) {
     const portraitPath = /^\/api\/characters\/(\d{1,12})\/portrait$/.exec(path);
     if (portraitPath) return portraitApi(req, res, me, method, Number(portraitPath[1]));
 
-    const sheetPath = /^\/api\/characters\/(\d{1,12})\/(sheet|approval)$/.exec(path);
+    const sheetPath = /^\/api\/characters\/(\d{1,12})\/(sheet|approval|edit)$/.exec(path);
     if (sheetPath) return sheetApi(req, res, me, method, Number(sheetPath[1]), sheetPath[2]!);
 
     const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam|give))?)?$/.exec(path);

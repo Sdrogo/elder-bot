@@ -50,6 +50,9 @@ const TEXT = {
     trackers: 'Tracciati',
     more: 'Dettagli',
     approvals: 'Approvazioni del Narratore',
+    editSheet: 'Modifica scheda',
+    editFailed: 'Non riesco ad aprire la modifica. Riprova.',
+    editLimit: 'Hai troppe bozze aperte: cancellane una dal pannello.',
     'status.pending': 'da approvare',
     'status.approved': 'approvato',
     'status.rejected': 'rifiutato',
@@ -84,6 +87,9 @@ const TEXT = {
     trackers: 'Trackers',
     more: 'Details',
     approvals: 'Storyteller approvals',
+    editSheet: 'Edit sheet',
+    editFailed: 'Could not open the editor. Try again.',
+    editLimit: 'You have too many open drafts: delete one from the panel.',
     'status.pending': 'waiting',
     'status.approved': 'approved',
     'status.rejected': 'rejected',
@@ -160,6 +166,30 @@ async function load() {
   draw(await response.json());
 }
 
+function notify(text) {
+  const box = document.getElementById('notice');
+  box.textContent = text;
+  box.hidden = false;
+}
+
+/** Opens the wizard on this sheet: the server makes a draft of it and the wizard changes it. */
+async function edit(button) {
+  button.disabled = true;
+  const response = await fetch(`/api/characters/${id}/edit`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'X-CSRF-Token': me.csrf },
+  });
+  if (response.ok) {
+    const { draft } = await response.json();
+    location.href = `/crea?bozza=${draft.id}`;
+    return;
+  }
+  const data = await response.json().catch(() => ({}));
+  notify(tr(data.error === 'limit' ? 'editLimit' : 'editFailed'));
+  button.disabled = false;
+}
+
 async function answer(index, approved) {
   const response = await fetch(`/api/characters/${id}/approval`, {
     method: 'POST',
@@ -188,6 +218,10 @@ function draw({ character, sheet, canApprove }) {
     d.generation ? tr('generation', d.generation) : '',
   ];
   head.append(el('p', 'quiet', meta.filter(Boolean).join(' · ')));
+  const editButton = el('button', 'button', tr('editSheet'));
+  editButton.type = 'button';
+  editButton.addEventListener('click', () => edit(editButton));
+  head.append(editButton);
   out.push(head);
 
   if (sheet.approvals.length) {

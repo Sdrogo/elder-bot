@@ -977,6 +977,73 @@ describe('character creation wizard', () => {
     expect((await send('POST', `/api/drafts/${againId}/create`, {})).status).toBe(409);
   });
 
+  it('reopens a full sheet in the wizard and saves it as a whole, keeping trackers and approvals', async () => {
+    const send = await asUser();
+    const data = brujah();
+    data.lifepaths[1] = {
+      id: 'custom-1',
+      custom: {
+        name: 'Gondoliere',
+        description: 'Canali e segreti.',
+        group: 'mortal',
+        skills: ['awareness', 'investigation', 'athletics', 'persuasion', 'shooting'],
+        resources: [{ kind: 'vehicle', detail: 'Gondola' }, { kind: 'contact' }, { kind: 'mask' }],
+      },
+      skills: { awareness: 2, investigation: 2, shooting: 1 },
+      resources: [1, 1, 1],
+    };
+    const saved = await send('POST', '/api/drafts', { data });
+    const draftId = ((await saved.json()) as { draft: { id: number } }).draft.id;
+    const made = await send('POST', `/api/drafts/${draftId}/create`, { guild: 'g' });
+    const { character } = (await made.json()) as { character: { id: number } };
+    const sheet = store.campaign.getSheet(character.id)!;
+    store.campaign.setApprovals(character.id, [
+      { ...(sheet.approvals[0] as object), status: 'approved' },
+    ]);
+    await send('POST', `/api/characters/${character.id}/track`, { track: 'vitae', delta: -2 });
+    const vitae = store.campaign.getCharacter(character.id)!.values.vitae;
+
+    // Someone who may not touch the character can't open its sheet for editing.
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altrui',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 3, resolve: 2 }),
+      sheet: { data, approvals: [] },
+    });
+    if (typeof theirs !== 'object') throw new Error('setup');
+    expect((await send('POST', `/api/characters/${theirs.id}/edit`)).status).toBe(404);
+    expect(
+      (await send('POST', `/api/characters/${character.id}/edit`, undefined, 'wrong')).status,
+    ).toBe(403);
+
+    const opened = await send('POST', `/api/characters/${character.id}/edit`);
+    expect(opened.status).toBe(200);
+    const { draft } = (await opened.json()) as {
+      draft: { id: number; data: { characterId: number; editing: boolean; name: string } };
+    };
+    expect(draft.data).toMatchObject({ characterId: character.id, editing: true, name: 'Nico' });
+    // Asking again goes back to the same draft.
+    const again = (await (await send('POST', `/api/characters/${character.id}/edit`)).json()) as {
+      draft: { id: number };
+    };
+    expect(again.draft.id).toBe(draft.id);
+
+    const changed = { ...draft.data, name: 'Nico II' };
+    await send('POST', `/api/drafts/${draft.id}`, { data: changed });
+    expect((await send('POST', `/api/drafts/${draft.id}/create`, {})).status).toBe(200);
+    const after = store.campaign.getCharacter(character.id)!;
+    expect(after.name).toBe('Nico II');
+    expect(after.values.vitae).toBe(vitae);
+    const stored = store.campaign.getSheet(character.id)!;
+    expect(stored.data).not.toHaveProperty('editing');
+    expect(stored.approvals).toEqual([
+      { code: 'custom-lifepath', target: 'Gondoliere', status: 'approved' },
+    ]);
+    expect(store.drafts.ownedBy('111')).toHaveLength(0);
+  });
+
   it('keeps a Chronicle and its characters on the same tier of play', async () => {
     const send = await asUser();
     expect(
