@@ -35,8 +35,13 @@ export const sheet: Command = {
     // Anyone at the table can look; only those who may change it get the buttons.
     const isPublic = interaction.options.getBoolean('public') ?? false;
     const editable = canEditCharacter(interaction, c, campaign);
+    // Several characters of their own: a menu to pick the one in play.
+    const choices =
+      !isPublic && c.ownerId === interaction.user.id
+        ? campaign.charactersOf(guildId, interaction.user.id)
+        : [];
     await interaction.reply({
-      ...sheetMessage(locale, c, chronicle, editable && !isPublic),
+      ...sheetMessage(locale, c, chronicle, editable && !isPublic, choices),
       ...(isPublic ? {} : { flags: MessageFlags.Ephemeral }),
     });
   },

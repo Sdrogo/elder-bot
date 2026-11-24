@@ -154,6 +154,9 @@ export const es: Messages = {
     '{hunger} por la Vitae de {name} ({vitae}/{max}). Usa la opción `hunger` para cambiarlo.',
   'sheet.chronicle': 'Crónica: {name}',
   'sheet.noChronicle': 'sin Crónica',
+  'sheet.usePlaceholder': 'Elige el personaje en juego',
+  'sheet.nowPlaying':
+    'Ahora juegas con {name}: las tiradas usan su Hambre y su Fuerza de Voluntad.',
   'button.pickCharacter': 'Elegir personaje',
   'opt.roll.npc': 'Tirada de un PNJ: la reserva de su ficha, sin dados de Hunger',
   'opt.roll.attribute': 'Atributo de la ficha de tu personaje',

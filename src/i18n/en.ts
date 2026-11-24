@@ -150,6 +150,8 @@ export const en = {
     "{hunger} from {name}'s Vitae ({vitae}/{max}). Use the `hunger` option to change it.",
   'sheet.chronicle': 'Chronicle: {name}',
   'sheet.noChronicle': 'no Chronicle',
+  'sheet.usePlaceholder': 'Pick the character in play',
+  'sheet.nowPlaying': 'You now play {name}: rolls use their Hunger and Willpower.',
   'button.pickCharacter': 'Choose a character',
   'opt.roll.npc': 'Roll for an NPC: the pool from their stat block, no Hunger dice',
   'opt.roll.attribute': 'Attribute from your character sheet',

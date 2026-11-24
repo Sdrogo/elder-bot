@@ -117,6 +117,8 @@ export async function pickCharacter(
   }
   const active = campaign.activeCharacter(interaction.channelId, interaction.user.id);
   if (active) return active;
+  const chosen = campaign.selectedCharacter(guildId, interaction.user.id);
+  if (chosen) return chosen;
   const own = campaign.charactersOf(guildId, interaction.user.id);
   if (own.length === 1) return own[0];
   await replyEphemeral(interaction, locale, own.length ? 'character.pickOne' : 'character.noneYet');
@@ -165,7 +167,7 @@ export function rollerHunger(
   locale: Locale,
   option = 'hunger',
   character?: Character,
-): { hunger: number; note?: APIEmbedField } {
+): { hunger: number; note?: APIEmbedField; character?: Character } {
   const given = interaction.options.getInteger(option);
   if (given !== null) return { hunger: given };
   const c =
@@ -175,6 +177,7 @@ export function rollerHunger(
   const hunger = hungerDice(c.values);
   return {
     hunger,
+    character: c,
     note: {
       name: 'Hunger',
       value: t(locale, 'character.hungerFromVitae', {

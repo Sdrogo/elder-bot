@@ -184,6 +184,10 @@ export class Campaign {
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         chronicle_id INTEGER NOT NULL REFERENCES chronicles (id) ON DELETE CASCADE,
         position INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS active_characters (
+        guild_id TEXT NOT NULL, owner_id TEXT NOT NULL,
+        character_id INTEGER NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+        PRIMARY KEY (guild_id, owner_id));
       CREATE TABLE IF NOT EXISTS live_chronicle (
         guild_id TEXT NOT NULL, storyteller_id TEXT NOT NULL,
         chronicle_id INTEGER NOT NULL REFERENCES chronicles (id) ON DELETE CASCADE,
@@ -639,10 +643,38 @@ export class Campaign {
       .prepare(
         `${CHARACTER_SELECT}
          JOIN chronicles ch ON ch.id = m.chronicle_id
-         WHERE ch.channel_id = ? AND c.owner_id = ? ORDER BY m.position LIMIT 1`,
+         WHERE ch.channel_id = ? AND c.owner_id = ?
+         ORDER BY EXISTS (SELECT 1 FROM active_characters a
+                          WHERE a.owner_id = c.owner_id AND a.character_id = c.id) DESC,
+                  m.position LIMIT 1`,
       )
       .get(channelId, userId) as CharacterRow | undefined;
     return row ? toCharacter(row) : undefined;
+  }
+
+  /** The character a user chose to play on a server, if they chose one. */
+  selectedCharacter(guildId: string, userId: string): Character | undefined {
+    const row = this.db
+      .prepare(
+        `${CHARACTER_SELECT}
+         JOIN active_characters a ON a.character_id = c.id
+         WHERE a.guild_id = ? AND a.owner_id = ?`,
+      )
+      .get(guildId, userId) as CharacterRow | undefined;
+    return row ? toCharacter(row) : undefined;
+  }
+
+  /** Make one of a user's own characters the one they play. False if it is not theirs. */
+  selectCharacter(characterId: number, userId: string): Character | undefined {
+    const c = this.getCharacter(characterId);
+    if (!c || c.ownerId !== userId) return undefined;
+    this.db
+      .prepare(
+        `INSERT INTO active_characters (guild_id, owner_id, character_id) VALUES (?, ?, ?)
+         ON CONFLICT (guild_id, owner_id) DO UPDATE SET character_id = excluded.character_id`,
+      )
+      .run(c.guildId, userId, c.id);
+    return c;
   }
 
   /**
@@ -656,6 +688,8 @@ export class Campaign {
   ): Character | undefined {
     const here = this.activeCharacter(channelId, userId);
     if (here || !guildId) return here;
+    const chosen = this.selectedCharacter(guildId, userId);
+    if (chosen) return chosen;
     const own = this.charactersOf(guildId, userId);
     return own.length === 1 ? own[0] : undefined;
   }
