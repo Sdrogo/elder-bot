@@ -106,6 +106,19 @@ describe('willpowerPayer', () => {
   });
 });
 
+describe('willpowerPayer after a sheet roll', () => {
+  it('charges the same character the roll used: the only one with a sheet', () => {
+    const sheeted = makeCharacter('u1', 'Con scheda');
+    makeCharacter('u1', 'Senza scheda');
+    store.campaign.attachSheet(sheeted.id, { data: {}, approvals: [] });
+    expect(store.campaign.playedCharacter('g1', 'free', 'u1')).toBeUndefined();
+    expect(store.campaign.sheetCharacter('g1', 'free', 'u1')?.id).toBe(sheeted.id);
+    expect(store.campaign.willpowerPayer('g1', 'free', 'u1')).toEqual({
+      character: expect.objectContaining({ id: sheeted.id }),
+    });
+  });
+});
+
 describe('selected character', () => {
   it('wins over the sole-character fallback and the scene order, and only for the owner', () => {
     const a = makeCharacter('u1', 'Alfa');

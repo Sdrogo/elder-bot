@@ -695,6 +695,24 @@ export class Campaign {
   }
 
   /**
+   * The character a sheet roll uses: the one played here, the one chosen with /elder sheet,
+   * otherwise the only character with a full sheet on the server. A roll and the Willpower
+   * button on it must agree on who this is.
+   */
+  sheetCharacter(
+    guildId: string | null,
+    channelId: string | null,
+    userId: string,
+  ): Character | undefined {
+    const here = channelId ? this.activeCharacter(channelId, userId) : undefined;
+    if (here || !guildId) return here;
+    const chosen = this.selectedCharacter(guildId, userId);
+    if (chosen) return chosen;
+    const own = this.charactersOf(guildId, userId).filter((c) => c.hasSheet);
+    return own.length === 1 ? own[0] : undefined;
+  }
+
+  /**
    * Who pays for a Willpower reroll: the character played here, or `ambiguous` when the
    * player owns several characters on this server and none is chosen (so nothing can be
    * charged), or `none` when they have no character at all and play without a tracker.
@@ -704,7 +722,9 @@ export class Campaign {
     channelId: string,
     userId: string,
   ): { character: Character } | 'ambiguous' | 'none' {
-    const character = this.playedCharacter(guildId, channelId, userId);
+    const character =
+      this.playedCharacter(guildId, channelId, userId) ??
+      this.sheetCharacter(guildId, channelId, userId);
     if (character) return { character };
     return guildId && this.charactersOf(guildId, userId).length > 1 ? 'ambiguous' : 'none';
   }
