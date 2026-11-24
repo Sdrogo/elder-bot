@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import type { XpEntry } from '../game/xp.js';
 import { SURGE_TTL_MS, parseSurges, type Surges } from '../game/sheetPool.js';
 import {
   LIMITS,
@@ -195,6 +196,12 @@ export class Campaign {
       CREATE TABLE IF NOT EXISTS character_sheets (
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         data TEXT NOT NULL, approvals TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS character_xp (
+        id INTEGER PRIMARY KEY,
+        character_id INTEGER NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+        actor_id TEXT NOT NULL, amount INTEGER NOT NULL, kind TEXT NOT NULL,
+        note TEXT NOT NULL, at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS character_xp_character ON character_xp (character_id);
       CREATE TABLE IF NOT EXISTS character_surges (
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         data TEXT NOT NULL, at INTEGER NOT NULL);
@@ -287,6 +294,49 @@ export class Campaign {
           createdAt: row.created_at,
         }
       : undefined;
+  }
+
+  // Experience points: an append-only log per character; the balance is its sum.
+
+  /** Adds entries to the XP logs in one go: one `[characterId, amount]` per character. */
+  addXp(
+    entries: readonly (readonly [number, number])[],
+    actorId: string,
+    kind: XpEntry['kind'],
+    note: string,
+    now = Date.now(),
+  ): void {
+    const insert = this.db.prepare(
+      `INSERT INTO character_xp (character_id, actor_id, amount, kind, note, at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    this.db.transaction(() => {
+      for (const [id, amount] of entries) insert.run(id, actorId, amount, kind, note, now);
+    })();
+  }
+
+  xpLog(characterId: number): XpEntry[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, at, actor_id, amount, kind, note FROM character_xp
+         WHERE character_id = ? ORDER BY id`,
+      )
+      .all(characterId) as {
+      id: number;
+      at: number;
+      actor_id: string;
+      amount: number;
+      kind: XpEntry['kind'];
+      note: string;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      at: r.at,
+      actorId: r.actor_id,
+      amount: r.amount,
+      kind: r.kind,
+      note: r.note,
+    }));
   }
 
   // Blood Surge: lasts the scene (p. 147). Kept per character until the scene or session ends,
