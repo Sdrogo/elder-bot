@@ -646,6 +646,21 @@ export class Campaign {
   }
 
   /**
+   * The character a roll is made as: the one at this channel's table, otherwise the user's only
+   * character on the server (so a table channel not bound to a Chronicle still counts Hunger).
+   */
+  playedCharacter(
+    guildId: string | null,
+    channelId: string,
+    userId: string,
+  ): Character | undefined {
+    const here = this.activeCharacter(channelId, userId);
+    if (here || !guildId) return here;
+    const own = this.charactersOf(guildId, userId);
+    return own.length === 1 ? own[0] : undefined;
+  }
+
+  /**
    * The Chronicle a roll belongs to, for the overlay: the one played in this channel,
    * otherwise a Chronicle on air where the roller has a character, otherwise the roller's
    * own Chronicle on air (a Storyteller rolling for an NPC). With the roller's character.

@@ -168,7 +168,9 @@ export function rollerHunger(
 ): { hunger: number; note?: APIEmbedField } {
   const given = interaction.options.getInteger(option);
   if (given !== null) return { hunger: given };
-  const c = character ?? store.campaign.activeCharacter(interaction.channelId, interaction.user.id);
+  const c =
+    character ??
+    store.campaign.playedCharacter(interaction.guildId, interaction.channelId, interaction.user.id);
   if (!c) return { hunger: 0 };
   const hunger = hungerDice(c.values);
   return {

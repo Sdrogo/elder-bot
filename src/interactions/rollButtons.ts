@@ -153,7 +153,11 @@ export async function handleRollButton(
     case 'wp': {
       if (!ref.faces) return;
       // A character at this table pays from its tracker: none left, no reroll.
-      const spender = store.campaign.activeCharacter(channelId, request.userId);
+      const spender = store.campaign.playedCharacter(
+        interaction.guildId,
+        channelId,
+        request.userId,
+      );
       if (spender && spender.values.willpower <= 0) {
         await replyEphemeral(interaction, t(locale, 'willpower.none', { name: spender.name }));
         return;
@@ -187,7 +191,11 @@ export async function handleRollButton(
     // The best reroll in one click: up to 3 failed normal dice, never the Hunger dice.
     case 'wp-auto': {
       if (!ref.faces) return;
-      const spender = store.campaign.activeCharacter(channelId, request.userId);
+      const spender = store.campaign.playedCharacter(
+        interaction.guildId,
+        channelId,
+        request.userId,
+      );
       if (spender && spender.values.willpower <= 0) {
         await replyEphemeral(interaction, t(locale, 'willpower.none', { name: spender.name }));
         return;
@@ -258,7 +266,11 @@ async function spendWillpower(
   const changes = response.rerolled.map(([from, to]) => `${from} → ${to}`).join(', ');
   let spent = t(locale, 'willpower.spent', { changes });
   const { campaign } = ctx.store;
-  const spender = campaign.activeCharacter(interaction.channelId, ref.request.userId);
+  const spender = campaign.playedCharacter(
+    interaction.guildId,
+    interaction.channelId,
+    ref.request.userId,
+  );
   if (spender) {
     const after = campaign.setTrack(
       spender.id,
