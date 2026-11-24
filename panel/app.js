@@ -137,6 +137,19 @@ const TEXT = {
     'chronicles.language': 'Lingua del bot',
     'chronicles.autoLanguage': 'quella di Discord di ciascuno',
     'chronicles.end': 'Chiudi sessione',
+    'xp.give': 'Dai XP',
+    'xp.who': 'A chi',
+    'xp.conditions': 'Motivi (1 XP ciascuno, max 5 a sessione)',
+    'xp.other': 'Altro (downtime, Diablerie): XP',
+    'xp.note': 'Motivo',
+    'xp.send': 'Assegna',
+    'xp.done': 'XP assegnati.',
+    'xp.need': 'Scegli almeno un personaggio e un motivo, oppure una quantità con il motivo.',
+    'cond.ambition': 'Ambition',
+    'cond.beast': 'Facing the Beast',
+    'cond.flaw': 'Flaw',
+    'cond.loss': 'Loss',
+    'cond.survival': 'Survival',
     'chronicles.ended': 'Sessione chiusa: i compiti prolungati in corso sono stati annullati.',
     'chronicles.archive': 'Archivia',
     'chronicles.transfer': 'Cedi la Cronaca',
@@ -280,6 +293,19 @@ const TEXT = {
     'chronicles.language': 'Bot language',
     'chronicles.autoLanguage': "each user's Discord language",
     'chronicles.end': 'End session',
+    'xp.give': 'Give XP',
+    'xp.who': 'To',
+    'xp.conditions': 'Reasons (1 XP each, max 5 per session)',
+    'xp.other': 'Other (downtime, Diablerie): XP',
+    'xp.note': 'Reason',
+    'xp.send': 'Award',
+    'xp.done': 'XP awarded.',
+    'xp.need': 'Pick at least one character and a reason, or an amount with its reason.',
+    'cond.ambition': 'Ambition',
+    'cond.beast': 'Facing the Beast',
+    'cond.flaw': 'Flaw',
+    'cond.loss': 'Loss',
+    'cond.survival': 'Survival',
     'chronicles.ended': 'Session ended: prolonged tasks still open were cancelled.',
     'chronicles.archive': 'Archive',
     'chronicles.transfer': 'Hand over the Chronicle',
@@ -803,6 +829,77 @@ function chronicleForm(ch, onDone) {
   return form;
 }
 
+/** The Storyteller's XP award: who, and either the session reasons or a free amount. */
+function xpForm(ch, onDone) {
+  const form = el('form', 'sheet-form');
+  const checks = (items, name) => {
+    const wrap = el('div', 'chips');
+    for (const [value, label] of items) {
+      const box = el('label', 'chip');
+      const input = el('input');
+      input.type = 'checkbox';
+      input.name = name;
+      input.value = value;
+      input.checked = name === 'who';
+      box.append(input, document.createTextNode(` ${label}`));
+      wrap.append(box);
+    }
+    return wrap;
+  };
+  const other = el('input');
+  other.type = 'number';
+  other.min = '1';
+  other.max = '1000';
+  const note = el('input');
+  note.maxLength = 200;
+  form.append(
+    field(
+      tr('xp.who'),
+      checks(
+        ch.characters.map((c) => [String(c.id), c.name]),
+        'who',
+      ),
+    ),
+    field(
+      tr('xp.conditions'),
+      checks(
+        ['ambition', 'beast', 'flaw', 'loss', 'survival'].map((k) => [k, tr(`cond.${k}`)]),
+        'cond',
+      ),
+    ),
+    field(tr('xp.other'), other),
+    field(tr('xp.note'), note),
+  );
+  const submit = el('button', 'primary', tr('xp.send'));
+  submit.type = 'submit';
+  const actions = el('div', 'actions');
+  actions.append(submit, button(tr('cancel'), onDone));
+  form.append(actions);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const picked = (name) =>
+      [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((i) => i.value);
+    const characters = picked('who').map(Number);
+    const conditions = picked('cond');
+    const amount = Number(other.value);
+    const body =
+      amount > 0 && note.value.trim()
+        ? { characters, other: amount, note: note.value.trim() }
+        : conditions.length
+          ? { characters, conditions }
+          : undefined;
+    if (!body || !characters.length) return notify(tr('xp.need'));
+    submit.disabled = true;
+    const ok = await change('POST', `/api/chronicles/${ch.id}/xp`, body);
+    submit.disabled = false;
+    if (ok) {
+      notify(tr('xp.done'));
+      onDone();
+    }
+  });
+  return form;
+}
+
 function chronicleBlock(ch) {
   const path = `/api/chronicles/${ch.id}`;
   const block = el('div', ch.live ? 'chronicle live' : 'chronicle');
@@ -816,6 +913,14 @@ function chronicleBlock(ch) {
       tools.replaceWith(form);
     }),
   );
+  if (ch.characters.length) {
+    tools.append(
+      button(tr('xp.give'), () => {
+        const form = xpForm(ch, () => form.replaceWith(tools));
+        tools.replaceWith(form);
+      }),
+    );
+  }
   if (ch.channel) {
     tools.append(
       confirmButton(tr('chronicles.end'), async () => {

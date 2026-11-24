@@ -51,6 +51,19 @@ const TEXT = {
     more: 'Dettagli',
     approvals: 'Approvazioni del Narratore',
     editSheet: 'Modifica scheda',
+    xp: 'Esperienza (XP)',
+    'xp.balance': 'Da spendere',
+    'xp.earned': 'Guadagnati in tutto',
+    'xp.empty': 'Nessun XP ancora: il Narratore li assegna a fine sessione.',
+    'xp.session': (list) => `Sessione: ${list}`,
+    'xp.spend': 'Spesa',
+    'xp.refund': 'Rimborso',
+    'xp.other': 'Altro',
+    'cond.ambition': 'Ambition',
+    'cond.beast': 'Facing the Beast',
+    'cond.flaw': 'Flaw',
+    'cond.loss': 'Loss',
+    'cond.survival': 'Survival',
     editFailed: 'Non riesco ad aprire la modifica. Riprova.',
     editLimit: 'Hai troppe bozze aperte: cancellane una dal pannello.',
     'status.pending': 'da approvare',
@@ -88,6 +101,19 @@ const TEXT = {
     more: 'Details',
     approvals: 'Storyteller approvals',
     editSheet: 'Edit sheet',
+    xp: 'Experience (XP)',
+    'xp.balance': 'To spend',
+    'xp.earned': 'Earned in total',
+    'xp.empty': 'No XP yet: the Storyteller awards it at the end of a session.',
+    'xp.session': (list) => `Session: ${list}`,
+    'xp.spend': 'Spent',
+    'xp.refund': 'Refund',
+    'xp.other': 'Other',
+    'cond.ambition': 'Ambition',
+    'cond.beast': 'Facing the Beast',
+    'cond.flaw': 'Flaw',
+    'cond.loss': 'Loss',
+    'cond.survival': 'Survival',
     editFailed: 'Could not open the editor. Try again.',
     editLimit: 'You have too many open drafts: delete one from the panel.',
     'status.pending': 'waiting',
@@ -190,6 +216,30 @@ async function edit(button) {
   button.disabled = false;
 }
 
+/** XP balance and the log of awards and spending, newest first. */
+function xpSection(xp) {
+  const list = el('div');
+  list.append(row(tr('xp.balance'), String(xp.balance)), row(tr('xp.earned'), String(xp.earned)));
+  if (!xp.log.length) list.append(el('p', 'quiet', tr('xp.empty')));
+  for (const e of [...xp.log].reverse()) {
+    const what =
+      e.kind === 'session'
+        ? tr(
+            'xp.session',
+            e.note
+              .split(',')
+              .map((c) => tr(`cond.${c}`))
+              .join(', '),
+          )
+        : e.kind === 'other'
+          ? `${tr('xp.other')}: ${e.note}`
+          : `${tr(`xp.${e.kind}`)}: ${e.note}`;
+    const when = new Date(e.at).toLocaleDateString(lang);
+    list.append(row(what, `${e.amount > 0 ? '+' : ''}${e.amount}`, when));
+  }
+  return section(tr('xp'), list);
+}
+
 async function answer(index, approved) {
   const response = await fetch(`/api/characters/${id}/approval`, {
     method: 'POST',
@@ -200,7 +250,7 @@ async function answer(index, approved) {
   if (response.ok) await load();
 }
 
-function draw({ character, sheet, canApprove }) {
+function draw({ character, sheet, canApprove, xp }) {
   const d = sheet.data;
   const t = TIER_RULES[d.tier];
   const ev = evaluate(d);
@@ -254,6 +304,8 @@ function draw({ character, sheet, canApprove }) {
     }
     out.push(section(tr('approvals'), list));
   }
+
+  if (xp) out.push(xpSection(xp));
 
   const grid = el('div', 'sheet-grid');
   const attrs = el('div', 'attr-grid');

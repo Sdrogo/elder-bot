@@ -1044,6 +1044,61 @@ describe('character creation wizard', () => {
     expect(store.drafts.ownedBy('111')).toHaveLength(0);
   });
 
+  it('lets the Storyteller award XP to some or all characters of a Chronicle', async () => {
+    const send = await asUser();
+    const make = (name: string) => {
+      const c = store.campaign.createCharacter({
+        guildId: 'g',
+        ownerId: '111',
+        name,
+        clan: 'brujah',
+        values: newCharacter({ tier: 'neonate', stamina: 3, composure: 3, resolve: 2 }),
+        sheet: { data: brujah(), approvals: [] },
+      });
+      if (typeof c !== 'object') throw new Error('setup');
+      return c;
+    };
+    const a = make('A');
+    const b = make('B');
+    const chronicle = store.campaign.createChronicle({
+      guildId: 'g',
+      storytellerId: '111',
+      name: 'Xp',
+      sect: 'camarilla',
+    });
+    if (typeof chronicle !== 'object') throw new Error('setup');
+    store.campaign.join(chronicle.id, a.id);
+    store.campaign.join(chronicle.id, b.id);
+    const path = `/api/chronicles/${chronicle.id}/xp`;
+
+    expect((await send('POST', path, { characters: 'all', conditions: [] })).status).toBe(400);
+    expect((await send('POST', path, { characters: 'all', conditions: ['x'] })).status).toBe(400);
+    expect((await send('POST', path, { characters: [a.id], other: 5 })).status).toBe(400);
+    expect((await send('POST', path, { characters: [999], conditions: ['loss'] })).status).toBe(
+      400,
+    );
+    expect(
+      (await send('POST', path, { characters: [a.id], conditions: ['loss'] }, 'wrong')).status,
+    ).toBe(403);
+
+    expect(
+      (await send('POST', path, { characters: [a.id], conditions: ['loss', 'flaw', 'loss'] }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await send('POST', path, { characters: 'all', other: 10, note: 'Downtime' })).status,
+    ).toBe(200);
+    const sheet = (await (await send('GET', `/api/characters/${a.id}/sheet`)).json()) as {
+      xp: { earned: number; balance: number; log: { amount: number; kind: string }[] };
+    };
+    expect(sheet.xp).toMatchObject({ earned: 12, balance: 12 });
+    expect(sheet.xp.log.map((e) => e.kind)).toEqual(['session', 'other']);
+    const other = (await (await send('GET', `/api/characters/${b.id}/sheet`)).json()) as {
+      xp: { balance: number };
+    };
+    expect(other.xp.balance).toBe(10);
+  });
+
   it('keeps a Chronicle and its characters on the same tier of play', async () => {
     const send = await asUser();
     expect(

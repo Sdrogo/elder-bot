@@ -35,6 +35,7 @@ import {
   type ChronicleTier,
 } from '../state/campaign.js';
 import { evaluate, trackerValues } from '../game/creation.js';
+import { awardAmount, parseAward, totals } from '../game/xp.js';
 import { parseDraft } from '../game/draft.js';
 import type { Draft } from '../state/drafts.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
@@ -855,10 +856,12 @@ export function createPanelHandler(deps: PanelDeps) {
       return json(res, 200, { draft: draftView(created) });
     }
     if (sub === 'sheet' && method === 'GET') {
+      const log = campaign.xpLog(c.id);
       return json(res, 200, {
         character: characterView(c, chronicles, me.userId, undefined, pendingOf(c)),
         sheet,
         canApprove,
+        xp: { ...totals(log), log },
       });
     }
     if (sub !== 'approval' || method !== 'POST') return json(res, 404, { error: 'not found' });
@@ -1124,6 +1127,27 @@ export function createPanelHandler(deps: PanelDeps) {
       case 'archive':
         campaign.archiveChronicle(chronicle.id);
         return ok();
+      case 'xp': {
+        // POST …/xp {characters: [ids] | 'all', conditions: [...] | other + note}: the
+        // Storyteller's award. Everyone named gets the same amount ("Experience as a Group").
+        const award = parseAward(body);
+        const members = campaign.members(chronicle.id);
+        const chosen =
+          body.characters === 'all'
+            ? members
+            : Array.isArray(body.characters)
+              ? members.filter((m) => (body.characters as unknown[]).includes(m.id))
+              : [];
+        if (!award || !chosen.length) return json(res, 400, { error: 'invalid body' });
+        const note = 'conditions' in award ? award.conditions.join(',') : award.note;
+        campaign.addXp(
+          chosen.map((m) => [m.id, awardAmount(award)] as const),
+          userId,
+          'conditions' in award ? 'session' : 'other',
+          note,
+        );
+        return ok();
+      }
       case 'transfer': {
         const to = await recipient(chronicle.guildId, body.to, userId);
         if (!to) return json(res, 400, { error: 'invalid', field: 'to' });
@@ -1546,7 +1570,7 @@ export function createPanelHandler(deps: PanelDeps) {
 
     const characterPath = /^\/api\/characters(?:\/(\d{1,12})(?:\/(track|cam|give))?)?$/.exec(path);
     const chroniclePath =
-      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove|end|archive|transfer))?)?$/.exec(
+      /^\/api\/chronicles(?:\/(\d{1,12})(?:\/(live|masquerade|move|remove|end|archive|transfer|xp))?)?$/.exec(
         path,
       );
     if (!(characterPath || chroniclePath) || !['POST', 'DELETE'].includes(method)) {
