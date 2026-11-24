@@ -20,7 +20,9 @@ export type Advance =
   | { kind: 'merit'; id: string }
   | { kind: 'trait'; id: string }
   | { kind: 'discipline'; id: Discipline; power?: string }
-  | { kind: 'power'; id: string };
+  | { kind: 'power'; id: string }
+  /** One rank of Humanity: only with the Storyteller's word, and no violations (p. 128). */
+  | { kind: 'humanity' };
 
 /** XP costs of the Experience Costs table (p. 65). Every dot costs the same. */
 export const XP_COSTS = {
@@ -33,6 +35,7 @@ export const XP_COSTS = {
   disciplineOwn: 15,
   disciplineOther: 20,
   power: 8,
+  humanity: 20,
 } as const;
 
 /** Highest Skill rating anywhere in play. */
@@ -64,8 +67,18 @@ export function costOf(d: SheetDraft, a: Advance): number {
       return needsStoryteller(d, a) ? XP_COSTS.disciplineOther : XP_COSTS.disciplineOwn;
     case 'power':
       return XP_COSTS.power;
+    case 'humanity':
+      return XP_COSTS.humanity;
   }
 }
+
+/** Purchases the Storyteller must approve: Humanity, and Disciplines or traits outside the clan. */
+export const needsApproval = (d: SheetDraft, a: Advance): boolean =>
+  a.kind === 'humanity' || needsStoryteller(d, a);
+
+/** Why `a` can't be bought or even asked for: its reasons without the Storyteller's approval. */
+export const blockers = (d: SheetDraft, a: Advance): Reason[] =>
+  advanceReasons(d, a).filter((r) => r.kind !== 'storyteller');
 
 const subject = (d: SheetDraft) => ({
   tier: d.tier,
@@ -128,12 +141,20 @@ export function advanceReasons(d: SheetDraft, a: Advance): Reason[] {
       if (!DISCIPLINES.includes(a.id)) return [{ kind: 'incomplete' }];
       const dots = dotsOf(d.disciplines, a.id);
       if (dots >= TIER_RULES[d.tier].maxDiscipline) return [{ kind: 'budget' }];
-      if (needsStoryteller(d, a)) return [{ kind: 'storyteller' }];
       // The new dot brings one power of that rank or lower; required when one is on offer.
       const offer = learnablePowers(d, a.id, dots + 1);
-      if (a.power === undefined) return offer.length ? [{ kind: 'incomplete' }] : [];
-      return offer.includes(a.power) ? [] : [{ kind: 'rank', rank: dots + 1, dots: dots + 1 }];
+      const reasons: Reason[] =
+        a.power === undefined
+          ? offer.length
+            ? [{ kind: 'incomplete' }]
+            : []
+          : offer.includes(a.power)
+            ? []
+            : [{ kind: 'rank', rank: dots + 1, dots: dots + 1 }];
+      return needsStoryteller(d, a) ? [...reasons, { kind: 'storyteller' }] : reasons;
     }
+    case 'humanity':
+      return [{ kind: 'storyteller' }];
     case 'power': {
       const power = POWERS_BY_ID.get(a.id);
       if (!power) return [{ kind: 'incomplete' }];
@@ -145,6 +166,20 @@ export function advanceReasons(d: SheetDraft, a: Advance): Reason[] {
         : [{ kind: 'rank', rank: power.rank, dots }];
     }
   }
+}
+
+/**
+ * Whether the purchase at `index` can be undone without breaking a later one (a power bought
+ * on a Discipline dot, a Skill dot behind a specialty). Replays the rest from the creation sheet.
+ */
+export function canUndo(base: SheetDraft, advances: readonly Advance[], index: number): boolean {
+  let sheet = base;
+  for (const [i, a] of advances.entries()) {
+    if (i === index) continue;
+    if (blockers(sheet, a).length) return false;
+    sheet = applyAdvance(sheet, a);
+  }
+  return true;
 }
 
 /** The sheet with one purchase added. Does not check the rules: see advanceReasons(). */
@@ -182,6 +217,9 @@ export function applyAdvance(d: SheetDraft, a: Advance): SheetDraft {
     case 'power':
       next.powers.push(a.id);
       break;
+    case 'humanity':
+      // Humanity lives on the tracker, not on the sheet.
+      break;
   }
   return next;
 }
@@ -201,6 +239,7 @@ export function advanceOptions(
     ...CLAN_TRAITS.map((t): Advance => ({ kind: 'trait', id: t.id })),
     ...DISCIPLINES.map((id): Advance => ({ kind: 'discipline', id })),
     ...POWERS.map((p): Advance => ({ kind: 'power', id: p.id })),
+    { kind: 'humanity' },
   ];
   return candidates.map((advance) => ({
     advance,
@@ -243,6 +282,8 @@ export function parseAdvance(v: unknown): Advance | undefined {
         ? { kind: 'discipline', id: o.id as Discipline }
         : { kind: 'discipline', id: o.id as Discipline, power };
     }
+    case 'humanity':
+      return { kind: 'humanity' };
     case 'power':
       return typeof o.id === 'string' && POWERS_BY_ID.has(o.id)
         ? { kind: 'power', id: o.id }

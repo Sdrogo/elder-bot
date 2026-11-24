@@ -3,6 +3,9 @@ import {
   advanceOptions,
   advanceReasons,
   applyAdvances,
+  blockers,
+  canUndo,
+  needsApproval,
   costOf,
   learnablePowers,
   parseAdvance,
@@ -59,9 +62,9 @@ describe('advancement', () => {
   });
 
   it('closes out-of-clan Disciplines (Storyteller) and what is already owned', () => {
-    expect(advanceReasons(d, { kind: 'discipline', id: 'auspex' })).toEqual([
-      { kind: 'storyteller' },
-    ]);
+    expect(advanceReasons(d, { kind: 'discipline', id: 'auspex' })).toContainEqual({
+      kind: 'storyteller',
+    });
     expect(advanceReasons(d, { kind: 'merit', id: 'might' })).toEqual([{ kind: 'taken' }]);
     expect(advanceReasons(d, { kind: 'power', id: 'awe' })).toEqual([{ kind: 'taken' }]);
     expect(advanceOptions(d).length).toBeGreaterThan(20);
@@ -76,5 +79,24 @@ describe('advancement', () => {
     expect(parseAdvance({ kind: 'resource', id: 'x' })).toBeUndefined();
     expect(parseAdvance({ kind: 'specialty', skill: 'persuasion', name: '  ' })).toBeUndefined();
     expect(parseAdvance('x')).toBeUndefined();
+  });
+
+  it('asks the Storyteller for Humanity and out-of-clan Disciplines, not for the rest', () => {
+    expect(needsApproval(d, { kind: 'humanity' })).toBe(true);
+    expect(needsApproval(d, { kind: 'discipline', id: 'auspex' })).toBe(true);
+    expect(needsApproval(d, { kind: 'discipline', id: 'celerity' })).toBe(false);
+    expect(costOf(d, { kind: 'humanity' })).toBe(20);
+    // Apart from the Storyteller's word, an out-of-clan Discipline is open.
+    const offer = learnablePowers(d, 'auspex', 1);
+    expect(blockers(d, { kind: 'discipline', id: 'auspex', power: offer[0]! })).toEqual([]);
+  });
+
+  it('refuses to undo a purchase that a later one stands on', () => {
+    const offer = learnablePowers(d, 'celerity', 2);
+    const first = { kind: 'discipline', id: 'celerity', power: offer[0]! } as const;
+    const next = learnablePowers(applyAdvances(d, [first]), 'celerity', 2);
+    const second = { kind: 'power', id: next[0]! } as const;
+    expect(canUndo(d, [first, second], 1)).toBe(true);
+    expect(canUndo(d, [first, second], 0)).toBe(false);
   });
 });

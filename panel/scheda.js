@@ -63,7 +63,7 @@ const TEXT = {
     'spend.short': 'XP insufficienti.',
     'spend.none': 'Niente da comprare con gli XP che hai.',
     'spend.note':
-      'Le Resource non si comprano con XP; Humanity e Discipline o tratti fuori clan richiedono il Narratore (in arrivo).',
+      'Le Resource non si comprano con XP; Humanity e Discipline o tratti fuori clan si chiedono al Narratore.',
     'kind.attribute': 'Attributo',
     'kind.skill': 'Skill',
     'kind.merit': 'Merit',
@@ -71,12 +71,22 @@ const TEXT = {
     'kind.discipline': 'Disciplina (+1 dot)',
     'kind.power': 'Potere',
     'kind.specialty': 'Specialty',
+    'kind.humanity': 'Humanity +1',
+    'request.pick': 'Da chiedere al Narratore',
+    'request.button': 'Chiedi al Narratore',
+    'request.duplicate': 'Hai già chiesto questo al Narratore.',
+    'request.title': 'Richieste al Narratore',
+    'request.cancel': 'Ritira',
+    'request.approve': 'Approva e compra',
+    'request.refuse': 'Rifiuta',
+    'refund.button': 'Annulla acquisto',
+    'refund.dependent': 'Prima annulla gli acquisti che dipendono da questo.',
+    'xp.refund': 'Rimborso',
     'xp.balance': 'Da spendere',
     'xp.earned': 'Guadagnati in tutto',
     'xp.empty': 'Nessun XP ancora: il Narratore li assegna a fine sessione.',
     'xp.session': (list) => `Sessione: ${list}`,
     'xp.spend': 'Spesa',
-    'xp.refund': 'Rimborso',
     'xp.other': 'Altro',
     'cond.ambition': 'Ambition',
     'cond.beast': 'Facing the Beast',
@@ -131,7 +141,7 @@ const TEXT = {
     'spend.short': 'Not enough XP.',
     'spend.none': 'Nothing to buy with the XP you have.',
     'spend.note':
-      'Resources cannot be bought with XP; Humanity and out-of-clan Disciplines or traits need the Storyteller (coming).',
+      'Resources cannot be bought with XP; Humanity and out-of-clan Disciplines or traits are asked of the Storyteller.',
     'kind.attribute': 'Attribute',
     'kind.skill': 'Skill',
     'kind.merit': 'Merit',
@@ -139,12 +149,22 @@ const TEXT = {
     'kind.discipline': 'Discipline (+1 dot)',
     'kind.power': 'Power',
     'kind.specialty': 'Specialty',
+    'kind.humanity': 'Humanity +1',
+    'request.pick': 'To ask the Storyteller',
+    'request.button': 'Ask the Storyteller',
+    'request.duplicate': 'You already asked for this.',
+    'request.title': 'Requests to the Storyteller',
+    'request.cancel': 'Withdraw',
+    'request.approve': 'Approve and buy',
+    'request.refuse': 'Refuse',
+    'refund.button': 'Undo purchase',
+    'refund.dependent': 'Undo the purchases that depend on this one first.',
+    'xp.refund': 'Refund',
     'xp.balance': 'To spend',
     'xp.earned': 'Earned in total',
     'xp.empty': 'No XP yet: the Storyteller awards it at the end of a session.',
     'xp.session': (list) => `Session: ${list}`,
     'xp.spend': 'Spent',
-    'xp.refund': 'Refund',
     'xp.other': 'Other',
     'cond.ambition': 'Ambition',
     'cond.beast': 'Facing the Beast',
@@ -269,29 +289,44 @@ function advanceLabel(a) {
               ? CLAN_TRAITS_BY_ID.get(a.id)?.name
               : a.kind === 'discipline'
                 ? `${DISCIPLINE_NAMES[a.id]}${a.power ? ` + ${POWERS_BY_ID.get(a.power)?.name}` : ''}`
-                : POWERS_BY_ID.get(a.id)?.name;
-  return `${tr(`kind.${a.kind}`)} ${name ?? '?'}`;
+                : a.kind === 'humanity'
+                  ? ''
+                  : POWERS_BY_ID.get(a.id)?.name;
+  return `${tr(`kind.${a.kind}`)} ${name ?? ''}`.trim();
 }
 
-async function buy(advance, button) {
+async function post(action, body, button) {
   button.disabled = true;
-  const response = await fetch(`/api/characters/${id}/spend`, {
+  const response = await fetch(`/api/characters/${id}/${action}`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': me.csrf },
-    body: JSON.stringify({ advance }),
+    body: JSON.stringify(body),
   });
   if (response.ok) {
     draw(await response.json());
     return;
   }
   const data = await response.json().catch(() => ({}));
-  notify(tr(data.error === 'short' ? 'spend.short' : 'spend.failed'));
+  notify(
+    tr(
+      data.error === 'short'
+        ? 'spend.short'
+        : data.error === 'dependent'
+          ? 'refund.dependent'
+          : data.error === 'duplicate'
+            ? 'request.duplicate'
+            : 'spend.failed',
+    ),
+  );
   button.disabled = false;
 }
 
+const buy = (advance, button) => post('spend', { advance }, button);
+const ask = (advance, button) => post('request', { advance }, button);
+
 /** The owner's shop: one select of what can be bought now, a free power when a dot brings one. */
-function spendSection(d, balance) {
+function spendSection(d, balance, character) {
   const box = el('div');
   const options = advanceOptions(d).filter((o) => o.reasons.length === 0 && o.cost <= balance);
   box.append(el('p', 'quiet', tr('spend.note')));
@@ -371,16 +406,83 @@ function spendSection(d, balance) {
       out.push(row3);
     }
   }
+  // What needs the Storyteller: Humanity, and Disciplines or traits outside the clan.
+  const askable = advanceOptions(d).filter(
+    (o) =>
+      o.cost <= balance &&
+      o.reasons.some((r) => r.kind === 'storyteller') &&
+      o.reasons.every((r) => r.kind === 'storyteller' || r.kind === 'incomplete') &&
+      !(
+        o.advance.kind === 'humanity' &&
+        (character.humanity.violations > 0 || character.humanity.rank >= 10)
+      ),
+  );
+  const plain = askable.filter((o) => o.reasons.length === 1);
+  if (plain.length) {
+    const sel = el('select');
+    plain.forEach((o, i) => {
+      const opt = el('option', '', `${advanceLabel(o.advance)} — ${o.cost} XP`);
+      opt.value = String(i);
+      sel.append(opt);
+    });
+    const go = el('button', 'chip', tr('request.button'));
+    go.type = 'button';
+    go.addEventListener('click', () => ask(plain[Number(sel.value)].advance, go));
+    const wrap = el('label', 'field');
+    wrap.append(el('span', '', tr('request.pick')), sel);
+    out.push(wrap, go);
+  }
+  for (const o of askable.filter((x) => x.reasons.length > 1)) {
+    const disc = o.advance.id;
+    const dots = d.disciplines[disc] ?? 0;
+    const offer = learnablePowers(d, disc, dots + 1);
+    if (!offer.length) continue;
+    const row4 = el('div', 'trait');
+    const choose = el('select');
+    for (const power of offer) {
+      const opt = el('option', '', POWERS_BY_ID.get(power).name);
+      opt.value = power;
+      choose.append(opt);
+    }
+    const go = el('button', 'chip', tr('request.button'));
+    go.type = 'button';
+    go.addEventListener('click', () =>
+      ask({ kind: 'discipline', id: disc, power: choose.value }, go),
+    );
+    row4.append(
+      el('span', '', `${DISCIPLINE_NAMES[disc]} ${dots} → ${dots + 1} (${o.cost} XP)`),
+      choose,
+      go,
+    );
+    out.push(row4);
+  }
   if (!out.length) box.append(el('p', 'quiet', tr('spend.none')));
   box.append(...out);
   return box;
 }
 
 /** XP balance and the log of awards and spending, newest first. */
-function xpSection(xp) {
+function xpSection(xp, character, canApprove) {
   const list = el('div');
+  const undone = new Set(xp.log.filter((e) => e.ref !== undefined).map((e) => e.ref));
   list.append(row(tr('xp.balance'), String(xp.balance)), row(tr('xp.earned'), String(xp.earned)));
   if (!xp.log.length) list.append(el('p', 'quiet', tr('xp.empty')));
+  for (const r of xp.requests ?? []) {
+    const line = row(`${tr('request.title')}: ${advanceLabel(r.advance)}`, `${r.cost}`);
+    const buttons = el('span', 'chips');
+    const yes = el('button', 'chip', tr('request.approve'));
+    const no = el('button', 'chip', tr(canApprove ? 'request.refuse' : 'request.cancel'));
+    yes.type = 'button';
+    no.type = 'button';
+    yes.addEventListener('click', () => post('answer', { request: r.id, approved: true }, yes));
+    no.addEventListener('click', () =>
+      post(canApprove ? 'answer' : 'cancel', { request: r.id, approved: false }, no),
+    );
+    if (canApprove) buttons.append(yes);
+    if (canApprove || character.owned) buttons.append(no);
+    line.append(buttons);
+    list.append(line);
+  }
   for (const e of [...xp.log].reverse()) {
     const what =
       e.kind === 'session'
@@ -395,9 +497,18 @@ function xpSection(xp) {
           ? `${tr('xp.other')}: ${e.note}`
           : e.kind === 'spend'
             ? `${tr('xp.spend')}: ${advanceLabel(e.advance)}`
-            : `${tr(`xp.${e.kind}`)}: ${e.note}`;
+            : e.kind === 'refund'
+              ? `${tr('xp.refund')}: ${advanceLabel(xp.log.find((x) => x.id === e.ref)?.advance)}`
+              : `${tr(`xp.${e.kind}`)}: ${e.note}`;
     const when = new Date(e.at).toLocaleDateString(lang);
-    list.append(row(what, `${e.amount > 0 ? '+' : ''}${e.amount}`, when));
+    const line = row(what, `${e.amount > 0 ? '+' : ''}${e.amount}`, when);
+    if (canApprove && e.kind === 'spend' && !undone.has(e.id)) {
+      const undo = el('button', 'chip', tr('refund.button'));
+      undo.type = 'button';
+      undo.addEventListener('click', () => post('refund', { entry: e.id }, undo));
+      line.append(undo);
+    }
+    list.append(line);
   }
   return section(tr('xp'), list);
 }
@@ -467,8 +578,9 @@ function draw({ character, sheet, canApprove, xp }) {
     out.push(section(tr('approvals'), list));
   }
 
-  if (xp) out.push(xpSection(xp));
-  if (xp && character.owned) out.push(section(tr('spend.title'), spendSection(d, xp.balance)));
+  if (xp) out.push(xpSection(xp, character, canApprove));
+  if (xp && character.owned)
+    out.push(section(tr('spend.title'), spendSection(d, xp.balance, character)));
 
   const grid = el('div', 'sheet-grid');
   const attrs = el('div', 'attr-grid');
