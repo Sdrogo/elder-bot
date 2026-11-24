@@ -50,7 +50,8 @@ export const frenzy: Command = {
     const locale = localeFor(interaction, ctx.store);
     const type = interaction.options.getString('type', true) as FrenzyType;
     // Values not typed come from the roller's character at this channel's Chronicle.
-    const character = ctx.store.campaign.activeCharacter(
+    const character = ctx.store.campaign.playedCharacter(
+      interaction.guildId,
       interaction.channelId,
       interaction.user.id,
     );

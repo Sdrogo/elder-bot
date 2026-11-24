@@ -78,6 +78,17 @@ describe('characters', () => {
   });
 });
 
+describe('playedCharacter', () => {
+  it('falls back to the only character on the server when the channel has no Chronicle', () => {
+    const only = makeCharacter('u1', 'Smerdino');
+    expect(store.campaign.playedCharacter('g1', 'free-channel', 'u1')?.id).toBe(only.id);
+    expect(store.campaign.playedCharacter('g1', 'free-channel', 'u2')).toBeUndefined();
+    expect(store.campaign.playedCharacter(null, 'dm', 'u1')).toBeUndefined();
+    makeCharacter('u1', 'Second');
+    expect(store.campaign.playedCharacter('g1', 'free-channel', 'u1')).toBeUndefined();
+  });
+});
+
 describe('chronicles', () => {
   it('play one per channel, and give each player their character there', () => {
     const st = 'st';
