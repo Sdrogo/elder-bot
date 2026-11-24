@@ -117,6 +117,8 @@ export async function pickCharacter(
   }
   const active = campaign.activeCharacter(interaction.channelId, interaction.user.id);
   if (active) return active;
+  const chosen = campaign.selectedCharacter(guildId, interaction.user.id);
+  if (chosen) return chosen;
   const own = campaign.charactersOf(guildId, interaction.user.id);
   if (own.length === 1) return own[0];
   await replyEphemeral(interaction, locale, own.length ? 'character.pickOne' : 'character.noneYet');

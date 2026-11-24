@@ -152,6 +152,8 @@ export const it: Messages = {
     "{hunger} dalla Vitae di {name} ({vitae}/{max}). Per cambiarla usa l'opzione `hunger`.",
   'sheet.chronicle': 'Cronaca: {name}',
   'sheet.noChronicle': 'nessuna Cronaca',
+  'sheet.usePlaceholder': 'Scegli il personaggio in uso',
+  'sheet.nowPlaying': 'Ora giochi con {name}: i tiri useranno la sua Fame e il suo Willpower.',
   'button.pickCharacter': 'Scegli un personaggio',
   'opt.roll.npc': 'Tiro per un PNG: il pool dalla sua scheda, senza dadi Hunger',
   'opt.roll.attribute': 'Attributo dalla scheda del personaggio',

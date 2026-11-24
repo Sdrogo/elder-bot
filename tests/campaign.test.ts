@@ -89,6 +89,25 @@ describe('playedCharacter', () => {
   });
 });
 
+describe('selected character', () => {
+  it('wins over the sole-character fallback and the scene order, and only for the owner', () => {
+    const a = makeCharacter('u1', 'Alfa');
+    const b = makeCharacter('u1', 'Beta');
+    expect(store.campaign.playedCharacter('g1', 'free', 'u1')).toBeUndefined();
+    expect(store.campaign.selectCharacter(b.id, 'u2')).toBeUndefined();
+    store.campaign.selectCharacter(b.id, 'u1');
+    expect(store.campaign.playedCharacter('g1', 'free', 'u1')?.id).toBe(b.id);
+
+    const rome = makeChronicle('st', 'Roma');
+    store.campaign.join(rome.id, a.id);
+    store.campaign.join(rome.id, b.id);
+    store.bindChronicle('c-rome', rome.id);
+    expect(store.campaign.activeCharacter('c-rome', 'u1')?.id).toBe(b.id);
+    store.campaign.selectCharacter(a.id, 'u1');
+    expect(store.campaign.activeCharacter('c-rome', 'u1')?.id).toBe(a.id);
+  });
+});
+
 describe('chronicles', () => {
   it('play one per channel, and give each player their character there', () => {
     const st = 'st';

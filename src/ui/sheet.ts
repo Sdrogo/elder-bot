@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  StringSelectMenuBuilder,
   type InteractionReplyOptions,
 } from 'discord.js';
 import {
@@ -25,11 +26,13 @@ import { COLORS } from './format.js';
 //   pc:adj:<characterId>:<track>:<delta>        a sheet button
 //   chr:pick:<chronicleId>:<userId>             open the invited player's character menu
 //   chr:join:<chronicleId>:<userId>             the menu itself
+//   pc:use:<userId>                             the menu that picks the character in play
 
 export type CampaignRef =
   | { kind: 'adjust'; characterId: number; track: Track; delta: number }
   | { kind: 'pick'; chronicleId: number; userId: string }
-  | { kind: 'join'; chronicleId: number; userId: string };
+  | { kind: 'join'; chronicleId: number; userId: string }
+  | { kind: 'use'; userId: string };
 
 export function encodeCampaignId(ref: CampaignRef): string {
   switch (ref.kind) {
@@ -37,6 +40,8 @@ export function encodeCampaignId(ref: CampaignRef): string {
       return `pc:adj:${ref.characterId}:${ref.track}:${ref.delta}`;
     case 'pick':
       return `chr:pick:${ref.chronicleId}:${ref.userId}`;
+    case 'use':
+      return `pc:use:${ref.userId}`;
     case 'join':
       return `chr:join:${ref.chronicleId}:${ref.userId}`;
   }
@@ -47,6 +52,9 @@ const TRACK_IDS = new Set<string>(Object.keys(TRACK_NAMES));
 
 export function decodeCampaignId(customId: string): CampaignRef | undefined {
   const [prefix, action, a, b, c] = customId.split(':');
+  if (prefix === 'pc' && action === 'use') {
+    return SNOWFLAKE.test(a ?? '') ? { kind: 'use', userId: a! } : undefined;
+  }
   const id = Number(a);
   if (!Number.isInteger(id) || id <= 0) return undefined;
   if (prefix === 'pc' && action === 'adj' && b && TRACK_IDS.has(b)) {
@@ -138,9 +146,28 @@ export function sheetMessage(
   c: Character,
   chronicle: Chronicle | undefined,
   editable: boolean,
+  /** The viewer's own characters on this server, when they may pick the one in play. */
+  choices: Character[] = [],
 ): Pick<InteractionReplyOptions, 'embeds' | 'components'> {
-  return {
-    embeds: [sheetEmbed(locale, c, chronicle)],
-    components: editable ? sheetButtons(c) : [],
-  };
+  const components: (
+    ActionRowBuilder<ButtonBuilder> | ActionRowBuilder<StringSelectMenuBuilder>
+  )[] = editable ? sheetButtons(c) : [];
+  if (choices.length > 1) {
+    components.push(
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(encodeCampaignId({ kind: 'use', userId: c.ownerId }))
+          .setPlaceholder(t(locale, 'sheet.usePlaceholder'))
+          .addOptions(
+            choices.slice(0, 25).map((x) => ({
+              label: x.name,
+              description: CLAN_NAMES[x.clan],
+              value: String(x.id),
+              default: x.id === c.id,
+            })),
+          ),
+      ),
+    );
+  }
+  return { embeds: [sheetEmbed(locale, c, chronicle)], components };
 }

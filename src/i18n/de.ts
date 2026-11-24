@@ -157,6 +157,8 @@ export const de: Messages = {
     '{hunger} aus der Vitae von {name} ({vitae}/{max}). Mit der Option `hunger` änderst du das.',
   'sheet.chronicle': 'Chronik: {name}',
   'sheet.noChronicle': 'keine Chronik',
+  'sheet.usePlaceholder': 'Wähle die Figur im Spiel',
+  'sheet.nowPlaying': 'Du spielst jetzt {name}: Würfe nutzen ihren Hunger und ihre Willenskraft.',
   'button.pickCharacter': 'Charakter wählen',
   'opt.roll.npc': 'Wurf für einen NSC: Pool aus dem Werteblock, ohne Hunger-Würfel',
   'opt.roll.attribute': 'Attribut vom Charakterbogen',

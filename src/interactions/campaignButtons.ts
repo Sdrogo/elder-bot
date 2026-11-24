@@ -91,9 +91,29 @@ export async function handleCampaignSelect(
   ctx: Context,
 ): Promise<void> {
   const ref = decodeCampaignId(interaction.customId);
-  if (ref?.kind !== 'join') return;
   const { campaign } = ctx.store;
   const locale = localeFor(interaction, ctx.store);
+  if (ref?.kind === 'use') {
+    if (interaction.user.id !== ref.userId)
+      return ephemeral(interaction, locale, 'button.notYours');
+    const chosen = campaign.selectCharacter(Number(interaction.values[0]), interaction.user.id);
+    if (!chosen) return ephemeral(interaction, locale, 'character.notFound');
+    const chronicle =
+      chosen.chronicleId !== undefined ? campaign.getChronicle(chosen.chronicleId) : undefined;
+    const own = campaign.charactersOf(chosen.guildId, interaction.user.id);
+    await interaction.update({
+      content: t(locale, 'sheet.nowPlaying', { name: chosen.name }),
+      ...sheetMessage(
+        locale,
+        chosen,
+        chronicle,
+        canEditCharacter(interaction, chosen, campaign),
+        own,
+      ),
+    });
+    return;
+  }
+  if (ref?.kind !== 'join') return;
   if (interaction.user.id !== ref.userId) return ephemeral(interaction, locale, 'button.notYours');
   const chronicle = campaign.getChronicle(ref.chronicleId);
   const c = campaign.getCharacter(Number(interaction.values[0]));
