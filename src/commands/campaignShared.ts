@@ -8,6 +8,7 @@ import { isAdmin } from '../auth/campaign.js';
 import { CLAN_NAMES, hungerDice, vitaeMax } from '../game/character.js';
 import { t, type Locale, type MessageKey } from '../i18n/index.js';
 import type { Character, Chronicle } from '../state/campaign.js';
+import { applyAdvances } from '../game/advancement.js';
 import { parseDraft } from '../game/draft.js';
 import type { SheetDraft } from '../game/creation.js';
 import type { Context } from './types.js';
@@ -202,6 +203,8 @@ export function sheetCharacter(
   }
   if (!character) return {};
   const stored = character.hasSheet ? campaign.getSheet(character.id) : undefined;
-  const sheet = stored ? parseDraft(stored.data) : undefined;
+  const base = stored ? parseDraft(stored.data) : undefined;
+  // The sheet as it is now: creation plus what the player bought with XP.
+  const sheet = base ? applyAdvances(base, campaign.advancesOf(character.id)) : undefined;
   return sheet ? { character, sheet } : { character };
 }

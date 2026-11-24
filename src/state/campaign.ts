@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import type { Advance } from '../game/advancement.js';
 import type { XpEntry } from '../game/xp.js';
 import { SURGE_TTL_MS, parseSurges, type Surges } from '../game/sheetPool.js';
 import {
@@ -210,6 +211,11 @@ export class Campaign {
     const columns = db.prepare('PRAGMA table_info(chronicles)').all() as { name: string }[];
     if (!columns.some((c) => c.name === 'tier'))
       db.exec('ALTER TABLE chronicles ADD COLUMN tier TEXT');
+    const xpColumns = db.prepare('PRAGMA table_info(character_xp)').all() as { name: string }[];
+    if (!xpColumns.some((c) => c.name === 'advance'))
+      db.exec('ALTER TABLE character_xp ADD COLUMN advance TEXT');
+    if (!xpColumns.some((c) => c.name === 'ref'))
+      db.exec('ALTER TABLE character_xp ADD COLUMN ref INTEGER');
     if (!columns.some((c) => c.name === 'locale'))
       db.exec('ALTER TABLE chronicles ADD COLUMN locale TEXT');
   }
@@ -318,7 +324,7 @@ export class Campaign {
   xpLog(characterId: number): XpEntry[] {
     const rows = this.db
       .prepare(
-        `SELECT id, at, actor_id, amount, kind, note FROM character_xp
+        `SELECT id, at, actor_id, amount, kind, note, advance, ref FROM character_xp
          WHERE character_id = ? ORDER BY id`,
       )
       .all(characterId) as {
@@ -328,6 +334,8 @@ export class Campaign {
       amount: number;
       kind: XpEntry['kind'];
       note: string;
+      advance: string | null;
+      ref: number | null;
     }[];
     return rows.map((r) => ({
       id: r.id,
@@ -336,7 +344,47 @@ export class Campaign {
       amount: r.amount,
       kind: r.kind,
       note: r.note,
+      ...(r.advance === null ? {} : { advance: JSON.parse(r.advance) as unknown }),
+      ...(r.ref === null ? {} : { ref: r.ref }),
     }));
+  }
+
+  /**
+   * Spends XP on a purchase. Refused ('short') when the balance can't cover it, checked in the
+   * same transaction as the write so two clicks can't overspend.
+   */
+  spendXp(
+    characterId: number,
+    actorId: string,
+    cost: number,
+    advance: unknown,
+    note: string,
+    now = Date.now(),
+  ): 'ok' | 'short' {
+    return this.db.transaction(() => {
+      const { balance } = this.db
+        .prepare(
+          'SELECT COALESCE(SUM(amount), 0) AS balance FROM character_xp WHERE character_id = ?',
+        )
+        .get(characterId) as { balance: number };
+      if (balance < cost) return 'short' as const;
+      this.db
+        .prepare(
+          `INSERT INTO character_xp (character_id, actor_id, amount, kind, note, at, advance)
+           VALUES (?, ?, ?, 'spend', ?, ?, ?)`,
+        )
+        .run(characterId, actorId, -cost, note, now, JSON.stringify(advance));
+      return 'ok' as const;
+    })();
+  }
+
+  /** Purchases still in force, oldest first (refunded ones, with a later `ref`, are gone). */
+  advancesOf(characterId: number): Advance[] {
+    const log = this.xpLog(characterId);
+    const undone = new Set(log.flatMap((e) => (e.ref === undefined ? [] : [e.ref])));
+    return log
+      .filter((e) => e.kind === 'spend' && e.advance !== undefined && !undone.has(e.id))
+      .map((e) => e.advance as Advance);
   }
 
   // Blood Surge: lasts the scene (p. 147). Kept per character until the scene or session ends,

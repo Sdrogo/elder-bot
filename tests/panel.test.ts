@@ -1099,6 +1099,62 @@ describe('character creation wizard', () => {
     expect(other.xp.balance).toBe(10);
   });
 
+  it('lets the owner spend XP on the sheet, once the Storyteller has awarded some', async () => {
+    const send = await asUser();
+    const made = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '111',
+      name: 'Spesa',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 3, resolve: 2 }),
+      sheet: { data: brujah(), approvals: [] },
+    });
+    const theirs = store.campaign.createCharacter({
+      guildId: 'g',
+      ownerId: '222',
+      name: 'Altrui',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 3, resolve: 2 }),
+      sheet: { data: brujah(), approvals: [] },
+    });
+    if (typeof made !== 'object' || typeof theirs !== 'object') throw new Error('setup');
+    const path = `/api/characters/${made.id}/spend`;
+    const skill = { advance: { kind: 'skill', id: 'persuasion' } };
+
+    expect((await send('POST', path, skill)).status).toBe(409);
+    store.campaign.addXp([[made.id, 30]], '111', 'other', 'test');
+    expect((await send('POST', path, skill, 'wrong')).status).toBe(403);
+    expect((await send('POST', path, { advance: { kind: 'skill', id: 'x' } })).status).toBe(400);
+    expect(
+      (await send('POST', path, { advance: { kind: 'discipline', id: 'auspex' } })).status,
+    ).toBe(409);
+    expect((await send('POST', `/api/characters/${theirs.id}/spend`, skill)).status).toBe(404);
+
+    const res = await send('POST', path, skill);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      sheet: { data: { extraSkills: { persuasion: number } } };
+      xp: { balance: number; log: { kind: string; amount: number }[] };
+    };
+    expect(body.sheet.data.extraSkills.persuasion).toBe(4);
+    expect(body.xp.balance).toBe(20);
+    expect(body.xp.log.at(-1)).toMatchObject({ kind: 'spend', amount: -10 });
+    // The sheet kept in the store is still the one from creation.
+    expect(store.campaign.getSheet(made.id)?.data).toMatchObject({
+      extraSkills: { persuasion: 3 },
+    });
+
+    // An Attribute raises the tracker behind it: Stamina 3 → 4 makes Health 9.
+    expect(
+      (await send('POST', path, { advance: { kind: 'attribute', id: 'stamina' } })).status,
+    ).toBe(200);
+    expect(store.campaign.getCharacter(made.id)!.values.stamina).toBe(4);
+    // Not enough left for a third purchase worth 20.
+    expect((await send('POST', path, { advance: { kind: 'attribute', id: 'wits' } })).status).toBe(
+      409,
+    );
+  });
+
   it('keeps a Chronicle and its characters on the same tier of play', async () => {
     const send = await asUser();
     expect(

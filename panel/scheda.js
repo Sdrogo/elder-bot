@@ -29,6 +29,7 @@ import {
 } from '/game/alpha2/core.js';
 import { DISCIPLINE_NAMES, DISCIPLINES, POWERS_BY_ID } from '/game/alpha2/disciplines.js';
 import { TIER_RULES } from '/game/alpha2/tiers.js';
+import { advanceOptions, learnablePowers } from '/game/advancement.js';
 
 const TEXT = {
   it: {
@@ -52,6 +53,24 @@ const TEXT = {
     approvals: 'Approvazioni del Narratore',
     editSheet: 'Modifica scheda',
     xp: 'Esperienza (XP)',
+    'spend.title': 'Spendi XP',
+    'spend.pick': 'Cosa vuoi migliorare',
+    'spend.power': 'Potere gratuito del nuovo dot',
+    'spend.button': (cost) => `Compra (${cost} XP)`,
+    'spend.specialty': 'Nuova specialty',
+    'spend.specialtyName': 'Nome della specialty',
+    'spend.failed': 'Acquisto non riuscito. Ricarica la scheda e riprova.',
+    'spend.short': 'XP insufficienti.',
+    'spend.none': 'Niente da comprare con gli XP che hai.',
+    'spend.note':
+      'Le Resource non si comprano con XP; Humanity e Discipline o tratti fuori clan richiedono il Narratore (in arrivo).',
+    'kind.attribute': 'Attributo',
+    'kind.skill': 'Skill',
+    'kind.merit': 'Merit',
+    'kind.trait': 'Tratto di clan',
+    'kind.discipline': 'Disciplina (+1 dot)',
+    'kind.power': 'Potere',
+    'kind.specialty': 'Specialty',
     'xp.balance': 'Da spendere',
     'xp.earned': 'Guadagnati in tutto',
     'xp.empty': 'Nessun XP ancora: il Narratore li assegna a fine sessione.',
@@ -102,6 +121,24 @@ const TEXT = {
     approvals: 'Storyteller approvals',
     editSheet: 'Edit sheet',
     xp: 'Experience (XP)',
+    'spend.title': 'Spend XP',
+    'spend.pick': 'What to improve',
+    'spend.power': 'Free power for the new dot',
+    'spend.button': (cost) => `Buy (${cost} XP)`,
+    'spend.specialty': 'New specialty',
+    'spend.specialtyName': 'Specialty name',
+    'spend.failed': 'Purchase failed. Reload the sheet and try again.',
+    'spend.short': 'Not enough XP.',
+    'spend.none': 'Nothing to buy with the XP you have.',
+    'spend.note':
+      'Resources cannot be bought with XP; Humanity and out-of-clan Disciplines or traits need the Storyteller (coming).',
+    'kind.attribute': 'Attribute',
+    'kind.skill': 'Skill',
+    'kind.merit': 'Merit',
+    'kind.trait': 'Clan trait',
+    'kind.discipline': 'Discipline (+1 dot)',
+    'kind.power': 'Power',
+    'kind.specialty': 'Specialty',
     'xp.balance': 'To spend',
     'xp.earned': 'Earned in total',
     'xp.empty': 'No XP yet: the Storyteller awards it at the end of a session.',
@@ -216,6 +253,129 @@ async function edit(button) {
   button.disabled = false;
 }
 
+/** A purchase in words: its kind and what it bought. */
+function advanceLabel(a) {
+  if (!a) return '';
+  const name =
+    a.kind === 'attribute'
+      ? ATTRIBUTE_NAMES[a.id]
+      : a.kind === 'skill'
+        ? SKILL_INFO[a.id].name
+        : a.kind === 'specialty'
+          ? `${SKILL_INFO[a.skill].name}: ${a.name}`
+          : a.kind === 'merit'
+            ? MERITS_BY_ID.get(a.id)?.name
+            : a.kind === 'trait'
+              ? CLAN_TRAITS_BY_ID.get(a.id)?.name
+              : a.kind === 'discipline'
+                ? `${DISCIPLINE_NAMES[a.id]}${a.power ? ` + ${POWERS_BY_ID.get(a.power)?.name}` : ''}`
+                : POWERS_BY_ID.get(a.id)?.name;
+  return `${tr(`kind.${a.kind}`)} ${name ?? '?'}`;
+}
+
+async function buy(advance, button) {
+  button.disabled = true;
+  const response = await fetch(`/api/characters/${id}/spend`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': me.csrf },
+    body: JSON.stringify({ advance }),
+  });
+  if (response.ok) {
+    draw(await response.json());
+    return;
+  }
+  const data = await response.json().catch(() => ({}));
+  notify(tr(data.error === 'short' ? 'spend.short' : 'spend.failed'));
+  button.disabled = false;
+}
+
+/** The owner's shop: one select of what can be bought now, a free power when a dot brings one. */
+function spendSection(d, balance) {
+  const box = el('div');
+  const options = advanceOptions(d).filter((o) => o.reasons.length === 0 && o.cost <= balance);
+  box.append(el('p', 'quiet', tr('spend.note')));
+  const pick = el('select');
+  for (const o of options) {
+    const a = o.advance;
+    const opt = el('option', '', `${advanceLabel(a)} — ${o.cost} XP`);
+    // A Discipline dot's free power is chosen next, so its option is the Discipline itself.
+    opt.value = String(options.indexOf(o));
+    pick.append(opt);
+  }
+  // Disciplines need a free power: offer them through their own select below.
+  const disciplines = DISCIPLINES.map((disc) => ({
+    disc,
+    dots: d.disciplines[disc] ?? 0,
+  })).filter(({ disc, dots }) => {
+    const own =
+      d.clan &&
+      advanceOptions(d).find((o) => o.advance.kind === 'discipline' && o.advance.id === disc);
+    return (
+      own && own.cost <= balance && own.reasons.every((r) => r.kind === 'incomplete') && dots >= 0
+    );
+  });
+  const out = [];
+  if (options.length) {
+    const buyButton = el('button', 'primary', tr('spend.button', options[0].cost));
+    buyButton.type = 'button';
+    pick.addEventListener('change', () => {
+      buyButton.textContent = tr('spend.button', options[Number(pick.value)].cost);
+    });
+    buyButton.addEventListener('click', () => buy(options[Number(pick.value)].advance, buyButton));
+    const wrap = el('label', 'field');
+    wrap.append(el('span', '', tr('spend.pick')), pick);
+    out.push(wrap, buyButton);
+  }
+  for (const { disc, dots } of disciplines) {
+    const offer = learnablePowers(d, disc, dots + 1);
+    const cost = advanceOptions(d).find(
+      (o) => o.advance.kind === 'discipline' && o.advance.id === disc,
+    ).cost;
+    const row2 = el('div', 'trait');
+    const choose = el('select');
+    for (const power of offer) {
+      const opt = el('option', '', POWERS_BY_ID.get(power).name);
+      opt.value = power;
+      choose.append(opt);
+    }
+    const go = el('button', 'chip', tr('spend.button', cost));
+    go.type = 'button';
+    go.addEventListener('click', () =>
+      buy({ kind: 'discipline', id: disc, power: choose.value }, go),
+    );
+    row2.append(el('span', '', `${DISCIPLINE_NAMES[disc]} ${dots} → ${dots + 1}`), choose, go);
+    if (offer.length) out.push(row2);
+  }
+  // Specialties: a Skill with at least one dot and a name.
+  if (balance >= 5) {
+    const skill = el('select');
+    for (const s of SKILLS) {
+      if (skillDots(d, s) < 1) continue;
+      const opt = el('option', '', SKILL_INFO[s].name);
+      opt.value = s;
+      skill.append(opt);
+    }
+    if (skill.childElementCount) {
+      const name = el('input');
+      name.maxLength = 40;
+      name.placeholder = tr('spend.specialtyName');
+      const go = el('button', 'chip', tr('spend.button', 5));
+      go.type = 'button';
+      go.addEventListener('click', () => {
+        if (name.value.trim())
+          buy({ kind: 'specialty', skill: skill.value, name: name.value.trim() }, go);
+      });
+      const row3 = el('div', 'trait');
+      row3.append(el('span', '', tr('spend.specialty')), skill, name, go);
+      out.push(row3);
+    }
+  }
+  if (!out.length) box.append(el('p', 'quiet', tr('spend.none')));
+  box.append(...out);
+  return box;
+}
+
 /** XP balance and the log of awards and spending, newest first. */
 function xpSection(xp) {
   const list = el('div');
@@ -233,7 +393,9 @@ function xpSection(xp) {
           )
         : e.kind === 'other'
           ? `${tr('xp.other')}: ${e.note}`
-          : `${tr(`xp.${e.kind}`)}: ${e.note}`;
+          : e.kind === 'spend'
+            ? `${tr('xp.spend')}: ${advanceLabel(e.advance)}`
+            : `${tr(`xp.${e.kind}`)}: ${e.note}`;
     const when = new Date(e.at).toLocaleDateString(lang);
     list.append(row(what, `${e.amount > 0 ? '+' : ''}${e.amount}`, when));
   }
@@ -306,6 +468,7 @@ function draw({ character, sheet, canApprove, xp }) {
   }
 
   if (xp) out.push(xpSection(xp));
+  if (xp && character.owned) out.push(section(tr('spend.title'), spendSection(d, xp.balance)));
 
   const grid = el('div', 'sheet-grid');
   const attrs = el('div', 'attr-grid');
