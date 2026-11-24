@@ -336,9 +336,10 @@ export function attributeChoices(
 }
 
 /**
- * Everything that can go with an Attribute, for the `with` option: Skills (and each specialty),
+ * Everything that can go with an Attribute, for the `with` option: Skills (their specialties in brackets),
  * Disciplines, known powers with their whole Power test, the other Attributes and the lifepaths.
- * Skills with dots come first; with an Attribute chosen, it is left out of the list.
+ * Order: Disciplines, Skills with dots, powers, lifepaths, Skills at 0, Attributes; with an
+ * Attribute chosen, it is left out of the list.
  */
 export function secondChoices(
   sheet: SheetDraft,
@@ -346,27 +347,25 @@ export function secondChoices(
   surges: Surges = {},
   attribute?: Attribute,
 ): TraitChoice[] {
+  // Discord shows only the first 25 suggestions until the player types: the traits a test
+  // most often uses come first, so Disciplines are never pushed out of sight.
   const skills = [...SKILLS].sort((a, b) => skillDots(sheet, b) - skillDots(sheet, a));
-  const out: TraitChoice[] = [];
-  for (const skill of skills) {
-    const dots = skillDots(sheet, skill);
-    const name = SKILL_INFO[skill].name;
-    out.push({ name: `${name} ${dots}`, value: encodeTrait({ kind: 'skill', id: skill }) });
-    specialtiesOf(sheet, skill).forEach((spec, i) =>
-      out.push({
-        name: `${name} ${dots} · ${spec} +${SPECIALTY_BONUS}`,
-        value: encodeTrait({ kind: 'skill', id: skill, specialty: i }),
-      }),
-    );
-  }
-  for (const disc of DISCIPLINES) {
-    const dots = disciplineDots(sheet, disc);
-    if (dots < 1) continue;
-    out.push({
-      name: `${DISCIPLINE_NAMES[disc]} ${dots}${surgeNote(surges, `disc:${disc}`)}`,
+  const skillChoice = (skill: Skill): TraitChoice => {
+    // One line per Skill: its specializations are picked in the separate `specialization` option.
+    const specs = specialtiesOf(sheet, skill);
+    const hint = specs.length ? ` (${specs.join(', ')})` : '';
+    return {
+      name: `${SKILL_INFO[skill].name} ${skillDots(sheet, skill)}${hint}`,
+      value: encodeTrait({ kind: 'skill', id: skill }),
+    };
+  };
+  const disciplines: TraitChoice[] = DISCIPLINES.filter((d) => disciplineDots(sheet, d) > 0).map(
+    (disc) => ({
+      name: `${DISCIPLINE_NAMES[disc]} ${disciplineDots(sheet, disc)}${surgeNote(surges, `disc:${disc}`)}`,
       value: encodeTrait({ kind: 'disc', id: disc }),
-    });
-  }
+    }),
+  );
+  const powers: TraitChoice[] = [];
   for (const id of sheet.powers) {
     const power = POWERS_BY_ID.get(id);
     if (!power) continue;
@@ -379,27 +378,51 @@ export function secondChoices(
     });
     const a = attribute ?? power.attribute;
     const total = typeof pool === 'string' ? '' : ` = ${pool.dice}`;
-    out.push({
+    powers.push({
       name: `${power.name} (${ATTRIBUTE_NAMES[a]} + ${DISCIPLINE_NAMES[power.discipline]}${total})`,
       value: encodeTrait({ kind: 'power', id }),
     });
   }
-  for (const a of ATTRIBUTES) {
-    if (a === attribute) continue;
-    out.push({
-      name: `${ATTRIBUTE_NAMES[a]} ${attributeDots(sheet, a)}${surgeNote(surges, `attr:${a}`)}`,
-      value: encodeTrait({ kind: 'attr', id: a }),
-    });
-  }
+  const lifepaths: TraitChoice[] = [];
   for (const l of sheet.lifepaths) {
     const lifepath = LIFEPATHS_BY_ID.get(l.id);
     if (!lifepath) continue;
-    out.push({
+    lifepaths.push({
       name: `Lifepath: ${lifepath.name} ${LIFEPATH_DOTS}`,
       value: encodeTrait({ kind: 'life', id: l.id }),
     });
   }
+  const attributes: TraitChoice[] = ATTRIBUTES.filter((a) => a !== attribute).map((a) => ({
+    name: `${ATTRIBUTE_NAMES[a]} ${attributeDots(sheet, a)}${surgeNote(surges, `attr:${a}`)}`,
+    value: encodeTrait({ kind: 'attr', id: a }),
+  }));
+  const out: TraitChoice[] = [
+    ...disciplines,
+    ...skills.filter((k) => skillDots(sheet, k) > 0).map(skillChoice),
+    ...powers,
+    ...lifepaths,
+    ...skills.filter((k) => skillDots(sheet, k) === 0).map(skillChoice),
+    ...attributes,
+  ];
   return out;
+}
+
+/**
+ * The specialties of the Skill picked in `with`, for the `specialization` option (+1 die, p. 39).
+ * Empty when `with` is not a Skill or the Skill has none.
+ */
+export function specialtyChoices(sheet: SheetDraft, second?: TraitRef): TraitChoice[] {
+  if (second?.kind !== 'skill') return [];
+  return specialtiesOf(sheet, second.id).map((spec, i) => ({
+    name: `${spec} +${SPECIALTY_BONUS}`,
+    value: String(i),
+  }));
+}
+
+/** The index a `specialization` choice carries, or undefined for anything typed by hand. */
+export function decodeSpecialty(value: string | null | undefined): number | undefined {
+  if (!value || !/^\d{1,2}$/.test(value)) return undefined;
+  return Number(value);
 }
 
 /**

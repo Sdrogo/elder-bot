@@ -12,8 +12,6 @@ export const it: Messages = {
 
   'opt.test.difficulty': 'Difficoltà: successi necessari per vincere',
   'opt.test.bonus': 'Dadi bonus (positivi) o penalità (negativi)',
-  'opt.test.hunger': 'I tuoi dadi Hunger (0-5): sostituiscono dadi normali del pool',
-  'opt.test.take_half': 'Taking Half: niente tiro, metà del pool (per eccesso) come successi',
   'opt.test.reason': 'Cosa stai tentando',
 
   'cmd.contest.description': 'Test contrapposto: vince chi ottiene più successi',
@@ -24,7 +22,6 @@ export const it: Messages = {
   'opt.contest.attribute': 'Attributo dalla scheda, o il suo valore per i pareggi se usi dice',
   'opt.contest.opponent_attribute':
     'Attributo del giocatore avversario, o un numero per i pareggi (PNG: metà pool)',
-  'opt.contest.hunger': 'I tuoi dadi Hunger (0-5)',
   'opt.contest.opponent_hunger': "Dadi Hunger dell'avversario (un PG vampiro)",
   'opt.contest.reason': 'Posta in gioco',
 
@@ -38,7 +35,6 @@ export const it: Messages = {
   'cmd.prolonged.roll.description': 'Tira per il tuo compito prolungato',
   'opt.prolonged.dice': 'Attributo + Abilità',
   'opt.prolonged.bonus': 'Dadi bonus o penalità',
-  'opt.prolonged.hunger': 'I tuoi dadi Hunger (0-5)',
 
   // Shared roll output.
   'roll.title': 'Test',
@@ -159,7 +155,7 @@ export const it: Messages = {
   'button.pickCharacter': 'Scegli un personaggio',
   'opt.roll.npc': 'Tiro per un PNG: il pool dalla sua scheda, senza dadi Hunger',
   'opt.roll.attribute': 'Attributo dalla scheda del personaggio',
-  'opt.roll.with': 'Cosa va insieme: Skill, specialità, Disciplina, potere, Attributo o lifepath',
+  'opt.roll.with': 'Cosa va insieme: Skill, Disciplina, potere, Attributo o lifepath',
   'opt.roll.surge':
     'Blood Surge: spendi Vitae per alzare un Attributo o una Disciplina per la scena',
   'sheetRoll.pool': 'Pool',
@@ -197,6 +193,12 @@ export const it: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} sulla scheda, {tracker} sui tracker. Il tiro usa la scheda.',
   'button.surgeEnd': 'Fine Blood Surge',
+  'opt.roll.specialization': 'Specialità della Skill scelta in with (+1 dado)',
+  'opt.contest.specialization': 'Specialità della Skill scelta in with (+1 dado)',
+  'opt.contest.opponent_specialization': 'Specialità della Skill scelta in opponent_with (+1 dado)',
+  'sheetRoll.hint.noSpecialties': 'Scegli prima in with una Skill con specialità',
+  'sheetRoll.issue.specialtyNeedsSkill':
+    'La specialità va con una Skill: scegli prima la Skill in `with`.',
   'sheetRoll.contest.needOpponent': "Scegli l'`opponent` per tirare dalla sua scheda.",
   'sheetRoll.contest.needOpponentPool':
     "Indica la pool dell'avversario: `opponent_dice`, oppure `opponent_attribute` + `opponent_with` dalla scheda del giocatore avversario.",
@@ -206,7 +208,7 @@ export const it: Messages = {
   'opt.contest.opponent_with': "Cosa va con l'Attributo del giocatore avversario, dalla sua scheda",
   'opt.contest.surge':
     'Blood Surge: spendi Vitae per alzare un Attributo o una Disciplina per la scena',
-  'opt.contest.with': 'Cosa va col tuo Attributo: Skill, specialità, Disciplina, potere, lifepath',
+  'opt.contest.with': 'Cosa va col tuo Attributo: Skill, Disciplina, potere, lifepath',
   'button.masqueradeThreat': 'Test di minaccia',
   'button.prolongedCancel': 'Annulla compito',
   'button.willpowerBest': 'Willpower: rilancia i fallimenti',

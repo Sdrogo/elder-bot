@@ -11,8 +11,6 @@ export const en = {
 
   'opt.test.difficulty': 'Difficulty: successes needed to win',
   'opt.test.bonus': 'Bonus dice (positive) or penalty dice (negative)',
-  'opt.test.hunger': 'Your Hunger dice (0-5): they replace normal dice in the pool',
-  'opt.test.take_half': 'Taking Half: no roll, half your pool (rounded up) as successes',
   'opt.test.reason': 'What you are attempting',
 
   'cmd.contest.description': 'Contested test: the most successes wins',
@@ -23,7 +21,6 @@ export const en = {
   'opt.contest.attribute': 'Attribute from your sheet, or its number for ties when you use dice',
   'opt.contest.opponent_attribute':
     "Opposing player's Attribute, or a number for ties (an NPC: half its pool)",
-  'opt.contest.hunger': 'Your Hunger dice (0-5)',
   'opt.contest.opponent_hunger': "Opponent's Hunger dice (a vampire PC)",
   'opt.contest.reason': "What's at stake",
 
@@ -37,7 +34,6 @@ export const en = {
   'cmd.prolonged.roll.description': 'Roll for your prolonged task',
   'opt.prolonged.dice': 'Attribute + Skill',
   'opt.prolonged.bonus': 'Bonus or penalty dice',
-  'opt.prolonged.hunger': 'Your Hunger dice (0-5)',
 
   // Shared roll output.
   'roll.title': 'Test',
@@ -157,7 +153,7 @@ export const en = {
   'button.pickCharacter': 'Choose a character',
   'opt.roll.npc': 'Roll for an NPC: the pool from their stat block, no Hunger dice',
   'opt.roll.attribute': 'Attribute from your character sheet',
-  'opt.roll.with': 'What goes with it: Skill, specialty, Discipline, power, Attribute or lifepath',
+  'opt.roll.with': 'What goes with it: Skill, Discipline, power, Attribute or lifepath',
   'opt.roll.surge': 'Blood Surge: spend Vitae to raise an Attribute or Discipline for the scene',
   'sheetRoll.pool': 'Pool',
   'sheetRoll.mixed':
@@ -192,6 +188,12 @@ export const en = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} on the sheet, {tracker} on the trackers. The roll uses the sheet.',
   'button.surgeEnd': 'End Blood Surge',
+  'opt.roll.specialization': 'Specialty of the Skill in with (+1 die)',
+  'opt.contest.specialization': 'Specialty of the Skill in with (+1 die)',
+  'opt.contest.opponent_specialization': 'Specialty of the Skill in opponent_with (+1 die)',
+  'sheetRoll.hint.noSpecialties': 'Pick a Skill with specialties in with first',
+  'sheetRoll.issue.specialtyNeedsSkill':
+    'A specialty goes with a Skill: pick the Skill in `with` first.',
   'sheetRoll.contest.needOpponent': 'Choose the `opponent` to roll from their sheet.',
   'sheetRoll.contest.needOpponentPool':
     "Give the opponent's pool: `opponent_dice`, or `opponent_attribute` + `opponent_with` from the opposing player's sheet.",
@@ -199,8 +201,7 @@ export const en = {
   'sheetRoll.hint.pickOpponent': 'Choose the opponent first',
   'opt.contest.opponent_with': "What goes with the opposing player's Attribute, from their sheet",
   'opt.contest.surge': 'Blood Surge: spend Vitae to raise an Attribute or Discipline for the scene',
-  'opt.contest.with':
-    'What goes with your Attribute: Skill, specialty, Discipline, power, lifepath',
+  'opt.contest.with': 'What goes with your Attribute: Skill, Discipline, power, lifepath',
   'button.masqueradeThreat': 'Threat test',
   'button.prolongedCancel': 'Cancel task',
   'button.willpowerBest': 'Willpower: reroll failures',

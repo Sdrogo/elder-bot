@@ -14,8 +14,6 @@ export const de: Messages = {
 
   'opt.test.difficulty': 'Schwierigkeit: benötigte Erfolge',
   'opt.test.bonus': 'Bonuswürfel (positiv) oder Maluswürfel (negativ)',
-  'opt.test.hunger': 'Deine Hunger-Würfel (0-5): ersetzen normale Würfel im Pool',
-  'opt.test.take_half': 'Taking Half: kein Wurf, halber Pool (aufgerundet) als Erfolge',
   'opt.test.reason': 'Was du versuchst',
 
   'cmd.contest.description': 'Vergleichende Probe: die meisten Erfolge gewinnen',
@@ -27,7 +25,6 @@ export const de: Messages = {
     'Attribut vom Bogen, oder sein Wert für Gleichstände, wenn du dice nutzt',
   'opt.contest.opponent_attribute':
     'Attribut des gegnerischen Spielers, oder eine Zahl für Gleichstände (NSC: halber Pool)',
-  'opt.contest.hunger': 'Deine Hunger-Würfel (0-5)',
   'opt.contest.opponent_hunger': 'Hunger-Würfel des Gegners (ein Vampir-SC)',
   'opt.contest.reason': 'Worum es geht',
 
@@ -41,7 +38,6 @@ export const de: Messages = {
   'cmd.prolonged.roll.description': 'Würfle für deine langwierige Aufgabe',
   'opt.prolonged.dice': 'Attribut + Fertigkeit',
   'opt.prolonged.bonus': 'Bonus- oder Maluswürfel',
-  'opt.prolonged.hunger': 'Deine Hunger-Würfel (0-5)',
 
   // Shared roll output.
   'roll.title': 'Probe',
@@ -164,8 +160,7 @@ export const de: Messages = {
   'button.pickCharacter': 'Charakter wählen',
   'opt.roll.npc': 'Wurf für einen NSC: Pool aus dem Werteblock, ohne Hunger-Würfel',
   'opt.roll.attribute': 'Attribut vom Charakterbogen',
-  'opt.roll.with':
-    'Was dazukommt: Fertigkeit, Spezialisierung, Disziplin, Kraft, Attribut oder Lifepath',
+  'opt.roll.with': 'Was dazukommt: Fertigkeit, Disziplin, Kraft, Attribut oder Lifepath',
   'opt.roll.surge': 'Blood Surge: Vitae ausgeben, um ein Attribut oder eine Disziplin zu steigern',
   'sheetRoll.pool': 'Pool',
   'sheetRoll.mixed':
@@ -202,6 +197,13 @@ export const de: Messages = {
   'sheetRoll.trackerDiffers':
     '{attribute}: {sheet} auf dem Bogen, {tracker} auf den Leisten. Der Wurf nutzt den Bogen.',
   'button.surgeEnd': 'Blood Surge beenden',
+  'opt.roll.specialization': 'Spezialisierung der Fertigkeit in with (+1 Würfel)',
+  'opt.contest.specialization': 'Spezialisierung der Fertigkeit in with (+1 Würfel)',
+  'opt.contest.opponent_specialization':
+    'Spezialisierung der Fertigkeit in opponent_with (+1 Würfel)',
+  'sheetRoll.hint.noSpecialties': 'Wähle zuerst in with eine Fertigkeit mit Spezialisierungen',
+  'sheetRoll.issue.specialtyNeedsSkill':
+    'Eine Spezialisierung gehört zu einer Fertigkeit: wähle zuerst die Fertigkeit in `with`.',
   'sheetRoll.contest.needOpponent': 'Wähle den `opponent`, um von seinem Bogen zu würfeln.',
   'sheetRoll.contest.needOpponentPool':
     'Gib den Pool des Gegners an: `opponent_dice`, oder `opponent_attribute` + `opponent_with` vom Bogen des gegnerischen Spielers.',
@@ -210,8 +212,7 @@ export const de: Messages = {
   'opt.contest.opponent_with': 'Was zum Attribut des gegnerischen Spielers kommt, von seinem Bogen',
   'opt.contest.surge':
     'Blood Surge: Vitae ausgeben, um ein Attribut oder eine Disziplin zu steigern',
-  'opt.contest.with':
-    'Was zu deinem Attribut kommt: Fertigkeit, Spezialisierung, Disziplin, Kraft, Lifepath',
+  'opt.contest.with': 'Was zu deinem Attribut kommt: Fertigkeit, Disziplin, Kraft, Lifepath',
   'button.masqueradeThreat': 'Bedrohungsprobe',
   'button.prolongedCancel': 'Aufgabe abbrechen',
   'button.willpowerBest': 'Willpower: Fehlschläge neu würfeln',
