@@ -708,6 +708,11 @@ function draw({ character, sheet, canApprove, xp }) {
     row('Humanity', String(character.humanity.rank)),
     row('Generation modifier', String(ev.derived.generationModifier)),
   );
+  // Impairment: the Storyteller's, and the groups Impaired by Health or Willpower at 0.
+  const impaired = [
+    ...new Set([...(character.impairments ?? []), ...(character.impaired ?? [])]),
+  ].map((k) => (['physical', 'social', 'mental'].includes(k) ? `${k} (all)` : k));
+  if (impaired.length) trackers.append(row('Impairment', impaired.join(', ')));
   grid.append(section(tr('trackers'), trackers));
 
   out.push(grid);

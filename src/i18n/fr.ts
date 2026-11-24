@@ -139,6 +139,18 @@ export const fr: Messages = {
   'cmd.sheet.description': "Affiche la fiche d'un personnage avec des boutons + et −",
   'opt.sheet.character': 'Le personnage (par défaut : le tien à cette table)',
   'opt.sheet.public': 'La montrer à tout le salon, sans boutons',
+  'cmd.impair.description': "Conteur : Impair les Attributs d'un personnage pour la scène",
+  'opt.impair.character': 'Le personnage',
+  'opt.impair.target': "Un groupe d'Attributs ou un seul Attribut (ou tous les retirer)",
+  'opt.impair.remove': "Terminer cet Impairment au lieu de l'ajouter",
+  'impair.choice.clear': 'Terminer tout Impairment',
+  'impair.noChronicle':
+    "Ce personnage n'est dans aucune Chronique : seul son Conteur peut lui imposer un Impairment.",
+  'impair.notYours': 'Seul le Conteur de la Chronique peut imposer un Impairment à un personnage.',
+  'impair.added':
+    "{name} est Impaired : {list}. −2 dés par Attribut Impaired dans un test, jusqu'à la fin de la scène.",
+  'impair.none': "{name} n'est plus Impaired par le Conteur.",
+  'impair.nothingToRemove': "{name} n'a aucun Impairment du Conteur à terminer.",
   'opt.invite.chronicle': 'La Chronique (par défaut : celle jouée dans ce salon)',
   'cmd.invite.description': 'Invite un joueur à amener un personnage dans une Chronique',
   'opt.invite.player': 'Le joueur',

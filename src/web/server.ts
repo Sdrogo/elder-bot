@@ -26,6 +26,7 @@ import {
   type CharacterValues,
   type Clan,
 } from '../game/character.js';
+import { decodeImpairKey, impairedCategories, type ImpairKey } from '../game/sheetPool.js';
 import {
   CHRONICLE_TIERS,
   isChronicleTier,
@@ -243,6 +244,7 @@ export function characterView(
   cam?: string,
   pending = 0,
   portrait?: string,
+  impairments: readonly string[] = [],
 ) {
   const v = c.values;
   const chronicle = c.chronicleId !== undefined ? chronicles.get(c.chronicleId) : undefined;
@@ -273,6 +275,10 @@ export function characterView(
     willpower: { current: v.willpower, max: willpowerMax(v) },
     humanity: { rank: v.humanity, violations: v.violations },
     baneful: v.baneful,
+    // Impairment from the Storyteller (groups of Attributes or single ones), until the scene ends.
+    impairments: [...impairments],
+    // What the empty trackers Impair by themselves: the groups.
+    impaired: impairedCategories(v),
   };
 }
 
@@ -810,7 +816,17 @@ export function createPanelHandler(deps: PanelDeps) {
         : campaign.getChronicle(character.chronicleId);
     if (ch) chronicles.set(ch.id, ch);
     return json(res, 200, {
-      character: character && characterView(character, chronicles, me.userId),
+      character:
+        character &&
+        characterView(
+          character,
+          chronicles,
+          me.userId,
+          undefined,
+          0,
+          undefined,
+          campaign.getImpairments(character.id),
+        ),
       approvals: result.approvals,
     });
   }
@@ -960,7 +976,15 @@ export function createPanelHandler(deps: PanelDeps) {
       const fresh = campaign.getCharacter(c.id) ?? c;
       const log = campaign.xpLog(c.id);
       return {
-        character: characterView(fresh, chronicles, me.userId, undefined, pendingOf(c)),
+        character: characterView(
+          fresh,
+          chronicles,
+          me.userId,
+          undefined,
+          pendingOf(c),
+          undefined,
+          campaign.getImpairments(c.id),
+        ),
         sheet: {
           ...sheet,
           data: applyAdvances(sheet.data as SheetDraft, campaign.advancesOf(c.id)),
@@ -1269,7 +1293,22 @@ export function createPanelHandler(deps: PanelDeps) {
       case 'end':
         // End of a session at the Chronicle's table: prolonged tasks still open are dropped.
         if (chronicle.channelId) store.endSession(chronicle.channelId);
+        // Without a table channel the scene still ends for the Chronicle's characters.
+        else campaign.clearChronicleImpairments(chronicle.id);
         return ok();
+      case 'impair': {
+        // POST …/impair {character, targets: [group | Attribute]}: the Storyteller's Impairment
+        // for the scene, replacing the list. An empty list ends it.
+        const id = member();
+        const targets = Array.isArray(body.targets) ? (body.targets as unknown[]) : undefined;
+        if (id === undefined || !targets || targets.length > 12) {
+          return json(res, 400, { error: 'invalid body' });
+        }
+        const keys = targets.map((k) => (typeof k === 'string' ? decodeImpairKey(k) : undefined));
+        if (keys.some((k) => k === undefined)) return json(res, 400, { error: 'invalid body' });
+        campaign.setImpairments(id, keys as ImpairKey[]);
+        return ok();
+      }
       case 'archive':
         campaign.archiveChronicle(chronicle.id);
         return ok();
@@ -1603,6 +1642,7 @@ export function createPanelHandler(deps: PanelDeps) {
           store.stage.camOf(c.id),
           pendingOf(c),
           store.stage.portraitTag(c.id),
+          campaign.getImpairments(c.id),
         );
       const stage = store.stage.settings(me.userId);
       // The names of the channels where the Chronicles are played.
@@ -1749,6 +1789,7 @@ export function createPanelHandler(deps: PanelDeps) {
           store.stage.camOf(c.id),
           0,
           store.stage.portraitTag(c.id),
+          campaign.getImpairments(c.id),
         ),
       });
     };

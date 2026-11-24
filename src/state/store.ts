@@ -159,7 +159,10 @@ export class Store {
     this.db.prepare('DELETE FROM prolonged WHERE channel_id = ?').run(channelId);
     // Blood Surge lasts a scene at most: none survives the end of the session.
     const chronicle = this.campaign.chronicleByChannel(channelId);
-    if (chronicle) this.campaign.clearChronicleSurges(chronicle.id);
+    if (chronicle) {
+      this.campaign.clearChronicleSurges(chronicle.id);
+      this.campaign.clearChronicleImpairments(chronicle.id);
+    }
   }
 
   close(): void {

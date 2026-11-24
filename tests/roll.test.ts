@@ -153,6 +153,7 @@ describe('slash commands', () => {
       'prolonged',
       'frenzy',
       'masquerade',
+      'impair',
       'sheet',
       'invite',
       'panel',

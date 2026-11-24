@@ -169,6 +169,10 @@ A task that needs several rolls to complete.
 
 Each player can have one prolonged task open per channel.
 
+### `/elder impair`
+
+For the Storyteller (or a server admin). Impairs a character's Attributes for the scene: a whole group (Physical, Social, Mental) or a single Attribute, for effects like Remorse. Each Impaired Attribute in a pool costs 2 dice in rolls made from the sheet. Pick **remove** to end one, or the "End all Impairment" choice for all. It also ends with "End session" on the panel, and the Storyteller can set it from the character's card on the panel. Health or Willpower at 0 still Impair by themselves.
+
 ### `/elder masquerade`
 
 The table's Masquerade Tracker: 10 boxes, from Superstition (0) to Open War (9–10). Anyone can show it; its buttons are for the Storyteller:

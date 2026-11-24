@@ -1,5 +1,6 @@
 import { contest } from './contest.js';
 import { frenzy } from './frenzy.js';
+import { impair } from './impair.js';
 import { invite } from './invite.js';
 import { masquerade } from './masquerade.js';
 import { panel } from './panel.js';
@@ -15,6 +16,7 @@ export const commands: Command[] = [
   prolonged,
   frenzy,
   masquerade,
+  impair,
   sheet,
   invite,
   panel,

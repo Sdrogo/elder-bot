@@ -142,6 +142,18 @@ export const de: Messages = {
   'cmd.sheet.description': 'Zeigt einen Charakterbogen mit + und − Knöpfen',
   'opt.sheet.character': 'Der Charakter (Standard: deiner an diesem Tisch)',
   'opt.sheet.public': 'Dem ganzen Kanal zeigen, ohne Knöpfe',
+  'cmd.impair.description': 'Erzähler: Impair die Attribute eines Charakters für die Szene',
+  'opt.impair.character': 'Der Charakter',
+  'opt.impair.target': 'Eine Attributgruppe oder ein einzelnes Attribut (oder alle aufheben)',
+  'opt.impair.remove': 'Dieses Impairment beenden statt hinzufügen',
+  'impair.choice.clear': 'Alle Impairments beenden',
+  'impair.noChronicle':
+    'Dieser Charakter ist in keiner Chronik: nur sein Erzähler kann ihn Impairen.',
+  'impair.notYours': 'Nur der Erzähler der Chronik kann einen Charakter Impairen.',
+  'impair.added':
+    '{name} ist Impaired: {list}. −2 Würfel je Impaired Attribut in einer Probe, bis zum Ende der Szene.',
+  'impair.none': '{name} ist durch den Erzähler nicht mehr Impaired.',
+  'impair.nothingToRemove': '{name} hat kein Impairment des Erzählers, das enden könnte.',
   'opt.invite.chronicle': 'Die Chronik (Standard: die in diesem Kanal gespielte)',
   'cmd.invite.description': 'Lädt einen Spieler ein, einen Charakter in die Chronik zu bringen',
   'opt.invite.player': 'Der Spieler',

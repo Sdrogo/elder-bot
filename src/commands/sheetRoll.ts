@@ -90,14 +90,15 @@ export async function respondSheetChoices(
   }
   const { character, sheet } = found;
   const surges = ctx.store.campaign.getSurges(character.id);
+  const impairments = ctx.store.campaign.getImpairments(character.id);
   const attribute = decodeTrait(interaction.options.getString(names.attribute));
   const second = decodeTrait(interaction.options.getString(names.with));
   let choices: TraitChoice[] = [];
   if (focused.name === names.attribute) {
-    choices = attributeChoices(sheet, character.values, surges);
+    choices = attributeChoices(sheet, character.values, surges, impairments);
   } else if (focused.name === names.with) {
     const a = attribute?.kind === 'attr' ? attribute.id : undefined;
-    choices = secondChoices(sheet, character.values, surges, a);
+    choices = secondChoices(sheet, character.values, surges, a, impairments);
   } else if (focused.name === names.specialty) {
     choices = specialtyChoices(sheet, second);
     if (!choices.length) {
@@ -191,13 +192,14 @@ export function rollFromSheet(
     second?.kind === 'skill' && specialty !== undefined ? { ...second, specialty } : second;
 
   let surges = campaign.getSurges(character.id);
+  const impairments = campaign.getImpairments(character.id);
   const input = {
     sheet,
     ...(attribute ? { attribute } : {}),
     ...(withSpecialty ? { second: withSpecialty } : {}),
   };
   // Check the pool before spending any Vitae.
-  const trial = buildSheetPool({ ...input, values: character.values, surges });
+  const trial = buildSheetPool({ ...input, values: character.values, surges, impairments });
   if (typeof trial === 'string') return { refuse: ISSUE_KEYS[trial] };
 
   const notes: APIEmbedField[] = [];
@@ -225,7 +227,12 @@ export function rollFromSheet(
     });
   }
 
-  const pool = buildSheetPool({ ...input, values: character.values, surges }) as SheetPool;
+  const pool = buildSheetPool({
+    ...input,
+    values: character.values,
+    surges,
+    impairments,
+  }) as SheetPool;
   notes.unshift({ name: t(locale, 'sheetRoll.pool'), value: recipe(pool) });
   if (pool.impairment) {
     notes.push({

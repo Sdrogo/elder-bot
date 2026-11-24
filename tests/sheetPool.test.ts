@@ -7,6 +7,7 @@ import {
   decodeSurge,
   decodeTrait,
   encodeTrait,
+  parseImpairments,
   recipe,
   secondChoices,
   specialtyChoices,
@@ -108,6 +109,32 @@ describe('buildSheetPool', () => {
       { health: 5, willpower: 0 },
     );
     expect(social.impairment).toBe(0);
+  });
+
+  it("adds the Storyteller's Impairment, by group or by Attribute, without counting twice", () => {
+    const input = {
+      attribute: { kind: 'attr', id: 'dexterity' },
+      second: { kind: 'skill', id: 'fighting' },
+    } as const;
+    expect(pool({ ...input, impairments: ['dexterity'] }).impairment).toBe(2);
+    expect(pool({ ...input, impairments: ['physical'] }).impairment).toBe(2);
+    expect(pool({ ...input, impairments: ['wits', 'social'] }).impairment).toBe(0);
+    const both = pool(
+      { ...input, impairments: ['dexterity', 'physical'] },
+      { health: 0, willpower: 5 },
+    );
+    expect([both.dice, both.impairment]).toEqual([3, 2]);
+    const attrs = pool({
+      attribute: { kind: 'attr', id: 'dexterity' },
+      second: { kind: 'attr', id: 'wits' },
+      impairments: ['physical', 'mental'],
+    });
+    expect(attrs.impairment).toBe(4);
+  });
+
+  it('keeps only valid groups and Attributes', () => {
+    expect(parseImpairments(['mental', 'wits', 'wits', 'nope', 3])).toEqual(['mental', 'wits']);
+    expect(parseImpairments('x')).toEqual([]);
   });
 
   it('counts active Blood Surges on Attributes and Disciplines', () => {
@@ -260,6 +287,40 @@ describe('stored surges', () => {
     campaign.setSurges(c.id, { 'disc:potence': 1 });
     store.endSession('c1');
     expect(campaign.getSurges(c.id)).toEqual({});
+  });
+
+  it("keeps the Storyteller's Impairment for the scene", () => {
+    const c = store.campaign.createCharacter({
+      guildId: 'g1',
+      ownerId: 'u1',
+      name: 'Nico',
+      clan: 'brujah',
+      values: newCharacter({ tier: 'neonate', stamina: 3, composure: 3, resolve: 2 }),
+    });
+    if (typeof c !== 'object') throw new Error(c);
+    const { campaign } = store;
+    expect(campaign.setImpairments(c.id, ['mental', 'wits', 'mental'], 1000)).toEqual([
+      'mental',
+      'wits',
+    ]);
+    expect(campaign.getImpairments(c.id, 2000)).toEqual(['mental', 'wits']);
+    expect(campaign.getImpairments(c.id, 1000 + 3 * 60 * 60 * 1000 + 1)).toEqual([]);
+    campaign.setImpairments(c.id, ['social']);
+    expect(campaign.setImpairments(c.id, [])).toEqual([]);
+    expect(campaign.getImpairments(c.id)).toEqual([]);
+
+    const chronicle = campaign.createChronicle({
+      guildId: 'g1',
+      storytellerId: 'st',
+      name: 'Roma',
+      sect: 'camarilla',
+    });
+    if (typeof chronicle !== 'object') throw new Error(chronicle);
+    campaign.join(chronicle.id, c.id);
+    campaign.bindChannel(chronicle.id, 'c1');
+    campaign.setImpairments(c.id, ['physical']);
+    store.endSession('c1');
+    expect(campaign.getImpairments(c.id)).toEqual([]);
   });
 });
 

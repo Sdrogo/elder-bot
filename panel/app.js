@@ -137,6 +137,15 @@ const TEXT = {
     'chronicles.language': 'Lingua del bot',
     'chronicles.autoLanguage': 'quella di Discord di ciascuno',
     'chronicles.end': 'Chiudi sessione',
+    'impair.title': 'Impairment',
+    'impair.edit': 'Impairment (fino a fine scena)',
+    'impair.none': 'nessuno',
+    'impair.auto': 'dai tracker a 0',
+    'impair.physical': 'Attributi Fisici',
+    'impair.social': 'Attributi Sociali',
+    'impair.mental': 'Attributi Mentali',
+    'impair.save': 'Imposta',
+    'impair.done': 'Impairment aggiornato.',
     'xp.give': 'Dai XP',
     'xp.who': 'A chi',
     'xp.conditions': 'Motivi (1 XP ciascuno, max 5 a sessione)',
@@ -293,6 +302,15 @@ const TEXT = {
     'chronicles.language': 'Bot language',
     'chronicles.autoLanguage': "each user's Discord language",
     'chronicles.end': 'End session',
+    'impair.title': 'Impairment',
+    'impair.edit': 'Impairment (until the end of the scene)',
+    'impair.none': 'none',
+    'impair.auto': 'from trackers at 0',
+    'impair.physical': 'Physical Attributes',
+    'impair.social': 'Social Attributes',
+    'impair.mental': 'Mental Attributes',
+    'impair.save': 'Set',
+    'impair.done': 'Impairment updated.',
     'xp.give': 'Give XP',
     'xp.who': 'To',
     'xp.conditions': 'Reasons (1 XP each, max 5 per session)',
@@ -550,6 +568,7 @@ function characterCard(c, chronicle) {
     track(c, 'Violations', '', String(hu.violations), 'violations'),
   );
 
+  card.append(impairBox(c, chronicle));
   if (c.editable) card.append(camBox(c), portraitBox(c));
 
   const actions = el('div', 'actions');
@@ -610,6 +629,70 @@ function characterCard(c, chronicle) {
   }
   if (actions.childElementCount) card.append(actions);
   return card;
+}
+
+const IMPAIR_GROUPS = ['physical', 'social', 'mental'];
+const IMPAIR_ATTRIBUTES = [
+  'strength',
+  'dexterity',
+  'stamina',
+  'charisma',
+  'manipulation',
+  'composure',
+  'intelligence',
+  'wits',
+  'resolve',
+];
+const impairName = (key) =>
+  IMPAIR_GROUPS.includes(key) ? tr(`impair.${key}`) : key.charAt(0).toUpperCase() + key.slice(1);
+
+/**
+ * Impairment on the card: what is in force for everyone to see (the Storyteller's, and the groups
+ * the empty Health and Willpower trackers Impair on their own), and for the Storyteller a form to
+ * change the Storyteller's list.
+ */
+function impairBox(c, chronicle) {
+  const box = el('div', 'impair');
+  const set = c.impairments ?? [];
+  const auto = c.impaired ?? [];
+  const shown = [
+    ...set.map(impairName),
+    ...auto.filter((g) => !set.includes(g)).map((g) => `${impairName(g)} (${tr('impair.auto')})`),
+  ];
+  const line = el('div', 'meta');
+  line.append(
+    `${tr('impair.title')}: `,
+    el('strong', '', shown.length ? shown.join(', ') : tr('impair.none')),
+  );
+  box.append(line);
+  if (!chronicle) return box;
+  const form = el('details', 'impair-box');
+  form.append(el('summary', '', tr('impair.edit')));
+  const wrap = el('div', 'chips');
+  for (const key of [...IMPAIR_GROUPS, ...IMPAIR_ATTRIBUTES]) {
+    const label = el('label', 'chip');
+    const input = el('input');
+    input.type = 'checkbox';
+    input.value = key;
+    input.checked = set.includes(key);
+    label.append(input, document.createTextNode(` ${impairName(key)}`));
+    wrap.append(label);
+  }
+  const save = button(
+    tr('impair.save'),
+    async () => {
+      const targets = [...wrap.querySelectorAll('input:checked')].map((i) => i.value);
+      const ok = await change('POST', `/api/chronicles/${chronicle.id}/impair`, {
+        character: c.id,
+        targets,
+      });
+      if (ok) notify(tr('impair.done'));
+    },
+    'primary',
+  );
+  form.append(wrap, save);
+  box.append(form);
+  return box;
 }
 
 /** The character's VDO.Ninja link: the player sends their webcam, OBS shows it in the frame. */
