@@ -192,20 +192,14 @@ export function rollerHunger(
 
 /**
  * The character whose sheet a roll uses: the user's character at this channel's Chronicle,
- * otherwise their only character with a full sheet on this server.
+ * then the one chosen with /elder sheet, otherwise their only character with a full sheet.
  */
 export function sheetCharacter(
   { store }: Context,
   where: { guildId: string | null; channelId: string | null; userId: string },
 ): { character: Character; sheet: SheetDraft } | { character?: Character; sheet?: undefined } {
   const { campaign } = store;
-  let character = where.channelId
-    ? campaign.activeCharacter(where.channelId, where.userId)
-    : undefined;
-  if (!character && where.guildId) {
-    const own = campaign.charactersOf(where.guildId, where.userId).filter((c) => c.hasSheet);
-    if (own.length === 1) character = own[0];
-  }
+  const character = campaign.sheetCharacter(where.guildId, where.channelId, where.userId);
   if (!character) return {};
   const stored = character.hasSheet ? campaign.getSheet(character.id) : undefined;
   const base = stored ? parseDraft(stored.data) : undefined;

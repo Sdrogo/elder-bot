@@ -234,6 +234,8 @@ export const it: Messages = {
   'frenzy.error.noCharacter':
     'Non hai un personaggio a questo tavolo: indica `dice` (Composure + Resolve) e `humanity`.',
   'willpower.none': '**{name}** non ha più Willpower.',
+  'willpower.pickCharacter':
+    'Scegli prima il personaggio che stai giocando con `/elder sheet`, così la Willpower viene scalata dalla scheda giusta.',
   'willpower.left': '{name}: Willpower {left}/{max}.',
 
   // Web panel.

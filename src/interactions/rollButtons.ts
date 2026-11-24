@@ -153,15 +153,7 @@ export async function handleRollButton(
     case 'wp': {
       if (!ref.faces) return;
       // A character at this table pays from its tracker: none left, no reroll.
-      const spender = store.campaign.playedCharacter(
-        interaction.guildId,
-        channelId,
-        request.userId,
-      );
-      if (spender && spender.values.willpower <= 0) {
-        await replyEphemeral(interaction, t(locale, 'willpower.none', { name: spender.name }));
-        return;
-      }
+      if (!(await canSpendWillpower(interaction, store, locale, request.userId))) return;
       const menu = new StringSelectMenuBuilder()
         .setCustomId(encodeRollId('wp-pick', ref.request, ref.faces))
         .setPlaceholder(t(locale, 'willpower.pick', { max: WILLPOWER_REROLL }))
@@ -191,15 +183,7 @@ export async function handleRollButton(
     // The best reroll in one click: up to 3 failed normal dice, never the Hunger dice.
     case 'wp-auto': {
       if (!ref.faces) return;
-      const spender = store.campaign.playedCharacter(
-        interaction.guildId,
-        channelId,
-        request.userId,
-      );
-      if (spender && spender.values.willpower <= 0) {
-        await replyEphemeral(interaction, t(locale, 'willpower.none', { name: spender.name }));
-        return;
-      }
+      if (!(await canSpendWillpower(interaction, store, locale, request.userId))) return;
       const failed = failedDice(ref.faces.normal);
       if (!failed.length) return replyEphemeral(interaction, t(locale, 'willpower.noFailures'));
       await spendWillpower(interaction, ctx, locale, { ...ref, faces: ref.faces }, failed);
@@ -241,6 +225,29 @@ export async function handleRollSelect(
 }
 
 /**
+ * Whether the roller can pay 1 Willpower now; otherwise tells them why, before any dice move.
+ * A player with several characters and none chosen is asked to pick one, so Willpower is
+ * never spent without being taken off a sheet.
+ */
+async function canSpendWillpower(
+  interaction: ButtonInteraction,
+  store: Context['store'],
+  locale: Locale,
+  userId: string,
+): Promise<boolean> {
+  const payer = store.campaign.willpowerPayer(interaction.guildId, interaction.channelId, userId);
+  if (payer === 'ambiguous') {
+    await replyEphemeral(interaction, t(locale, 'willpower.pickCharacter'));
+    return false;
+  }
+  if (typeof payer === 'object' && payer.character.values.willpower <= 0) {
+    await replyEphemeral(interaction, t(locale, 'willpower.none', { name: payer.character.name }));
+    return false;
+  }
+  return true;
+}
+
+/**
  * Push Yourself (p. 104): rerolls the picked normal dice, once per roll, and takes 1 Willpower
  * from the roller's character at this table.
  */
@@ -266,11 +273,16 @@ async function spendWillpower(
   const changes = response.rerolled.map(([from, to]) => `${from} → ${to}`).join(', ');
   let spent = t(locale, 'willpower.spent', { changes });
   const { campaign } = ctx.store;
-  const spender = campaign.playedCharacter(
+  const payer = campaign.willpowerPayer(
     interaction.guildId,
     interaction.channelId,
     ref.request.userId,
   );
+  // A select menu can be answered later than the button: re-check, never reroll unpaid.
+  if (payer === 'ambiguous') {
+    return replyEphemeral(interaction, t(locale, 'willpower.pickCharacter'));
+  }
+  const spender = typeof payer === 'object' ? payer.character : undefined;
   if (spender) {
     const after = campaign.setTrack(
       spender.id,
