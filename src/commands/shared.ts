@@ -1,3 +1,4 @@
+import type { Character } from '../state/campaign.js';
 import {
   ActionRowBuilder,
   type APIEmbedField,
@@ -37,7 +38,7 @@ export function hungerOption(
 export interface RollExtras {
   npc?: boolean;
   /** Hunger already worked out (a roll from a character sheet); otherwise from the option. */
-  hunger?: { hunger: number; note?: APIEmbedField };
+  hunger?: { hunger: number; note?: APIEmbedField; character?: Character };
   /** Fields shown before the Hunger note: the pool from the sheet, Blood Surge, Impairment. */
   notes?: APIEmbedField[];
   /** Buttons on a row of their own under the roll's buttons. */
@@ -53,7 +54,9 @@ export async function replyWithRoll(
   { npc = false, hunger, notes = [], extraButtons = [] }: RollExtras = {},
 ): Promise<void> {
   const locale = localeFor(interaction, ctx.store);
-  const fromCharacter = npc ? { hunger: 0 } : (hunger ?? rollerHunger(interaction, ctx, locale));
+  const fromCharacter: NonNullable<RollExtras['hunger']> = npc
+    ? { hunger: 0 }
+    : (hunger ?? rollerHunger(interaction, ctx, locale));
   const request: RollRequest = {
     channelId: interaction.channelId,
     userId: interaction.user.id,
@@ -66,7 +69,7 @@ export async function replyWithRoll(
   };
   const response = performRoll(request, { roller: ctx.roller, npc });
   const reason = interaction.options.getString('reason');
-  const fullTitle = `${interaction.user.displayName}: ${reason ?? title}`;
+  const fullTitle = `${fromCharacter.character?.name ?? interaction.user.displayName}: ${reason ?? title}`;
   const allNotes = [...notes, ...(fromCharacter.note ? [fromCharacter.note] : [])];
   const message = rollMessage(locale, response, fullTitle, allNotes);
   if (extraButtons.length) {

@@ -167,7 +167,7 @@ export function rollerHunger(
   locale: Locale,
   option = 'hunger',
   character?: Character,
-): { hunger: number; note?: APIEmbedField } {
+): { hunger: number; note?: APIEmbedField; character?: Character } {
   const given = interaction.options.getInteger(option);
   if (given !== null) return { hunger: given };
   const c =
@@ -177,6 +177,7 @@ export function rollerHunger(
   const hunger = hungerDice(c.values);
   return {
     hunger,
+    character: c,
     note: {
       name: 'Hunger',
       value: t(locale, 'character.hungerFromVitae', {
