@@ -7,10 +7,11 @@ import {
   coterieHavenDots,
   evaluate,
   isCoterieHaven,
+  lifepathOf,
   resourceTotals,
   skillDots,
 } from '/game/creation.js';
-import { LIFEPATHS_BY_ID, MERITS_BY_ID, PATHS, SIRES_BY_ID } from '/game/alpha2/background.js';
+import { MERITS_BY_ID, PATHS, SIRES_BY_ID } from '/game/alpha2/background.js';
 import { CLAN_INFO, CLAN_TRAITS_BY_ID } from '/game/alpha2/clans.js';
 import {
   DISCIPLINE_DETAILS,
@@ -56,6 +57,8 @@ const TEXT = {
     reject: 'Rifiuta',
     noChronicle: 'Il Narratore potrà approvarlo quando il personaggio entrerà in una Cronaca.',
     broodChild: (mate) => `Brood Child: impara la Disciplina da ${mate || '?'}`,
+    customLifepathApproval: (name) => `Lifepath personalizzato: ${name || '?'}`,
+    customLifepath: 'personalizzato',
     path: (name) => `Segue il ${name} invece di Humanity`,
     none: 'Nessuno',
     'cat.physical': 'Fisici',
@@ -88,6 +91,8 @@ const TEXT = {
     reject: 'Reject',
     noChronicle: 'The Storyteller can approve it once the character joins a Chronicle.',
     broodChild: (mate) => `Brood Child: learns the Discipline from ${mate || '?'}`,
+    customLifepathApproval: (name) => `Custom lifepath: ${name || '?'}`,
+    customLifepath: 'custom',
     path: (name) => `Follows the ${name} instead of Humanity`,
     none: 'None',
     'cat.physical': 'Physical',
@@ -191,7 +196,9 @@ function draw({ character, sheet, canApprove }) {
       const text =
         a.code === 'path'
           ? tr('path', PATHS.find((p) => p.id === a.target)?.name ?? a.target)
-          : tr('broodChild', a.target);
+          : a.code === 'custom-lifepath'
+            ? tr('customLifepathApproval', a.target)
+            : tr('broodChild', a.target);
       const r = el('div', 'trait');
       const status = el('span', `status ${a.status}`, tr(`status.${a.status}`));
       r.append(el('span', '', text), status);
@@ -290,7 +297,7 @@ function draw({ character, sheet, canApprove }) {
     if (subject?.trim()) written.set(`${kind}:${subject.trim().toLowerCase()}`, subject.trim());
   };
   for (const pick of d.lifepaths) {
-    LIFEPATHS_BY_ID.get(pick.id)?.resources.forEach((r, i) =>
+    lifepathOf(pick)?.resources.forEach((r, i) =>
       remember(r.kind, pick.resourceDetails?.[i] || r.detail),
     );
   }
@@ -316,9 +323,18 @@ function draw({ character, sheet, canApprove }) {
 
   const lps = el('div');
   for (const pick of d.lifepaths) {
-    const lp = LIFEPATHS_BY_ID.get(pick.id);
+    const lp = lifepathOf(pick);
     if (!lp) continue;
-    lps.append(row(lp.name, '', lp.it));
+    lps.append(row(lp.name, '', pick.custom ? `${lp.it} (${tr('customLifepath')})` : lp.it));
+    if (pick.custom) {
+      const skills = lp.skills.map((x) => SKILL_INFO[x.skill]?.name ?? x.skill).join(', ');
+      const res = lp.resources
+        .map((r) =>
+          r.detail ? `${RESOURCE_INFO[r.kind].name}: ${r.detail}` : RESOURCE_INFO[r.kind].name,
+        )
+        .join(', ');
+      lps.append(el('p', 'quiet', `${skills} · ${res}`));
+    }
     if (LIFEPATH_DETAILS[lp.id]) lps.append(more(LIFEPATH_DETAILS[lp.id]));
   }
   grid.append(section(tr('lifepaths'), lps));

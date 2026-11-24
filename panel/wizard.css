@@ -499,3 +499,59 @@ details.more p {
 .lifepath > details.more {
   margin: 4px 0 8px;
 }
+
+/* A lifepath the player writes, and Flaws written by hand. */
+.field textarea,
+.custom-grid select,
+.resource-row textarea,
+.resource-buttons select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.field textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.custom-lifepath h4 {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.custom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.custom-grid .resource-row {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.custom-lifepath {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+
+.resource-row textarea {
+  flex-basis: 100%;
+  resize: vertical;
+}
+
+.resource-row .disc-title {
+  flex: 1;
+}
+
+.resource-buttons select {
+  max-width: 100%;
+}

@@ -9,9 +9,11 @@ import {
   clanTraitOptions,
   disciplineRoom,
   emptyDraft,
+  CUSTOM_LIFEPATH,
   evaluate,
   isCoterieHaven,
   lifepathCount,
+  lifepathOf,
   lifepathOptions,
   meritOptions,
   pathOptions,
@@ -119,9 +121,13 @@ const TEXT = {
     'details.note': (n) =>
       `Servono almeno ${n} Flaw: scegline uno dagli esempi o scrivine uno tuo.`,
     'details.name': 'Nome del personaggio',
-    'details.flaw': 'Flaw',
     'details.flawNote': 'Nota (facoltativa)',
-    'details.addFlaw': 'Aggiungi Flaw',
+    'details.addFlaw': 'Scrivi un Flaw tuo',
+    'details.pickExample': 'Scegli un Flaw di esempio…',
+    'details.customName': 'Nome del Flaw',
+    'details.customNote': 'Cosa comporta e quando ti complica la vita',
+    'details.flawRule':
+      'Quando un Flaw ti complica la situazione hai −2 dadi a quel test; se la complica molto, il Narratore può darti 1 XP a fine sessione. Puoi usare gli esempi o scrivere i tuoi.',
     'create.title': 'Crea il personaggio',
     'create.server': 'Server Discord',
     'create.button': 'Crea il personaggio',
@@ -186,6 +192,14 @@ const TEXT = {
     'lp.all': 'Tutti i lifepath',
     'lp.choose': 'a scelta',
     'group.mortal': 'Da mortale',
+    'lp.custom': 'Crea il tuo lifepath',
+    'lp.customNote': `Se nessun lifepath descrive il tuo personaggio puoi scriverne uno: cosa rappresenta, ${CUSTOM_LIFEPATH.skills} Skill e ${CUSTOM_LIFEPATH.resources} Resources che avrebbe chiunque lo abbia vissuto. Serve l’approvazione del Narratore.`,
+    'lp.customName': 'Nome del lifepath',
+    'lp.customDescription': 'Cosa facevi, in breve',
+    'lp.customGroup': 'Tipo',
+    'lp.customSkill': (n) => `Skill ${n}`,
+    'lp.customResource': (n) => `Resource ${n}`,
+    'lp.customDetail': 'Dettaglio (es. Contact: Ricettatore)',
     'group.neonate': 'Da Neonate',
     'group.ancilla': 'Da Ancilla',
     'attr.title': 'Attributi',
@@ -232,6 +246,8 @@ const TEXT = {
       'lifepaths-too-many': (i) => `Troppi lifepath: ${i.value} su ${i.limit}.`,
       'lifepath-repeated': 'Lo stesso lifepath due volte.',
       'lifepath-tier': (i) => `${nameOf(i.target)} non è per questo livello.`,
+      'custom-lifepath-incomplete': (i) =>
+        `${nameOf(i.target)}: dagli un nome e scegli ${CUSTOM_LIFEPATH.skills} Skill diverse e ${CUSTOM_LIFEPATH.resources} Resources.`,
       'lifepath-skills-left': (i) => `${nameOf(i.target)}: ${left(i)} punti Skill da mettere.`,
       'lifepath-skills-over': (i) => `${nameOf(i.target)}: ${over(i)} punti Skill di troppo.`,
       'lifepath-resources-left': (i) =>
@@ -330,9 +346,13 @@ const TEXT = {
     'details.title': 'Name, Flaws and creation',
     'details.note': (n) => `You need at least ${n} Flaw: pick an example or write your own.`,
     'details.name': 'Character name',
-    'details.flaw': 'Flaw',
     'details.flawNote': 'Note (optional)',
-    'details.addFlaw': 'Add a Flaw',
+    'details.addFlaw': 'Write your own Flaw',
+    'details.pickExample': 'Pick an example Flaw…',
+    'details.customName': 'Flaw name',
+    'details.customNote': 'What it means and when it gets in your way',
+    'details.flawRule':
+      'When a Flaw complicates things you take −2 dice on that test; if it complicates them a lot, the Storyteller may give you 1 XP at the end of the session. Use the examples or write your own.',
     'create.title': 'Create the character',
     'create.server': 'Discord server',
     'create.button': 'Create the character',
@@ -394,6 +414,14 @@ const TEXT = {
     'lp.all': 'All lifepaths',
     'lp.choose': 'your choice',
     'group.mortal': 'Mortal',
+    'lp.custom': 'Create your own lifepath',
+    'lp.customNote': `If no lifepath fits your character you can write one: what it stands for, ${CUSTOM_LIFEPATH.skills} Skills and ${CUSTOM_LIFEPATH.resources} Resources anyone who lived it would have. It needs the Storyteller's approval.`,
+    'lp.customName': 'Lifepath name',
+    'lp.customDescription': 'What you did, in short',
+    'lp.customGroup': 'Kind',
+    'lp.customSkill': (n) => `Skill ${n}`,
+    'lp.customResource': (n) => `Resource ${n}`,
+    'lp.customDetail': 'Detail (e.g. Contact: Fence)',
     'group.neonate': 'Neonate',
     'group.ancilla': 'Ancilla',
     'attr.title': 'Attributes',
@@ -440,6 +468,8 @@ const TEXT = {
       'lifepaths-too-many': (i) => `Too many lifepaths: ${i.value} of ${i.limit}.`,
       'lifepath-repeated': 'The same lifepath twice.',
       'lifepath-tier': (i) => `${nameOf(i.target)} is not for this tier.`,
+      'custom-lifepath-incomplete': (i) =>
+        `${nameOf(i.target)}: give it a name and pick ${CUSTOM_LIFEPATH.skills} different Skills and ${CUSTOM_LIFEPATH.resources} Resources.`,
       'lifepath-skills-left': (i) => `${nameOf(i.target)}: ${left(i)} Skill dots left.`,
       'lifepath-skills-over': (i) => `${nameOf(i.target)}: ${over(i)} Skill dots too many.`,
       'lifepath-resources-left': (i) => `${nameOf(i.target)}: ${left(i)} Resource dots left.`,
@@ -497,6 +527,8 @@ function nameOf(target) {
   if (!target) return '';
   if (target === 'coterie-haven') return tr('res.coterie');
   if (LIFEPATHS_BY_ID.has(target)) return LIFEPATHS_BY_ID.get(target).name;
+  const custom = d.lifepaths.find((p) => p.id === target && p.custom);
+  if (custom) return lifepathOf(custom).name;
   if (SKILL_INFO[target]) return SKILL_INFO[target].name;
   if (ATTRIBUTE_NAMES[target]) return ATTRIBUTE_NAMES[target];
   if (DISCIPLINE_NAMES[target]) return DISCIPLINE_NAMES[target];
@@ -795,7 +827,7 @@ function renderSide() {
     );
   }
   d.lifepaths.forEach((pick, n) => {
-    const name = LIFEPATHS_BY_ID.get(pick.id)?.name ?? pick.id;
+    const name = lifepathOf(pick)?.name ?? pick.id;
     box.append(pool(tr('side.lifepathSkills', name), pools.lifepathSkills[n]));
     box.append(pool(tr('side.lifepathResources', name), pools.lifepathResources[n]));
   });
@@ -1075,6 +1107,24 @@ const VIEWS = {
       }
       list.append(grid);
     }
+    // A lifepath the player writes (p. 29).
+    const custom = el('div', 'card');
+    custom.append(el('h3', '', tr('lp.custom')), el('p', 'quiet', tr('lp.customNote')));
+    const make = button(tr('lp.custom'), () =>
+      update((x) => {
+        let k = 1;
+        while (x.lifepaths.some((p) => p.id === `custom-${k}`)) k++;
+        x.lifepaths.push({
+          id: `custom-${k}`,
+          custom: { name: '', description: '', group: 'mortal', skills: [], resources: [] },
+          skills: {},
+          resources: [],
+        });
+      }),
+    );
+    make.disabled = full;
+    custom.append(make);
+    list.append(custom);
     return box;
   },
 
@@ -1312,7 +1362,7 @@ const VIEWS = {
     fromLifepaths.append(el('h3', '', tr('res.fromLifepaths')));
     const rows = new Map();
     for (const pick of d.lifepaths) {
-      const lp = LIFEPATHS_BY_ID.get(pick.id);
+      const lp = lifepathOf(pick);
       lp?.resources.forEach((r, i) => {
         const dots = pick.resources[i] ?? 0;
         if (!dots) return;
@@ -1440,32 +1490,29 @@ const VIEWS = {
     box.append(field(tr('details.name'), name));
 
     box.append(el('h3', '', 'Flaws'));
-    const list = el('datalist');
-    list.id = 'flaw-list';
-    for (const f of FLAWS) {
-      const opt = el('option');
-      opt.value = f.name;
-      opt.textContent = f.it;
-      list.append(opt);
-    }
-    box.append(list);
+    box.append(el('p', 'quiet', tr('details.flawRule')));
     d.flaws.forEach((f, n) => {
+      const known = f.id && FLAWS.find((k) => k.id === f.id);
       const row = el('div', 'card resource-row');
-      const flawName = el('input');
-      flawName.maxLength = 120;
-      flawName.setAttribute('list', 'flaw-list');
-      flawName.placeholder = tr('details.flaw');
-      flawName.value = f.name;
-      flawName.addEventListener('input', () =>
-        update((x) => {
-          const known = FLAWS.find((k) => k.name === flawName.value);
-          x.flaws[n] = { ...x.flaws[n], name: flawName.value, ...(known ? { id: known.id } : {}) };
-          if (!known) delete x.flaws[n].id;
-        }, false),
-      );
-      const note = el('input');
-      note.maxLength = 120;
-      note.placeholder = tr('details.flawNote');
+      let title;
+      if (known) {
+        title = el('span', 'disc-title');
+        title.append(el('strong', '', known.name), el('span', 'quiet', known.it));
+      } else {
+        title = el('input');
+        title.maxLength = 120;
+        title.placeholder = tr('details.customName');
+        title.value = f.name;
+        title.addEventListener('input', () =>
+          update((x) => {
+            x.flaws[n].name = title.value;
+          }, false),
+        );
+      }
+      const note = el(known ? 'input' : 'textarea');
+      note.maxLength = 400;
+      if (!known) note.rows = 2;
+      note.placeholder = known ? tr('details.flawNote') : tr('details.customNote');
       note.value = f.note ?? '';
       note.addEventListener('input', () =>
         update((x) => {
@@ -1474,23 +1521,40 @@ const VIEWS = {
         }, false),
       );
       row.append(
-        flawName,
-        note,
+        title,
         button(tr('lp.remove'), () =>
           update((x) => {
             x.flaws.splice(n, 1);
           }),
         ),
+        note,
       );
       box.append(row);
+    });
+    const adders = el('div', 'resource-buttons');
+    const pick = el('select');
+    pick.append(el('option', '', tr('details.pickExample')));
+    for (const f of FLAWS) {
+      if (d.flaws.some((x) => x.id === f.id)) continue;
+      const opt = el('option', '', `${f.name} · ${f.it}`);
+      opt.value = f.id;
+      pick.append(opt);
+    }
+    pick.addEventListener('change', () => {
+      const f = FLAWS.find((k) => k.id === pick.value);
+      if (f)
+        update((x) => {
+          x.flaws.push({ id: f.id, name: f.name });
+        });
     });
     const add = button(tr('details.addFlaw'), () =>
       update((x) => {
         x.flaws.push({ name: '' });
       }),
     );
-    add.disabled = d.flaws.length >= 12;
-    box.append(add, hints('details'), createBox());
+    pick.disabled = add.disabled = d.flaws.length >= 12;
+    adders.append(pick, add);
+    box.append(adders, hints('details'), createBox());
     return box;
   },
 };
@@ -1514,7 +1578,11 @@ function createBox() {
   box.append(el('h3', '', tr('create.title')));
   if (current.approvals.length) {
     const names = current.approvals.map((a) =>
-      a.code === 'path' ? nameOf(a.target) : 'Brood Child',
+      a.code === 'path'
+        ? nameOf(a.target)
+        : a.code === 'custom-lifepath'
+          ? `Lifepath: ${a.target}`
+          : 'Brood Child',
     );
     box.append(el('p', 'quiet', tr('create.approvals', names.join(', '))));
   }
@@ -1605,8 +1673,123 @@ function resourceLabel(r) {
   return r.detail ? `${name}: ${r.detail}` : name;
 }
 
+/** The fields of a lifepath the player writes: name, what it is, kind, Skills and Resources. */
+function customLifepathEditor(pick, n) {
+  const c = pick.custom;
+  const box = el('div', 'custom-lifepath');
+  const change = (fn, redraw = true) =>
+    update((x) => {
+      fn(x.lifepaths[n].custom, x.lifepaths[n]);
+    }, redraw);
+
+  const name = el('input');
+  name.maxLength = 80;
+  name.value = c.name;
+  name.addEventListener('input', () =>
+    change((cx) => {
+      cx.name = name.value;
+    }, false),
+  );
+  const description = el('textarea');
+  description.maxLength = 400;
+  description.rows = 2;
+  description.value = c.description;
+  description.addEventListener('input', () =>
+    change((cx) => {
+      cx.description = description.value;
+    }, false),
+  );
+  const group = el('select');
+  for (const g of ['mortal', 'neonate', 'ancilla']) {
+    const opt = el('option', '', tr(`group.${g}`));
+    opt.value = g;
+    opt.selected = c.group === g;
+    group.append(opt);
+  }
+  group.addEventListener('change', () =>
+    change((cx) => {
+      cx.group = group.value;
+    }),
+  );
+  box.append(
+    field(tr('lp.customName'), name),
+    field(tr('lp.customDescription'), description),
+    field(tr('lp.customGroup'), group),
+  );
+
+  const skills = el('div', 'custom-grid');
+  for (let i = 0; i < CUSTOM_LIFEPATH.skills; i++) {
+    const select = el('select');
+    select.setAttribute('aria-label', tr('lp.customSkill', i + 1));
+    select.append(el('option', '', '—'));
+    for (const skill of Object.keys(SKILL_INFO)) {
+      const opt = el('option', '', SKILL_INFO[skill].name);
+      opt.value = skill;
+      opt.selected = c.skills[i] === skill;
+      // A Skill already picked in another box can't be picked twice.
+      opt.disabled = c.skills.includes(skill) && c.skills[i] !== skill;
+      select.append(opt);
+    }
+    select.addEventListener('change', () =>
+      change((cx, px) => {
+        const old = cx.skills[i];
+        const list = [...cx.skills];
+        if (select.value) list[i] = select.value;
+        else list.splice(i, 1);
+        cx.skills = list.filter(Boolean);
+        // Dots put in a Skill the lifepath no longer has go back to the pool.
+        if (old && !cx.skills.includes(old)) delete px.skills[old];
+      }),
+    );
+    skills.append(select);
+  }
+  box.append(el('h4', '', tr('lp.skills')), skills);
+
+  const resources = el('div', 'custom-grid');
+  for (let i = 0; i < CUSTOM_LIFEPATH.resources; i++) {
+    const r = c.resources[i];
+    const row = el('div', 'resource-row');
+    const kind = el('select');
+    kind.setAttribute('aria-label', tr('lp.customResource', i + 1));
+    kind.append(el('option', '', '—'));
+    for (const k of RESOURCE_KINDS) {
+      const opt = el('option', '', RESOURCE_INFO[k].name);
+      opt.value = k;
+      opt.selected = r?.kind === k;
+      kind.append(opt);
+    }
+    kind.addEventListener('change', () =>
+      change((cx, px) => {
+        const list = [...cx.resources];
+        if (kind.value) list[i] = { ...(list[i] ?? {}), kind: kind.value };
+        else {
+          list.splice(i, 1);
+          px.resources.splice(i, 1);
+        }
+        cx.resources = list.filter(Boolean);
+      }),
+    );
+    const detail = el('input');
+    detail.maxLength = 80;
+    detail.placeholder = tr('lp.customDetail');
+    detail.value = r?.detail ?? '';
+    detail.disabled = !r;
+    detail.addEventListener('input', () =>
+      change((cx) => {
+        if (!cx.resources[i]) return;
+        if (detail.value.trim()) cx.resources[i].detail = detail.value;
+        else delete cx.resources[i].detail;
+      }, false),
+    );
+    row.append(kind, detail);
+    resources.append(row);
+  }
+  box.append(el('h4', '', tr('lp.resources')), resources);
+  return box;
+}
+
 function chosenLifepath(pick, n) {
-  const lp = LIFEPATHS_BY_ID.get(pick.id);
+  const lp = lifepathOf(pick);
   const card = el('div', 'card lifepath');
   const head = el('div', 'section-head');
   head.append(
@@ -1619,6 +1802,7 @@ function chosenLifepath(pick, n) {
   );
   card.append(head);
   if (!lp) return card;
+  if (pick.custom) card.append(customLifepathEditor(pick, n));
   if (LIFEPATH_DETAILS[lp.id]) card.append(more(LIFEPATH_DETAILS[lp.id]));
   const sp = current.pools.lifepathSkills[n];
   const rp = current.pools.lifepathResources[n];
@@ -1659,6 +1843,7 @@ function chosenLifepath(pick, n) {
     const label = el('span', 'resource');
     label.append(el('span', '', resourceLabel(r)));
     const detail = el('input');
+    detail.hidden = !!pick.custom;
     detail.maxLength = 120;
     detail.placeholder = tr('lp.detail');
     detail.value = pick.resourceDetails?.[i] ?? '';
@@ -1698,7 +1883,7 @@ function specialtyInputs(skill, slots) {
   const list = el('datalist');
   list.id = listId;
   const fromLifepaths = d.lifepaths.flatMap(
-    (p) => LIFEPATHS_BY_ID.get(p.id)?.skills.find((s) => s.skill === skill)?.specialties ?? [],
+    (p) => lifepathOf(p)?.skills.find((s) => s.skill === skill)?.specialties ?? [],
   );
   for (const name of new Set([...fromLifepaths, ...SKILL_INFO[skill].specialties])) {
     const opt = el('option');

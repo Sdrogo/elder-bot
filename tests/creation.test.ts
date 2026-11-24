@@ -9,6 +9,7 @@ import { parseDraft } from '../src/game/draft.js';
 import {
   clanOptions,
   coterieHavenDots,
+  lifepathOf,
   clanTraitOptions,
   disciplineRoom,
   emptyDraft,
@@ -282,6 +283,68 @@ describe('evaluate', () => {
     });
     expect(parsed?.extraResources[0]?.coterie).toBeUndefined();
     expect(parseDraft(d)?.extraResources[0]?.coterie).toBe(true);
+  });
+
+  it('accepts a lifepath the player writes, with the Storyteller’s approval', () => {
+    const d = brujah();
+    d.lifepaths[1] = {
+      id: 'custom-1',
+      custom: {
+        name: 'Gondoliere',
+        description: 'Portavi turisti e segreti per i canali.',
+        group: 'mortal',
+        skills: ['awareness', 'investigation', 'athletics', 'persuasion', 'shooting'],
+        resources: [{ kind: 'vehicle', detail: 'Gondola' }, { kind: 'contact' }, { kind: 'mask' }],
+      },
+      skills: { awareness: 2, investigation: 2, shooting: 1 },
+      resources: [1, 1, 1],
+    };
+    const ev = evaluate(d);
+    expect(ev.issues.filter((i) => i.severity !== 'hint')).toEqual([]);
+    expect(ev.complete).toBe(true);
+    expect(ev.approvals).toContainEqual({ code: 'custom-lifepath', target: 'Gondoliere' });
+    expect(lifepathOf(d.lifepaths[1]!)?.skills.map((s) => s.skill)).toContain('shooting');
+
+    // Four Skills, or a Skill outside the lifepath, are not enough.
+    const short = structuredClone(d);
+    short.lifepaths[1]!.custom!.skills.pop();
+    expect(codes(short)).toContain('custom-lifepath-incomplete');
+    expect(codes(short)).toContain('skill-not-in-lifepath');
+    // A custom lifepath follows the tier rules like any other.
+    const old = structuredClone(d);
+    old.lifepaths[1]!.custom!.group = 'ancilla';
+    expect(codes(old)).toContain('lifepath-tier');
+  });
+
+  it('cleans a custom lifepath from the browser', () => {
+    const parsed = parseDraft({
+      ...brujah(),
+      lifepaths: [
+        {
+          id: 'custom-2',
+          custom: {
+            name: 'X'.repeat(200),
+            group: 'elder',
+            skills: ['awareness', 'awareness', 'flying', 'knowledge'],
+            resources: [{ kind: 'castle' }, { kind: 'haven', detail: ' Cripta ' }],
+          },
+          skills: { awareness: 2, fighting: 3 },
+          resources: [2, 9],
+        },
+        { id: 'not-a-lifepath', skills: {}, resources: [] },
+      ],
+    });
+    expect(parsed?.lifepaths).toHaveLength(1);
+    const pick = parsed!.lifepaths[0]!;
+    expect(pick.custom).toEqual({
+      name: 'X'.repeat(80),
+      description: '',
+      group: 'mortal',
+      skills: ['awareness', 'knowledge'],
+      resources: [{ kind: 'haven', detail: 'Cripta' }],
+    });
+    expect(pick.skills).toEqual({ awareness: 2 });
+    expect(pick.resources).toEqual([2]);
   });
 
   it('flags choices that need the Storyteller', () => {

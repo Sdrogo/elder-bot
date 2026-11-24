@@ -10,7 +10,7 @@ import {
   SIRES,
   SIRES_BY_ID,
 } from './alpha2/background.js';
-import type { Lifepath } from './alpha2/background.js';
+import type { Lifepath, LifepathGroup, LifepathResource } from './alpha2/background.js';
 import {
   ALPHA2_CLANS,
   CLAN_INFO,
@@ -43,8 +43,27 @@ import {
 
 // ---------- The draft the player fills in ----------
 
+/**
+ * A lifepath the player writes (p. 29, "Creating your own lifepath"): what it is, 5 Skills and
+ * 3 Resources. Its group sets which tiers can take it, like the packet's lifepaths.
+ */
+export interface CustomLifepath {
+  name: string;
+  description: string;
+  group: LifepathGroup;
+  skills: Skill[];
+  resources: LifepathResource[];
+}
+
+export const CUSTOM_LIFEPATH = { skills: 5, resources: 3 } as const;
+
+/** Custom lifepaths have ids custom-1, custom-2, …, never a packet id. */
+export const isCustomLifepathId = (id: string) => /^custom-\d+$/.test(id);
+
 export interface LifepathPick {
+  /** A packet lifepath id, or custom-N for a lifepath the player wrote (see `custom`). */
   id: string;
+  custom?: CustomLifepath;
   /** Dots this lifepath puts in its own Skills. */
   skills: Partial<Record<Skill, number>>;
   /** Dots per entry of the lifepath's Resources list, in the same order. */
@@ -234,9 +253,24 @@ export interface Issue {
   limit?: number;
 }
 
+/** The lifepath behind a pick: the packet's, or the one the player wrote. */
+export function lifepathOf(pick: LifepathPick): Lifepath | undefined {
+  if (!isCustomLifepathId(pick.id)) return LIFEPATHS_BY_ID.get(pick.id);
+  const c = pick.custom;
+  if (!c) return undefined;
+  return {
+    id: pick.id,
+    name: c.name.trim() || 'Lifepath personalizzato',
+    group: c.group,
+    skills: c.skills.map((skill) => ({ skill })),
+    resources: c.resources,
+    it: c.description,
+  };
+}
+
 /** Choices the packet leaves to the Storyteller: the sheet saves, but shows them as pending. */
 export interface Approval {
-  code: 'brood-child' | 'path';
+  code: 'brood-child' | 'path' | 'custom-lifepath';
   target?: string;
 }
 
@@ -341,7 +375,7 @@ export function evaluate(d: SheetDraft): Evaluation {
   const lifepathSkills: Pool[] = [];
   const lifepathResources: Pool[] = [];
   for (const pick of d.lifepaths) {
-    const lp = LIFEPATHS_BY_ID.get(pick.id);
+    const lp = lifepathOf(pick);
     if (!lp) {
       add({ step: 'lifepaths', severity: 'error', code: 'lifepath-unknown', target: pick.id });
       lifepathSkills.push({ spent: 0, budget: 0 });
@@ -353,6 +387,23 @@ export function evaluate(d: SheetDraft): Evaluation {
     seen.add(lp.id);
     if (!groups.includes(lp.group))
       add({ step: 'lifepaths', severity: 'error', code: 'lifepath-tier', target: lp.id });
+    if (pick.custom) {
+      const c = pick.custom;
+      const skills = new Set(c.skills);
+      if (
+        !c.name.trim() ||
+        skills.size !== CUSTOM_LIFEPATH.skills ||
+        skills.size !== c.skills.length ||
+        c.resources.length !== CUSTOM_LIFEPATH.resources
+      )
+        add({
+          step: 'lifepaths',
+          severity: 'todo',
+          code: 'custom-lifepath-incomplete',
+          target: lp.id,
+        });
+      approvals.push({ code: 'custom-lifepath', target: lp.name });
+    }
 
     const own = new Set(lp.skills.map((s) => s.skill));
     for (const skill of SKILLS) {
@@ -559,7 +610,7 @@ export function evaluate(d: SheetDraft): Evaluation {
   // Extra dots raising a lifepath Resource need no subject of their own: the lifepath has it.
   const fromLifepaths = new Set(
     d.lifepaths.flatMap((pick) =>
-      (LIFEPATHS_BY_ID.get(pick.id)?.resources ?? []).map((r, i) =>
+      (lifepathOf(pick)?.resources ?? []).map((r, i) =>
         resourceKey(r.kind, pick.resourceDetails?.[i] || r.detail),
       ),
     ),
@@ -693,7 +744,7 @@ export function resourceTotals(d: SheetDraft): Map<string, number> {
     totals.set(key, (totals.get(key) ?? 0) + dots);
   };
   for (const pick of d.lifepaths) {
-    const lp = LIFEPATHS_BY_ID.get(pick.id);
+    const lp = lifepathOf(pick);
     lp?.resources.forEach((r, i) =>
       put(r.kind, pick.resourceDetails?.[i] || r.detail, pick.resources[i] ?? 0),
     );

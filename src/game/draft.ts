@@ -2,7 +2,7 @@
 // progress, so nothing here enforces the rules (evaluate() does that): it only keeps known ids,
 // whole numbers in range and short strings, and drops everything else.
 
-import { LIFEPATHS_BY_ID, MERITS_BY_ID, PATHS, SIRES_BY_ID } from './alpha2/background.js';
+import { MERITS_BY_ID, PATHS, SIRES_BY_ID } from './alpha2/background.js';
 import { CLAN_TRAITS_BY_ID, isAlpha2Clan } from './alpha2/clans.js';
 import {
   ATTRIBUTE_CATEGORIES,
@@ -11,16 +11,27 @@ import {
   SKILLS,
   type AttributeCategory,
   type ResourceKind,
+  type Skill,
 } from './alpha2/core.js';
 import { DISCIPLINES, isDiscipline, POWERS_BY_ID } from './alpha2/disciplines.js';
 import { CREATION_TIERS, type CreationTier } from './alpha2/prereq.js';
-import type { FlawPick, LifepathPick, ResourcePick, SheetDraft } from './creation.js';
+import {
+  CUSTOM_LIFEPATH,
+  isCustomLifepathId,
+  lifepathOf,
+  type CustomLifepath,
+  type FlawPick,
+  type LifepathPick,
+  type ResourcePick,
+  type SheetDraft,
+} from './creation.js';
 
 export const DRAFT_LIMITS = {
   /** Highest dot value kept anywhere in a draft. */
   dots: 10,
   name: 80,
   text: 120,
+  description: 400,
   list: 12,
 } as const;
 
@@ -49,13 +60,41 @@ const ids = (v: unknown, known: (id: string) => boolean) => [
   ...new Set(list(v).filter((id): id is string => typeof id === 'string' && known(id))),
 ];
 
+const LIFEPATH_GROUPS = ['mortal', 'neonate', 'ancilla'] as const;
+
+/** A lifepath the player wrote: known Skills and Resource types, short texts, the packet's sizes. */
+function customLifepath(v: unknown): CustomLifepath {
+  const c = isObj(v) ? v : {};
+  const group = LIFEPATH_GROUPS.find((g) => g === c.group) ?? 'mortal';
+  const skills = [
+    ...new Set(list(c.skills).filter((x): x is Skill => SKILLS.includes(x as Skill))),
+  ].slice(0, CUSTOM_LIFEPATH.skills);
+  const resources = list(c.resources)
+    .filter(isObj)
+    .filter((r) => RESOURCE_KINDS.includes(r.kind as ResourceKind))
+    .slice(0, CUSTOM_LIFEPATH.resources)
+    .map((r) => {
+      const detail = text(r.detail, DRAFT_LIMITS.name)?.trim();
+      return detail ? { kind: r.kind as ResourceKind, detail } : { kind: r.kind as ResourceKind };
+    });
+  return {
+    name: text(c.name, DRAFT_LIMITS.name) ?? '',
+    description: text(c.description, DRAFT_LIMITS.description) ?? '',
+    group,
+    skills,
+    resources,
+  };
+}
+
 function lifepath(v: unknown): LifepathPick | undefined {
   if (!isObj(v) || typeof v.id !== 'string') return undefined;
-  const lp = LIFEPATHS_BY_ID.get(v.id);
+  const base: LifepathPick = { id: v.id, skills: {}, resources: [] };
+  if (isCustomLifepathId(v.id)) base.custom = customLifepath(v.custom);
+  const lp = lifepathOf(base);
   if (!lp) return undefined;
   const own = lp.skills.map((s) => s.skill);
   const resources = lp.resources.map((_, i) => dots(list(v.resources)[i]) ?? 0);
-  const pick: LifepathPick = { id: lp.id, skills: dotMap(v.skills, own), resources };
+  const pick: LifepathPick = { ...base, skills: dotMap(v.skills, own), resources };
   const details = list(v.resourceDetails).slice(0, lp.resources.length);
   if (details.some((d) => typeof d === 'string' && d.trim())) {
     pick.resourceDetails = lp.resources.map((_, i) => text(details[i]) ?? '');
@@ -81,7 +120,7 @@ function flaw(v: unknown): FlawPick | undefined {
   const out: FlawPick = { name };
   const id = text(v.id, 40);
   if (id) out.id = id;
-  const note = text(v.note);
+  const note = text(v.note, DRAFT_LIMITS.description);
   if (note) out.note = note;
   return out;
 }
