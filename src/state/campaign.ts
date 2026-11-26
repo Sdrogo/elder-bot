@@ -1,7 +1,14 @@
 import type Database from 'better-sqlite3';
 import type { Advance } from '../game/advancement.js';
 import type { XpEntry, XpRequest } from '../game/xp.js';
-import { SURGE_TTL_MS, parseSurges, type Surges } from '../game/sheetPool.js';
+import {
+  IMPAIR_TTL_MS,
+  SURGE_TTL_MS,
+  parseImpairments,
+  parseSurges,
+  type ImpairKey,
+  type Surges,
+} from '../game/sheetPool.js';
 import {
   LIMITS,
   normalize,
@@ -214,6 +221,9 @@ export class Campaign {
       CREATE INDEX IF NOT EXISTS character_xp_requests_character
         ON character_xp_requests (character_id);
       CREATE TABLE IF NOT EXISTS character_surges (
+        character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
+        data TEXT NOT NULL, at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS character_impairments (
         character_id INTEGER PRIMARY KEY REFERENCES characters (id) ON DELETE CASCADE,
         data TEXT NOT NULL, at INTEGER NOT NULL);
     `);
@@ -504,6 +514,50 @@ export class Campaign {
     this.db
       .prepare(
         `DELETE FROM character_surges WHERE character_id IN
+           (SELECT character_id FROM chronicle_members WHERE chronicle_id = ?)`,
+      )
+      .run(chronicleId);
+  }
+
+  // Impairment from the Storyteller: lasts the scene like a surge, with the same safety clock.
+
+  getImpairments(characterId: number, now = Date.now()): ImpairKey[] {
+    const row = this.db
+      .prepare('SELECT data, at FROM character_impairments WHERE character_id = ?')
+      .get(characterId) as { data: string; at: number } | undefined;
+    if (!row) return [];
+    if (now - row.at > IMPAIR_TTL_MS) {
+      this.clearImpairments(characterId);
+      return [];
+    }
+    return parseImpairments(JSON.parse(row.data));
+  }
+
+  /** Saves the whole list; an empty one ends the Impairment. */
+  setImpairments(characterId: number, keys: readonly ImpairKey[], now = Date.now()): ImpairKey[] {
+    const list = parseImpairments([...keys]);
+    if (!list.length) {
+      this.clearImpairments(characterId);
+      return [];
+    }
+    this.db
+      .prepare(
+        `INSERT INTO character_impairments (character_id, data, at) VALUES (?, ?, ?)
+         ON CONFLICT (character_id) DO UPDATE SET data = excluded.data, at = excluded.at`,
+      )
+      .run(characterId, JSON.stringify(list), now);
+    return list;
+  }
+
+  clearImpairments(characterId: number): void {
+    this.db.prepare('DELETE FROM character_impairments WHERE character_id = ?').run(characterId);
+  }
+
+  /** End of a session: the Chronicle's Impairment ends. */
+  clearChronicleImpairments(chronicleId: number): void {
+    this.db
+      .prepare(
+        `DELETE FROM character_impairments WHERE character_id IN
            (SELECT character_id FROM chronicle_members WHERE chronicle_id = ?)`,
       )
       .run(chronicleId);

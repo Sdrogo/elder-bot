@@ -139,8 +139,44 @@ export function impairedCategories(
   return out;
 }
 
-export const isImpaired = (a: Attribute, impaired: readonly AttributeCategory[]) =>
-  impaired.includes(categoryOf(a));
+export const isImpaired = (
+  a: Attribute,
+  impaired: readonly AttributeCategory[],
+  manual: readonly ImpairKey[] = [],
+) => impaired.includes(categoryOf(a)) || manual.includes(a) || manual.includes(categoryOf(a));
+
+// Impairment the Storyteller imposes: a whole group of Attributes or a single one (Remorse and
+// monsters' abilities), until the end of the scene. Empty trackers Impair by themselves.
+
+/** A group of Attributes or one Attribute. */
+export type ImpairKey = AttributeCategory | Attribute;
+
+export const IMPAIR_CATEGORIES = Object.keys(ATTRIBUTES_BY_CATEGORY) as AttributeCategory[];
+
+/** The name of a group or an Attribute, for messages. */
+export const impairLabel = (key: ImpairKey): string =>
+  (IMPAIR_CATEGORIES as string[]).includes(key)
+    ? `${key[0]!.toUpperCase()}${key.slice(1)} Attributes`
+    : ATTRIBUTE_NAMES[key as Attribute];
+
+/** How long a Storyteller's Impairment is kept if nobody ends the scene. */
+export const IMPAIR_TTL_MS = 3 * 60 * 60 * 1000;
+
+export function decodeImpairKey(v: string): ImpairKey | undefined {
+  if ((IMPAIR_CATEGORIES as string[]).includes(v)) return v as AttributeCategory;
+  return isAttribute(v) ? v : undefined;
+}
+
+/** Keeps what is a valid group or Attribute, without repeats. */
+export function parseImpairments(v: unknown): ImpairKey[] {
+  if (!Array.isArray(v)) return [];
+  const out: ImpairKey[] = [];
+  for (const item of v) {
+    const key = typeof item === 'string' ? decodeImpairKey(item) : undefined;
+    if (key && !out.includes(key)) out.push(key);
+  }
+  return out;
+}
 
 export const disciplineDots = (d: SheetDraft, disc: Discipline) => d.disciplines[disc] ?? 0;
 
@@ -186,6 +222,8 @@ export interface PoolInput {
   second?: TraitRef;
   /** Surges already active on the character (a new one is added before calling). */
   surges?: Surges;
+  /** Impairment the Storyteller imposed, on top of the empty trackers. */
+  impairments?: readonly ImpairKey[];
 }
 
 /** Sums an Attribute and a second trait from the sheet, or says what is missing. */
@@ -193,6 +231,7 @@ export function buildSheetPool(input: PoolInput): SheetPool | PoolIssue {
   const { sheet, second } = input;
   const surges = input.surges ?? {};
   const impaired = impairedCategories(input.values);
+  const manual = input.impairments ?? [];
   if (input.attribute && input.attribute.kind !== 'attr') return 'unknown-trait';
 
   let power: Power | undefined;
@@ -247,7 +286,7 @@ export function buildSheetPool(input: PoolInput): SheetPool | PoolIssue {
     }
   }
 
-  const hit = attributes.filter((a) => isImpaired(a, impaired));
+  const hit = attributes.filter((a) => isImpaired(a, impaired, manual));
   const impairment = hit.length * IMPAIRMENT;
   const raw = parts.reduce((n, p) => n + p.dots + (p.surge ?? 0), 0);
   return {
@@ -319,18 +358,22 @@ export interface TraitChoice {
 
 const surgeNote = (surges: Surges, key: SurgeKey) =>
   surges[key] ? ` (+${surges[key]} Blood Surge)` : '';
-const impairedNote = (a: Attribute, impaired: readonly AttributeCategory[]) =>
-  isImpaired(a, impaired) ? ` (−${IMPAIRMENT} Impaired)` : '';
+const impairedNote = (
+  a: Attribute,
+  impaired: readonly AttributeCategory[],
+  manual: readonly ImpairKey[],
+) => (isImpaired(a, impaired, manual) ? ` (−${IMPAIRMENT} Impaired)` : '');
 
 /** The nine Attributes with their dots, for the `attribute` option. */
 export function attributeChoices(
   sheet: SheetDraft,
   values: Pick<CharacterValues, 'health' | 'willpower'>,
   surges: Surges = {},
+  impairments: readonly ImpairKey[] = [],
 ): TraitChoice[] {
   const impaired = impairedCategories(values);
   return ATTRIBUTES.map((a) => ({
-    name: `${ATTRIBUTE_NAMES[a]} ${attributeDots(sheet, a)}${surgeNote(surges, `attr:${a}`)}${impairedNote(a, impaired)}`,
+    name: `${ATTRIBUTE_NAMES[a]} ${attributeDots(sheet, a)}${surgeNote(surges, `attr:${a}`)}${impairedNote(a, impaired, impairments)}`,
     value: encodeTrait({ kind: 'attr', id: a }),
   }));
 }
@@ -346,6 +389,7 @@ export function secondChoices(
   values: Pick<CharacterValues, 'health' | 'willpower'>,
   surges: Surges = {},
   attribute?: Attribute,
+  impairments: readonly ImpairKey[] = [],
 ): TraitChoice[] {
   // Discord shows only the first 25 suggestions until the player types: the traits a test
   // most often uses come first, so Disciplines are never pushed out of sight.
@@ -373,6 +417,7 @@ export function secondChoices(
       sheet,
       values,
       surges,
+      impairments,
       second: { kind: 'power', id },
       ...(attribute ? { attribute: { kind: 'attr', id: attribute } } : {}),
     });

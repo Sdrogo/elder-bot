@@ -137,6 +137,18 @@ export const it: Messages = {
   'cmd.sheet.description': 'Mostra la scheda di un personaggio con i pulsanti + e −',
   'opt.sheet.character': 'Il personaggio (predefinito: il tuo a questo tavolo)',
   'opt.sheet.public': 'Mostrala a tutto il canale, senza pulsanti',
+  'cmd.impair.description': 'Narratore: Impair gli Attributi di un personaggio per la scena',
+  'opt.impair.character': 'Il personaggio',
+  'opt.impair.target': 'Un gruppo di Attributi o un solo Attributo (o toglili tutti)',
+  'opt.impair.remove': 'Termina questo Impairment invece di aggiungerlo',
+  'impair.choice.clear': 'Termina ogni Impairment',
+  'impair.noChronicle':
+    "Questo personaggio non è in una Cronaca: solo il suo Narratore può imporgli l'Impairment.",
+  'impair.notYours': "Solo il Narratore della Cronaca può imporre l'Impairment a un personaggio.",
+  'impair.added':
+    '{name} è Impaired: {list}. −2 dadi per ogni Attributo Impaired in una prova, fino alla fine della scena.',
+  'impair.none': '{name} non è più Impaired per volere del Narratore.',
+  'impair.nothingToRemove': '{name} non ha Impairment del Narratore da terminare.',
   'opt.invite.chronicle': 'La Cronaca (predefinito: quella giocata in questo canale)',
   'cmd.invite.description': 'Invita un giocatore a portare un personaggio nella Cronaca',
   'opt.invite.player': 'Il giocatore',
