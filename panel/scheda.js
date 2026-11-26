@@ -482,6 +482,12 @@ function openSpend(d, balance, character) {
     confirm.disabled = false;
   };
 
+  // One dropdown, grouped by kind; what the XP do not cover is listed but disabled.
+  const select = el('select', 'spend-select');
+  const blank = el('option', '', tr('spend.choose'));
+  blank.value = '';
+  select.append(blank);
+  const byValue = new Map();
   for (const group of GROUPS) {
     const list = entries.filter((e) =>
       e.advance.kind === 'specialty' || e.advance.kind === 'humanity'
@@ -489,28 +495,35 @@ function openSpend(d, balance, character) {
         : groupOf(e.advance) === group,
     );
     if (!list.length) continue;
-    body.append(el('h4', '', tr(`group.${group}`)));
+    const optgroup = el('optgroup');
+    optgroup.label = tr(`group.${group}`);
     for (const entry of list) {
       const a = entry.advance;
-      const short = entry.cost > balance;
-      const line = el('label', short ? 'spend-option short' : 'spend-option');
-      const radio = el('input');
-      radio.type = 'radio';
-      radio.name = 'advance';
-      radio.disabled = short;
-      radio.addEventListener('change', () => pick(entry));
-      const name = el(
-        'span',
-        'name',
-        a.kind === 'specialty' ? tr('spend.specialty') : shortLabel(a),
-      );
+      const name = a.kind === 'specialty' ? tr('spend.specialty') : shortLabel(a);
       const step = stepText(d, a, character);
-      if (step) name.append(el('span', 'quiet', ` ${step}`));
-      if (entry.ask) name.append(el('span', 'ask', ` ${tr('spend.ask')}`));
-      line.append(radio, name, el('span', 'num', `${entry.cost} XP`));
-      body.append(line);
+      const opt = el(
+        'option',
+        '',
+        `${name}${step ? ` ${step}` : ''}${entry.ask ? ` ${tr('spend.ask')}` : ''} · ${entry.cost} XP`,
+      );
+      opt.value = String(byValue.size);
+      opt.disabled = entry.cost > balance;
+      byValue.set(opt.value, entry);
+      optgroup.append(opt);
     }
+    select.append(optgroup);
   }
+  select.addEventListener('change', () => {
+    const entry = byValue.get(select.value);
+    if (entry) pick(entry);
+    else {
+      chosen = undefined;
+      extra.replaceChildren();
+      summary.textContent = tr('spend.choose');
+      confirm.disabled = true;
+    }
+  });
+  if (entries.length) body.append(select);
   if (!entries.length) body.append(el('p', 'quiet', tr('spend.none')));
 
   confirm.addEventListener('click', () => {
