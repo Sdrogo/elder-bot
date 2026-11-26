@@ -138,13 +138,22 @@ const TEXT = {
     'chronicles.autoLanguage': 'quella di Discord di ciascuno',
     'chronicles.end': 'Chiudi sessione',
     'xp.give': 'Dai XP',
-    'xp.who': 'A chi',
-    'xp.conditions': 'Motivi (1 XP ciascuno, max 5 a sessione)',
-    'xp.other': 'Altro (downtime, Diablerie): XP',
+    'xp.session': 'XP di sessione',
+    'xp.sessionNote': 'Spunta i motivi di ciascun personaggio: 1 XP per motivo, massimo 5.',
+    'xp.character': 'Personaggio',
+    'xp.total': 'Totale',
+    'xp.sum': 'Totale da assegnare',
+    'xp.sendSession': 'Assegna XP di sessione',
+    'xp.single': 'XP a un solo personaggio',
+    'xp.singleNote':
+      'Diablerie, downtime: vanno solo al personaggio che li ha guadagnati, non a quelli spuntati sopra.',
+    'xp.amount': 'XP',
     'xp.note': 'Motivo',
-    'xp.send': 'Assegna',
+    'xp.sendOne': 'Assegna a questo personaggio',
     'xp.done': 'XP assegnati.',
-    'xp.need': 'Scegli almeno un personaggio e un motivo, oppure una quantità con il motivo.',
+    'xp.needSession': 'Spunta almeno un motivo.',
+    'xp.needOne': 'Serve un importo e il motivo.',
+    'xp.close': 'Chiudi',
     'cond.ambition': 'Ambition',
     'cond.beast': 'Facing the Beast',
     'cond.flaw': 'Flaw',
@@ -294,13 +303,22 @@ const TEXT = {
     'chronicles.autoLanguage': "each user's Discord language",
     'chronicles.end': 'End session',
     'xp.give': 'Give XP',
-    'xp.who': 'To',
-    'xp.conditions': 'Reasons (1 XP each, max 5 per session)',
-    'xp.other': 'Other (downtime, Diablerie): XP',
+    'xp.session': 'Session XP',
+    'xp.sessionNote': "Tick each character's reasons: 1 XP per reason, 5 at most.",
+    'xp.character': 'Character',
+    'xp.total': 'Total',
+    'xp.sum': 'Total to award',
+    'xp.sendSession': 'Award session XP',
+    'xp.single': 'XP for one character',
+    'xp.singleNote':
+      'Diablerie, downtime: only the character who earned it gets it, not the ones ticked above.',
+    'xp.amount': 'XP',
     'xp.note': 'Reason',
-    'xp.send': 'Award',
+    'xp.sendOne': 'Award to this character',
     'xp.done': 'XP awarded.',
-    'xp.need': 'Pick at least one character and a reason, or an amount with its reason.',
+    'xp.needSession': 'Tick at least one reason.',
+    'xp.needOne': 'An amount and its reason are needed.',
+    'xp.close': 'Close',
     'cond.ambition': 'Ambition',
     'cond.beast': 'Facing the Beast',
     'cond.flaw': 'Flaw',
@@ -829,75 +847,132 @@ function chronicleForm(ch, onDone) {
   return form;
 }
 
-/** The Storyteller's XP award: who, and either the session reasons or a free amount. */
+const XP_CONDITIONS = ['ambition', 'beast', 'flaw', 'loss', 'survival'];
+const SESSION_XP_CAP = 5;
+
+/**
+ * The Storyteller's XP award. Session XP: a grid of characters by reasons, each row its own
+ * reasons, all sent at once. Below it, a free amount (Diablerie, downtime) for one character.
+ */
 function xpForm(ch, onDone) {
-  const form = el('form', 'sheet-form');
-  const checks = (items, name) => {
-    const wrap = el('div', 'chips');
-    for (const [value, label] of items) {
-      const box = el('label', 'chip');
+  const box = el('div', 'xp-award');
+
+  // Session XP: one row per character, one column per reason.
+  box.append(el('h4', '', tr('xp.session')), el('p', 'quiet', tr('xp.sessionNote')));
+  const table = el('table', 'xp-grid');
+  const head = el('tr');
+  head.append(el('th', '', tr('xp.character')));
+  for (const k of XP_CONDITIONS) head.append(el('th', 'cond', tr(`cond.${k}`)));
+  head.append(el('th', 'num', tr('xp.total')));
+  const thead = el('thead');
+  thead.append(head);
+  const tbody = el('tbody');
+  const rows = ch.characters.map((c) => {
+    const tr2 = el('tr');
+    tr2.append(el('td', 'name', c.name));
+    const boxes = XP_CONDITIONS.map((k) => {
+      const td = el('td', 'cond');
       const input = el('input');
       input.type = 'checkbox';
-      input.name = name;
-      input.value = value;
-      input.checked = name === 'who';
-      box.append(input, document.createTextNode(` ${label}`));
-      wrap.append(box);
+      input.value = k;
+      input.setAttribute('aria-label', `${c.name}: ${tr(`cond.${k}`)}`);
+      td.append(input);
+      tr2.append(td);
+      return input;
+    });
+    const total = el('td', 'num', '0');
+    tr2.append(total);
+    tbody.append(tr2);
+    return { id: c.id, boxes, total, row: tr2 };
+  });
+  const sum = el('td', 'num', '0');
+  const foot = el('tr');
+  const label = el('td', 'quiet', tr('xp.sum'));
+  label.colSpan = XP_CONDITIONS.length + 1;
+  foot.append(label, sum);
+  const tfoot = el('tfoot');
+  tfoot.append(foot);
+  table.append(thead, tbody, tfoot);
+  const scroll = el('div', 'table-scroll');
+  scroll.append(table);
+  const picked = (r) => r.boxes.filter((b) => b.checked).map((b) => b.value);
+  const sendSession = el('button', 'primary', tr('xp.sendSession'));
+  sendSession.type = 'button';
+  const refresh = () => {
+    let all = 0;
+    for (const r of rows) {
+      const n = Math.min(SESSION_XP_CAP, picked(r).length);
+      r.total.textContent = String(n);
+      r.row.classList.toggle('picked', n > 0);
+      all += n;
     }
-    return wrap;
+    sum.textContent = String(all);
+    sendSession.disabled = all === 0;
   };
-  const other = el('input');
-  other.type = 'number';
-  other.min = '1';
-  other.max = '1000';
-  const note = el('input');
-  note.maxLength = 200;
-  form.append(
-    field(
-      tr('xp.who'),
-      checks(
-        ch.characters.map((c) => [String(c.id), c.name]),
-        'who',
-      ),
-    ),
-    field(
-      tr('xp.conditions'),
-      checks(
-        ['ambition', 'beast', 'flaw', 'loss', 'survival'].map((k) => [k, tr(`cond.${k}`)]),
-        'cond',
-      ),
-    ),
-    field(tr('xp.other'), other),
-    field(tr('xp.note'), note),
-  );
-  const submit = el('button', 'primary', tr('xp.send'));
-  submit.type = 'submit';
-  const actions = el('div', 'actions');
-  actions.append(submit, button(tr('cancel'), onDone));
-  form.append(actions);
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const picked = (name) =>
-      [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((i) => i.value);
-    const characters = picked('who').map(Number);
-    const conditions = picked('cond');
-    const amount = Number(other.value);
-    const body =
-      amount > 0 && note.value.trim()
-        ? { characters, other: amount, note: note.value.trim() }
-        : conditions.length
-          ? { characters, conditions }
-          : undefined;
-    if (!body || !characters.length) return notify(tr('xp.need'));
-    submit.disabled = true;
-    const ok = await change('POST', `/api/chronicles/${ch.id}/xp`, body);
-    submit.disabled = false;
+  tbody.addEventListener('change', refresh);
+  refresh();
+  sendSession.addEventListener('click', async () => {
+    const awards = rows
+      .map((r) => ({ character: r.id, conditions: picked(r) }))
+      .filter((a) => a.conditions.length);
+    if (!awards.length) return notify(tr('xp.needSession'));
+    sendSession.disabled = true;
+    const ok = await change('POST', `/api/chronicles/${ch.id}/xp`, { awards });
+    refresh();
     if (ok) {
       notify(tr('xp.done'));
       onDone();
     }
   });
-  return form;
+  const sessionBar = el('div', 'actions');
+  sessionBar.append(sendSession);
+  box.append(scroll, sessionBar);
+
+  // A free amount for a single character: only the one who committed the Diablerie gets it.
+  box.append(el('h4', '', tr('xp.single')), el('p', 'quiet', tr('xp.singleNote')));
+  const who = el('select');
+  for (const c of ch.characters) {
+    const opt = el('option', '', c.name);
+    opt.value = String(c.id);
+    who.append(opt);
+  }
+  const amount = el('input');
+  amount.type = 'number';
+  amount.min = '1';
+  amount.max = '1000';
+  amount.inputMode = 'numeric';
+  const note = el('input');
+  note.maxLength = 200;
+  const sendOne = el('button', '', tr('xp.sendOne'));
+  sendOne.type = 'button';
+  sendOne.addEventListener('click', async () => {
+    const other = Number(amount.value);
+    if (!(other > 0) || !note.value.trim()) return notify(tr('xp.needOne'));
+    sendOne.disabled = true;
+    const ok = await change('POST', `/api/chronicles/${ch.id}/xp`, {
+      characters: [Number(who.value)],
+      other,
+      note: note.value.trim(),
+    });
+    sendOne.disabled = false;
+    if (ok) {
+      notify(tr('xp.done'));
+      onDone();
+    }
+  });
+  const single = el('div', 'xp-single');
+  single.append(
+    field(tr('xp.character'), who),
+    field(tr('xp.amount'), amount),
+    field(tr('xp.note'), note),
+    sendOne,
+  );
+  box.append(single);
+
+  const close = el('div', 'actions');
+  close.append(button(tr('xp.close'), onDone));
+  box.append(close);
+  return box;
 }
 
 function chronicleBlock(ch) {

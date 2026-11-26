@@ -46,7 +46,7 @@ import {
   type Advance,
 } from '../game/advancement.js';
 import { advanceNote } from '../game/xp.js';
-import { awardAmount, parseAward, totals } from '../game/xp.js';
+import { awardAmount, parseAward, parseSessionAwards, totals } from '../game/xp.js';
 import { parseDraft } from '../game/draft.js';
 import type { Draft } from '../state/drafts.js';
 import { SESSION_DAYS, type WebSession } from '../state/sessions.js';
@@ -1274,10 +1274,33 @@ export function createPanelHandler(deps: PanelDeps) {
         campaign.archiveChronicle(chronicle.id);
         return ok();
       case 'xp': {
-        // POST …/xp {characters: [ids] | 'all', conditions: [...] | other + note}: the
-        // Storyteller's award. Everyone named gets the same amount ("Experience as a Group").
-        const award = parseAward(body);
+        // POST …/xp, the Storyteller's award, in one of three shapes:
+        // - {awards: [{character, conditions}]}: each character its own session reasons;
+        // - {characters: [ids] | 'all', conditions}: the same reasons for everyone named;
+        // - {characters: [id], other, note}: a free amount (Diablerie, downtime) for ONE
+        //   character, since only the one who earned it gets it.
         const members = campaign.members(chronicle.id);
+        if (body.awards !== undefined) {
+          const awards = parseSessionAwards(body.awards);
+          if (!awards || !awards.every((a) => members.some((m) => m.id === a.character))) {
+            return json(res, 400, { error: 'invalid body' });
+          }
+          campaign.addXp(
+            awards.map(
+              (a) =>
+                [
+                  a.character,
+                  awardAmount({ conditions: a.conditions }),
+                  a.conditions.join(','),
+                ] as const,
+            ),
+            userId,
+            'session',
+            '',
+          );
+          return ok();
+        }
+        const award = parseAward(body);
         const chosen =
           body.characters === 'all'
             ? members
@@ -1285,6 +1308,9 @@ export function createPanelHandler(deps: PanelDeps) {
               ? members.filter((m) => (body.characters as unknown[]).includes(m.id))
               : [];
         if (!award || !chosen.length) return json(res, 400, { error: 'invalid body' });
+        if ('other' in award && (body.characters === 'all' || chosen.length !== 1)) {
+          return json(res, 400, { error: 'one character' });
+        }
         const note = 'conditions' in award ? award.conditions.join(',') : award.note;
         campaign.addXp(
           chosen.map((m) => [m.id, awardAmount(award)] as const),

@@ -314,9 +314,12 @@ export class Campaign {
 
   // Experience points: an append-only log per character; the balance is its sum.
 
-  /** Adds entries to the XP logs in one go: one `[characterId, amount]` per character. */
+  /**
+   * Adds entries to the XP logs in one go: one `[characterId, amount]` per character, with an
+   * optional third element replacing `note` for that character.
+   */
   addXp(
-    entries: readonly (readonly [number, number])[],
+    entries: readonly (readonly [number, number, string?])[],
     actorId: string,
     kind: XpEntry['kind'],
     note: string,
@@ -327,7 +330,9 @@ export class Campaign {
        VALUES (?, ?, ?, ?, ?, ?)`,
     );
     this.db.transaction(() => {
-      for (const [id, amount] of entries) insert.run(id, actorId, amount, kind, note, now);
+      for (const [id, amount, own] of entries) {
+        insert.run(id, actorId, amount, kind, own ?? note, now);
+      }
     })();
   }
 

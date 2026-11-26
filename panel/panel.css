@@ -473,3 +473,227 @@ a.button.primary {
   gap: 4px 14px;
   font-size: 13px;
 }
+
+/* The Storyteller's XP award: characters by reasons, then one-character awards. */
+.xp-award {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.xp-award h4 {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.xp-award p {
+  margin: 0;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.xp-grid {
+  border-collapse: collapse;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.xp-grid th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--quiet);
+  text-align: left;
+}
+
+.xp-grid th,
+.xp-grid td {
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.xp-grid .cond {
+  text-align: center;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.xp-grid .num {
+  text-align: right;
+  width: 1%;
+}
+
+.xp-grid input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--blood);
+}
+
+.xp-grid tr.picked td {
+  background: var(--blood-soft);
+}
+
+.xp-grid tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+.xp-single {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 90px minmax(160px, 2fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .xp-single {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Sheet tabs: the sheet first, XP on its own tab. */
+.sheet-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin: 4px 0 14px;
+  flex-wrap: wrap;
+}
+
+.sheet-tabs .tab {
+  font: inherit;
+  color: var(--quiet);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-tabs .tab[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--blood);
+}
+
+.sheet-tabs .tab.pending::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--blood);
+  vertical-align: middle;
+}
+
+/* The XP shop dialog. */
+.spend-dialog {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 88vh;
+}
+
+.spend-dialog::backdrop {
+  background: #000a;
+}
+
+.spend-dialog form {
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
+.spend-dialog header,
+.spend-dialog footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.spend-dialog header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.spend-dialog footer {
+  border-top: 1px solid var(--line);
+}
+
+.spend-list {
+  overflow: auto;
+  padding: 0 16px 8px;
+  flex: 1;
+}
+
+.spend-list h4 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--quiet);
+}
+
+.spend-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.spend-option:has(input:checked) {
+  border-color: var(--blood);
+  background: var(--blood-soft);
+}
+
+.spend-option.short {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.spend-option .name {
+  flex: 1;
+}
+
+.spend-option .num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.spend-option .ask {
+  color: #d9a441;
+  font-size: 12px;
+}
+
+.spend-extra {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.spend-extra:not(:empty) {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.spend-note {
+  margin: 0;
+  padding: 0 16px 12px;
+}

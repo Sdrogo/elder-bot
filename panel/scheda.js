@@ -29,7 +29,7 @@ import {
 } from '/game/alpha2/core.js';
 import { DISCIPLINE_NAMES, DISCIPLINES, POWERS_BY_ID } from '/game/alpha2/disciplines.js';
 import { TIER_RULES } from '/game/alpha2/tiers.js';
-import { advanceOptions, learnablePowers } from '/game/advancement.js';
+import { XP_COSTS, advanceOptions, learnablePowers } from '/game/advancement.js';
 
 const TEXT = {
   it: {
@@ -54,6 +54,24 @@ const TEXT = {
     editSheet: 'Modifica scheda',
     xp: 'Esperienza (XP)',
     'spend.title': 'Spendi XP',
+    'spend.open': 'Spendi XP…',
+    'spend.choose': 'Scegli cosa migliorare',
+    'spend.left': (name, cost, left) => `${name}: ${cost} XP, ne restano ${left}`,
+    'spend.ask': 'richiede il Narratore',
+    'spend.close': 'Chiudi',
+    'spend.confirm': 'Compra',
+    'spend.skill': 'Skill',
+    'group.attribute': 'Attributes',
+    'group.skill': 'Skills',
+    'group.discipline': 'Disciplines',
+    'group.power': 'Poteri',
+    'group.merit': 'Merits',
+    'group.trait': 'Tratti di clan',
+    'group.other': 'Altro',
+    'tab.sheet': 'Scheda',
+    'tab.xp': (n) => `XP · ${n}`,
+    'tab.requests': (n) => (n === 1 ? '1 richiesta' : `${n} richieste`),
+    'xp.history': 'Storico',
     'spend.pick': 'Cosa vuoi migliorare',
     'spend.power': 'Potere gratuito del nuovo dot',
     'spend.button': (cost) => `Compra (${cost} XP)`,
@@ -132,6 +150,24 @@ const TEXT = {
     editSheet: 'Edit sheet',
     xp: 'Experience (XP)',
     'spend.title': 'Spend XP',
+    'spend.open': 'Spend XP…',
+    'spend.choose': 'Pick what to improve',
+    'spend.left': (name, cost, left) => `${name}: ${cost} XP, ${left} left`,
+    'spend.ask': 'needs the Storyteller',
+    'spend.close': 'Close',
+    'spend.confirm': 'Buy',
+    'spend.skill': 'Skill',
+    'group.attribute': 'Attributes',
+    'group.skill': 'Skills',
+    'group.discipline': 'Disciplines',
+    'group.power': 'Powers',
+    'group.merit': 'Merits',
+    'group.trait': 'Clan traits',
+    'group.other': 'Other',
+    'tab.sheet': 'Sheet',
+    'tab.xp': (n) => `XP · ${n}`,
+    'tab.requests': (n) => (n === 1 ? '1 request' : `${n} requests`),
+    'xp.history': 'History',
     'spend.pick': 'What to improve',
     'spend.power': 'Free power for the new dot',
     'spend.button': (cost) => `Buy (${cost} XP)`,
@@ -304,6 +340,7 @@ async function post(action, body, button) {
     body: JSON.stringify(body),
   });
   if (response.ok) {
+    document.querySelector('dialog[open]')?.close();
     draw(await response.json());
     return;
   }
@@ -325,147 +362,175 @@ async function post(action, body, button) {
 const buy = (advance, button) => post('spend', { advance }, button);
 const ask = (advance, button) => post('request', { advance }, button);
 
-/** The owner's shop: one select of what can be bought now, a free power when a dot brings one. */
-function spendSection(d, balance, character) {
-  const box = el('div');
-  const options = advanceOptions(d).filter((o) => o.reasons.length === 0 && o.cost <= balance);
-  box.append(el('p', 'quiet', tr('spend.note')));
-  const pick = el('select');
-  for (const o of options) {
-    const a = o.advance;
-    const opt = el('option', '', `${advanceLabel(a)} — ${o.cost} XP`);
-    // A Discipline dot's free power is chosen next, so its option is the Discipline itself.
-    opt.value = String(options.indexOf(o));
-    pick.append(opt);
-  }
-  // Disciplines need a free power: offer them through their own select below.
-  const disciplines = DISCIPLINES.map((disc) => ({
-    disc,
-    dots: d.disciplines[disc] ?? 0,
-  })).filter(({ disc, dots }) => {
-    const own =
-      d.clan &&
-      advanceOptions(d).find((o) => o.advance.kind === 'discipline' && o.advance.id === disc);
-    return (
-      own && own.cost <= balance && own.reasons.every((r) => r.kind === 'incomplete') && dots >= 0
-    );
-  });
-  const out = [];
-  if (options.length) {
-    const buyButton = el('button', 'primary', tr('spend.button', options[0].cost));
-    buyButton.type = 'button';
-    pick.addEventListener('change', () => {
-      buyButton.textContent = tr('spend.button', options[Number(pick.value)].cost);
-    });
-    buyButton.addEventListener('click', () => buy(options[Number(pick.value)].advance, buyButton));
-    const wrap = el('label', 'field');
-    wrap.append(el('span', '', tr('spend.pick')), pick);
-    out.push(wrap, buyButton);
-  }
-  for (const { disc, dots } of disciplines) {
-    const offer = learnablePowers(d, disc, dots + 1);
-    const cost = advanceOptions(d).find(
-      (o) => o.advance.kind === 'discipline' && o.advance.id === disc,
-    ).cost;
-    const row2 = el('div', 'trait');
-    const choose = el('select');
-    for (const power of offer) {
-      const opt = el('option', '', POWERS_BY_ID.get(power).name);
-      opt.value = power;
-      choose.append(opt);
-    }
-    const go = el('button', 'chip', tr('spend.button', cost));
-    go.type = 'button';
-    go.addEventListener('click', () =>
-      buy({ kind: 'discipline', id: disc, power: choose.value }, go),
-    );
-    row2.append(el('span', '', `${DISCIPLINE_NAMES[disc]} ${dots} → ${dots + 1}`), choose, go);
-    if (offer.length) out.push(row2);
-  }
-  // Specialties: a Skill with at least one dot and a name.
-  if (balance >= 5) {
-    const skill = el('select');
-    for (const s of SKILLS) {
-      if (skillDots(d, s) < 1) continue;
-      const opt = el('option', '', SKILL_INFO[s].name);
-      opt.value = s;
-      skill.append(opt);
-    }
-    if (skill.childElementCount) {
-      const name = el('input');
-      name.maxLength = 40;
-      name.placeholder = tr('spend.specialtyName');
-      const go = el('button', 'chip', tr('spend.button', 5));
-      go.type = 'button';
-      go.addEventListener('click', () => {
-        if (name.value.trim())
-          buy({ kind: 'specialty', skill: skill.value, name: name.value.trim() }, go);
-      });
-      const row3 = el('div', 'trait');
-      row3.append(el('span', '', tr('spend.specialty')), skill, name, go);
-      out.push(row3);
-    }
-  }
-  // What needs the Storyteller: Humanity, and Disciplines or traits outside the clan.
-  const askable = advanceOptions(d).filter(
+/** The current and next value of what a purchase raises, e.g. "3 → 4"; empty when none. */
+function stepText(d, a, character) {
+  const now =
+    a.kind === 'attribute'
+      ? Math.max(1, d.attributes[a.id] ?? 0)
+      : a.kind === 'skill'
+        ? skillDots(d, a.id)
+        : a.kind === 'discipline'
+          ? (d.disciplines[a.id] ?? 0)
+          : a.kind === 'humanity'
+            ? character.humanity.rank
+            : undefined;
+  return now === undefined ? '' : `${now} → ${now + 1}`;
+}
+
+const GROUPS = ['attribute', 'skill', 'discipline', 'power', 'merit', 'trait', 'other'];
+const groupOf = (a) => (GROUPS.includes(a.kind) ? a.kind : 'other');
+/** A name without the kind in front, since the dialog groups by kind. */
+function shortLabel(a) {
+  if (a.kind === 'attribute') return ATTRIBUTE_NAMES[a.id];
+  if (a.kind === 'skill') return SKILL_INFO[a.id].name;
+  if (a.kind === 'discipline') return DISCIPLINE_NAMES[a.id];
+  if (a.kind === 'humanity') return 'Humanity';
+  return advanceLabel(a)
+    .replace(tr(`kind.${a.kind}`), '')
+    .trim();
+}
+
+/**
+ * The owner's shop, in a dialog: every trait that can be raised, grouped by kind, with its cost.
+ * The ones the XP do not cover are greyed out; the ones that need the Storyteller are marked
+ * and are asked for instead of bought. A Discipline dot picks its free power here too.
+ */
+function openSpend(d, balance, character) {
+  const dialog = el('dialog', 'spend-dialog');
+  const form = el('form');
+  form.method = 'dialog';
+  const head = el('header');
+  head.append(el('h3', '', `${tr('spend.title')} · ${tr('xp.balance')} ${balance}`));
+  const close = el('button', '', tr('spend.close'));
+  close.type = 'button';
+  close.addEventListener('click', () => dialog.close());
+  head.append(close);
+  const body = el('div', 'spend-list');
+  const options = advanceOptions(d).filter(
     (o) =>
-      o.cost <= balance &&
-      o.reasons.some((r) => r.kind === 'storyteller') &&
       o.reasons.every((r) => r.kind === 'storyteller' || r.kind === 'incomplete') &&
       !(
         o.advance.kind === 'humanity' &&
         (character.humanity.violations > 0 || character.humanity.rank >= 10)
       ),
   );
-  const plain = askable.filter((o) => o.reasons.length === 1);
-  if (plain.length) {
-    const sel = el('select');
-    plain.forEach((o, i) => {
-      const opt = el('option', '', `${advanceLabel(o.advance)} — ${o.cost} XP`);
-      opt.value = String(i);
-      sel.append(opt);
+  // A new Specialty: on any Skill with a dot, its name typed in the dialog.
+  const specialtySkills = SKILLS.filter((x) => skillDots(d, x) >= 1);
+  const entries = options.map((o) => ({
+    ...o,
+    ask: o.reasons.some((r) => r.kind === 'storyteller'),
+  }));
+  if (specialtySkills.length) {
+    entries.push({
+      advance: { kind: 'specialty' },
+      cost: XP_COSTS.specialty,
+      ask: false,
+      reasons: [],
     });
-    const go = el('button', 'chip', tr('request.button'));
-    go.type = 'button';
-    go.addEventListener('click', () => ask(plain[Number(sel.value)].advance, go));
-    const wrap = el('label', 'field');
-    wrap.append(el('span', '', tr('request.pick')), sel);
-    out.push(wrap, go);
   }
-  for (const o of askable.filter((x) => x.reasons.length > 1)) {
-    const disc = o.advance.id;
-    const dots = d.disciplines[disc] ?? 0;
-    const offer = learnablePowers(d, disc, dots + 1);
-    if (!offer.length) continue;
-    const row4 = el('div', 'trait');
-    const choose = el('select');
-    for (const power of offer) {
-      const opt = el('option', '', POWERS_BY_ID.get(power).name);
-      opt.value = power;
-      choose.append(opt);
+  const extra = el('div', 'spend-extra');
+  const summary = el('span', 'quiet', tr('spend.choose'));
+  const confirm = el('button', 'primary', tr('spend.confirm'));
+  confirm.type = 'button';
+  confirm.disabled = true;
+  let chosen;
+  let readAdvance = () => undefined;
+
+  const pick = (entry) => {
+    chosen = entry;
+    extra.replaceChildren();
+    const a = entry.advance;
+    readAdvance = () => a;
+    if (a.kind === 'discipline') {
+      const offer = learnablePowers(d, a.id, (d.disciplines[a.id] ?? 0) + 1);
+      if (offer.length) {
+        const choose = el('select');
+        for (const power of offer) {
+          const opt = el('option', '', POWERS_BY_ID.get(power).name);
+          opt.value = power;
+          choose.append(opt);
+        }
+        const wrap = el('label', 'field');
+        wrap.append(el('span', '', tr('spend.power')), choose);
+        extra.append(wrap);
+        readAdvance = () => ({ kind: 'discipline', id: a.id, power: choose.value });
+      }
     }
-    const go = el('button', 'chip', tr('request.button'));
-    go.type = 'button';
-    go.addEventListener('click', () =>
-      ask({ kind: 'discipline', id: disc, power: choose.value }, go),
+    if (a.kind === 'specialty') {
+      const skill = el('select');
+      for (const x of specialtySkills) {
+        const opt = el('option', '', SKILL_INFO[x].name);
+        opt.value = x;
+        skill.append(opt);
+      }
+      const name = el('input');
+      name.maxLength = 40;
+      name.placeholder = tr('spend.specialtyName');
+      const a1 = el('label', 'field');
+      a1.append(el('span', '', tr('spend.skill')), skill);
+      const a2 = el('label', 'field');
+      a2.append(el('span', '', tr('spend.specialtyName')), name);
+      extra.append(a1, a2);
+      readAdvance = () =>
+        name.value.trim()
+          ? { kind: 'specialty', skill: skill.value, name: name.value.trim() }
+          : undefined;
+    }
+    const label = a.kind === 'specialty' ? tr('spend.specialty') : shortLabel(a);
+    summary.textContent = tr('spend.left', label, entry.cost, balance - entry.cost);
+    confirm.textContent = entry.ask ? tr('request.button') : tr('spend.confirm');
+    confirm.disabled = false;
+  };
+
+  for (const group of GROUPS) {
+    const list = entries.filter((e) =>
+      e.advance.kind === 'specialty' || e.advance.kind === 'humanity'
+        ? group === 'other'
+        : groupOf(e.advance) === group,
     );
-    row4.append(
-      el('span', '', `${DISCIPLINE_NAMES[disc]} ${dots} → ${dots + 1} (${o.cost} XP)`),
-      choose,
-      go,
-    );
-    out.push(row4);
+    if (!list.length) continue;
+    body.append(el('h4', '', tr(`group.${group}`)));
+    for (const entry of list) {
+      const a = entry.advance;
+      const short = entry.cost > balance;
+      const line = el('label', short ? 'spend-option short' : 'spend-option');
+      const radio = el('input');
+      radio.type = 'radio';
+      radio.name = 'advance';
+      radio.disabled = short;
+      radio.addEventListener('change', () => pick(entry));
+      const name = el(
+        'span',
+        'name',
+        a.kind === 'specialty' ? tr('spend.specialty') : shortLabel(a),
+      );
+      const step = stepText(d, a, character);
+      if (step) name.append(el('span', 'quiet', ` ${step}`));
+      if (entry.ask) name.append(el('span', 'ask', ` ${tr('spend.ask')}`));
+      line.append(radio, name, el('span', 'num', `${entry.cost} XP`));
+      body.append(line);
+    }
   }
-  if (!out.length) box.append(el('p', 'quiet', tr('spend.none')));
-  box.append(...out);
-  return box;
+  if (!entries.length) body.append(el('p', 'quiet', tr('spend.none')));
+
+  confirm.addEventListener('click', () => {
+    const advance = readAdvance();
+    if (!chosen || !advance) return;
+    (chosen.ask ? ask : buy)(advance, confirm);
+  });
+  const foot = el('footer');
+  foot.append(summary, confirm);
+  form.append(head, body, extra, foot);
+  dialog.append(form, el('p', 'quiet spend-note', tr('spend.note')));
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 /** XP balance and the log of awards and spending, newest first. */
 function xpSection(xp, character, canApprove) {
   const list = el('div');
   const undone = new Set(xp.log.filter((e) => e.ref !== undefined).map((e) => e.ref));
-  list.append(row(tr('xp.balance'), String(xp.balance)), row(tr('xp.earned'), String(xp.earned)));
   if (!xp.log.length) list.append(el('p', 'quiet', tr('xp.empty')));
   for (const r of xp.requests ?? []) {
     const line = row(`${tr('request.title')}: ${advanceLabel(r.advance)}`, `${r.cost}`);
@@ -510,8 +575,26 @@ function xpSection(xp, character, canApprove) {
     }
     list.append(line);
   }
-  return section(tr('xp'), list);
+  return section(tr('xp.history'), list);
 }
+
+/** The XP tab: what is left and earned, the shop's button, then requests and the log. */
+function xpTab(d, xp, character, canApprove) {
+  const top = el('div');
+  top.append(row(tr('xp.balance'), String(xp.balance)), row(tr('xp.earned'), String(xp.earned)));
+  if (character.owned) {
+    const open = el('button', 'primary', tr('spend.open'));
+    open.type = 'button';
+    open.addEventListener('click', () => openSpend(d, xp.balance, character));
+    const bar = el('div', 'actions');
+    bar.append(open);
+    top.append(bar, el('p', 'quiet', tr('spend.note')));
+  }
+  return [section(tr('xp'), top), xpSection(xp, character, canApprove)];
+}
+
+/** Which tab the sheet shows; kept across redraws, so a purchase stays on the XP tab. */
+let tab = 'sheet';
 
 async function answer(index, approved) {
   const response = await fetch(`/api/characters/${id}/approval`, {
@@ -547,6 +630,8 @@ function draw({ character, sheet, canApprove, xp }) {
   head.append(editButton);
   out.push(head);
 
+  const sheetPane = el('div');
+  const xpPane = el('div');
   if (sheet.approvals.length) {
     const list = el('div');
     sheet.approvals.forEach((a, index) => {
@@ -575,12 +660,38 @@ function draw({ character, sheet, canApprove, xp }) {
     if (!character.chronicle && sheet.approvals.some((a) => a.status === 'pending')) {
       list.append(el('p', 'quiet', tr('noChronicle')));
     }
-    out.push(section(tr('approvals'), list));
+    sheetPane.append(section(tr('approvals'), list));
   }
 
-  if (xp) out.push(xpSection(xp, character, canApprove));
-  if (xp && character.owned)
-    out.push(section(tr('spend.title'), spendSection(d, xp.balance, character)));
+  // The sheet comes first; XP (balance, shop, requests, log) live on their own tab.
+  if (xp) {
+    const tabs = el('div', 'sheet-tabs');
+    tabs.setAttribute('role', 'tablist');
+    const pending = (xp.requests ?? []).length;
+    const xpLabel = pending
+      ? `${tr('tab.xp', xp.balance)} · ${tr('tab.requests', pending)}`
+      : tr('tab.xp', xp.balance);
+    const buttons = [
+      ['sheet', tr('tab.sheet')],
+      ['xp', xpLabel],
+    ].map(([key, label]) => {
+      const b = el('button', pending && key === 'xp' ? 'tab pending' : 'tab', label);
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.addEventListener('click', () => show(key));
+      tabs.append(b);
+      return [key, b];
+    });
+    const show = (key) => {
+      tab = key;
+      for (const [k, b] of buttons) b.setAttribute('aria-selected', String(k === key));
+      sheetPane.hidden = key !== 'sheet';
+      xpPane.hidden = key !== 'xp';
+    };
+    out.push(tabs);
+    xpPane.append(...xpTab(d, xp, character, canApprove));
+    show(tab);
+  }
 
   const grid = el('div', 'sheet-grid');
   const attrs = el('div', 'attr-grid');
@@ -710,7 +821,9 @@ function draw({ character, sheet, canApprove, xp }) {
   );
   grid.append(section(tr('trackers'), trackers));
 
-  out.push(grid);
+  sheetPane.append(grid);
+  out.push(sheetPane, xpPane);
+  if (!xp) xpPane.hidden = true;
   document.getElementById('sheet').replaceChildren(...out);
   document.title = `ElderBot · ${character.name}`;
 }
