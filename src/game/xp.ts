@@ -41,6 +41,28 @@ export interface XpRequest {
 /** The award a Storyteller asked for: 1 XP per condition, or a free amount (outside the cap). */
 export type AwardRequest = { conditions: AwardCondition[] } | { other: number; note: string };
 
+/**
+ * Per-character session reasons: `[{character, conditions}]`, each character at most once and
+ * with at least one reason. Undefined when the list is not valid.
+ */
+export function parseSessionAwards(
+  v: unknown,
+): { character: number; conditions: AwardCondition[] }[] | undefined {
+  if (!Array.isArray(v) || !v.length || v.length > 100) return undefined;
+  const out: { character: number; conditions: AwardCondition[] }[] = [];
+  for (const item of v as unknown[]) {
+    if (typeof item !== 'object' || item === null) return undefined;
+    const { character, conditions } = item as Record<string, unknown>;
+    if (!Number.isInteger(character) || out.some((o) => o.character === character)) {
+      return undefined;
+    }
+    const award = parseAward({ conditions });
+    if (!award || !('conditions' in award)) return undefined;
+    out.push({ character: character as number, conditions: award.conditions });
+  }
+  return out;
+}
+
 /** Checks a request body; undefined when it is not a valid award. */
 export function parseAward(v: Record<string, unknown>): AwardRequest | undefined {
   if (v.conditions !== undefined) {

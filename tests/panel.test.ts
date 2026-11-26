@@ -1086,18 +1086,56 @@ describe('character creation wizard', () => {
       (await send('POST', path, { characters: [a.id], conditions: ['loss', 'flaw', 'loss'] }))
         .status,
     ).toBe(200);
+    // A free amount (Diablerie, downtime) goes to one character only.
     expect(
-      (await send('POST', path, { characters: 'all', other: 10, note: 'Downtime' })).status,
+      (await send('POST', path, { characters: 'all', other: 10, note: 'Diablerie' })).status,
+    ).toBe(400);
+    expect(
+      (await send('POST', path, { characters: [a.id, b.id], other: 10, note: 'Diablerie' })).status,
+    ).toBe(400);
+    expect(
+      (await send('POST', path, { characters: [a.id], other: 10, note: 'Diablerie' })).status,
+    ).toBe(200);
+    // Each character its own session reasons, in one award.
+    expect((await send('POST', path, { awards: [] })).status).toBe(400);
+    expect(
+      (await send('POST', path, { awards: [{ character: 999, conditions: ['loss'] }] })).status,
+    ).toBe(400);
+    expect(
+      (
+        await send('POST', path, {
+          awards: [
+            { character: a.id, conditions: ['loss'] },
+            { character: a.id, conditions: ['flaw'] },
+          ],
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await send('POST', path, {
+          awards: [
+            { character: a.id, conditions: ['ambition'] },
+            { character: b.id, conditions: ['beast', 'survival', 'loss'] },
+          ],
+        })
+      ).status,
     ).toBe(200);
     const sheet = (await (await send('GET', `/api/characters/${a.id}/sheet`)).json()) as {
-      xp: { earned: number; balance: number; log: { amount: number; kind: string }[] };
+      xp: {
+        earned: number;
+        balance: number;
+        log: { amount: number; kind: string; note: string }[];
+      };
     };
-    expect(sheet.xp).toMatchObject({ earned: 12, balance: 12 });
-    expect(sheet.xp.log.map((e) => e.kind)).toEqual(['session', 'other']);
+    expect(sheet.xp).toMatchObject({ earned: 13, balance: 13 });
+    expect(sheet.xp.log.map((e) => e.kind)).toEqual(['session', 'other', 'session']);
+    expect(sheet.xp.log[2]!.note).toBe('ambition');
     const other = (await (await send('GET', `/api/characters/${b.id}/sheet`)).json()) as {
-      xp: { balance: number };
+      xp: { balance: number; log: { note: string }[] };
     };
-    expect(other.xp.balance).toBe(10);
+    expect(other.xp.balance).toBe(3);
+    expect(other.xp.log.map((e) => e.note)).toEqual(['beast,survival,loss']);
   });
 
   it('lets the owner spend XP on the sheet, once the Storyteller has awarded some', async () => {
